@@ -115,7 +115,7 @@ func (s *Service) makeReverseProxy(development string) errors.E {
 		Director:      director,
 		Transport:     cleanhttp.DefaultPooledTransport(),
 		FlushInterval: -1,
-		ErrorLog:      log.New(s.Log, "", 0),
+		ErrorLog:      log.New(s.Logger, "", 0),
 	}
 	return nil
 }
@@ -161,17 +161,17 @@ func (s *Service) serveStaticFiles(router *Router) errors.E {
 }
 
 func (s *Service) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	log := hlog.FromRequest(req)
-	log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err).Fields(errors.AllDetails(err))
 	})
 	if errors.Is(err, context.Canceled) {
-		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str("context", "canceled")
 		})
 		return
 	} else if errors.Is(err, context.DeadlineExceeded) {
-		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str("context", "deadline exceeded")
 		})
 		return
@@ -181,7 +181,7 @@ func (s *Service) internalServerErrorWithError(w http.ResponseWriter, req *http.
 }
 
 func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
-	log := hlog.FromRequest(req)
+	logger := hlog.FromRequest(req)
 	var e error
 	switch ee := err.(type) {
 	case error:
@@ -189,7 +189,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err inte
 	case string:
 		e = errors.New(ee)
 	}
-	log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		if e != nil {
 			return c.Err(e).Fields(errors.AllDetails(e))
 		}
@@ -200,8 +200,8 @@ func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err inte
 }
 
 func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	log := hlog.FromRequest(req)
-	log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err).Fields(errors.AllDetails(err))
 	})
 
@@ -209,8 +209,8 @@ func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, 
 }
 
 func (s *Service) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	log := hlog.FromRequest(req)
-	log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err).Fields(errors.AllDetails(err))
 	})
 
@@ -325,9 +325,9 @@ func (s *Service) writeJSON(w http.ResponseWriter, req *http.Request, contentEnc
 
 	etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
 
-	log := hlog.FromRequest(req)
+	logger := hlog.FromRequest(req)
 	if len(metadata) > 0 {
-		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return logValues(c, "metadata", metadata)
 		})
 	}

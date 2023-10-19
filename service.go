@@ -53,7 +53,7 @@ type Site struct {
 }
 
 type Service struct {
-	Log            zerolog.Logger
+	Logger         zerolog.Logger
 	Sites          map[string]Site
 	Version        string
 	BuildTimestamp string
@@ -67,9 +67,9 @@ type Service struct {
 	reverseProxy *httputil.ReverseProxy
 }
 
-func NewService(log zerolog.Logger, version, buildTimestamp, revision string, sites map[string]Site) (*Service, errors.E) {
+func NewService(logger zerolog.Logger, version, buildTimestamp, revision string, sites map[string]Site) (*Service, errors.E) {
 	s := &Service{
-		Log:            log,
+		Logger:         logger,
 		Sites:          sites,
 		Version:        version,
 		BuildTimestamp: buildTimestamp,
@@ -84,8 +84,8 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			id, ok := req.Context().Value(connectionIDContextKey).(string)
 			if ok {
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, id)
 				})
 			}
@@ -98,8 +98,8 @@ func protocolHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			proto := strings.TrimPrefix(req.Proto, "HTTP/")
-			log := zerolog.Ctx(req.Context())
-			log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			logger := zerolog.Ctx(req.Context())
+			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 				return c.Str(fieldKey, proto)
 			})
 			next.ServeHTTP(w, req)
@@ -113,8 +113,8 @@ func remoteAddrHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ip := getHost(req.RemoteAddr)
 			if ip != "" {
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, ip)
 				})
 			}
@@ -128,8 +128,8 @@ func hostHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			host := getHost(req.Host)
 			if host != "" {
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, host)
 				})
 			}
@@ -150,8 +150,8 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 				req = req.WithContext(ctx)
 			}
 			if fieldKey != "" {
-				log := zerolog.Ctx(ctx)
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(ctx)
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, id.String())
 				})
 			}
@@ -168,8 +168,8 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 func urlHandler(pathKey, queryKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			log := zerolog.Ctx(req.Context())
-			log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			logger := zerolog.Ctx(req.Context())
+			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 				c = c.Str(pathKey, req.URL.Path)
 				if len(req.Form) > 0 {
 					c = logValues(c, "query", req.Form)
@@ -188,8 +188,8 @@ func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 			etag := w.Header().Get("Etag")
 			if etag != "" {
 				etag = strings.ReplaceAll(etag, `"`, "")
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, etag)
 				})
 			}
@@ -203,8 +203,8 @@ func contentEncodingHandler(fieldKey string) func(next http.Handler) http.Handle
 			next.ServeHTTP(w, req)
 			contentEncoding := w.Header().Get("Content-Encoding")
 			if contentEncoding != "" {
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, contentEncoding)
 				})
 			}
@@ -218,8 +218,8 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 
 	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		log := zerolog.Ctx(req.Context())
-		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		logger := zerolog.Ctx(req.Context())
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str(zerolog.MessageFieldName, name)
 		})
 		h(w, req, params)
@@ -312,8 +312,8 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 				},
 			}), req)
 			if websocket {
-				log := zerolog.Ctx(req.Context())
-				log.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				logger := zerolog.Ctx(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					data := zerolog.Dict()
 					data.Int64("fromClient", read)
 					data.Int64("toClient", written)
@@ -353,7 +353,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 				errors.Details(errE)["path"] = route.Path
 				return errE
 			}
-			s.Log.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: handler found")
+			s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: handler found")
 			// We cannot use Handler here because it is a named type.
 			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 			if !ok {
@@ -382,10 +382,10 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 				handlerName := fmt.Sprintf("%sAPI%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
 				m := v.MethodByName(handlerName)
 				if !m.IsValid() {
-					s.Log.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
+					s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
 					continue
 				}
-				s.Log.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
+				s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
 				foundAnyAPIHandler = true
 				// We cannot use Handler here because it is a named type.
 				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
@@ -478,7 +478,7 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 
 	c := alice.New()
 
-	c = c.Append(hlog.NewHandler(s.Log))
+	c = c.Append(hlog.NewHandler(s.Logger))
 	// It has to be before accessHandler so that it can access the timing context.
 	c = c.Append(func(next http.Handler) http.Handler {
 		return servertiming.Middleware(next, nil)
