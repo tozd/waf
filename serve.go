@@ -60,11 +60,6 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 }
 
 func (s *Server) Run(logger zerolog.Logger, sites map[string]Site) errors.E { //nolint:maintidx
-	development := s.ProxyTo
-	if !s.Development {
-		development = ""
-	}
-
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
@@ -220,6 +215,10 @@ func (s *Server) Run(logger zerolog.Logger, sites map[string]Site) errors.E { //
 		letsEncryptGetCertificate = manager.GetCertificate
 	}
 
+	development := s.ProxyTo
+	if !s.Development {
+		development = ""
+	}
 	service, err := NewService(logger, cli.Version, cli.BuildTimestamp, cli.Revision, sites, development)
 	if err != nil {
 		return err
