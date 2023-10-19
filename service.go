@@ -69,18 +69,6 @@ type Service struct {
 	reverseProxy *httputil.ReverseProxy
 }
 
-func NewService(logger zerolog.Logger, version, buildTimestamp, revision string, sites map[string]Site) (*Service, errors.E) {
-	s := &Service{
-		Logger:         logger,
-		Sites:          sites,
-		Version:        version,
-		BuildTimestamp: buildTimestamp,
-		Revision:       revision,
-	}
-
-	return s, nil
-}
-
 func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -502,6 +490,12 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		l := zerolog.Ctx(req.Context()).WithLevel(level)
 		if s.Version != "" {
 			l = l.Str("version", s.Version)
+		}
+		if s.BuildTimestamp != "" {
+			l = l.Str("buildTimestamp", s.BuildTimestamp)
+		}
+		if s.Revision != "" {
+			l = l.Str("revision", s.Revision)
 		}
 		if code != 0 {
 			l = l.Int("code", code)
