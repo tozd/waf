@@ -47,7 +47,9 @@ type Site struct {
 	Title    string `json:"title"          yaml:"title"`
 	CertFile string `json:"cert,omitempty" yaml:"cert,omitempty"`
 	KeyFile  string `json:"key,omitempty"  yaml:"key,omitempty"`
+
 	// Maps between content types, paths, and content/etags.
+	// They are per site because they can include rendered per-site content.
 	compressedFiles      map[string]map[string][]byte
 	compressedFilesEtags map[string]map[string]string
 }
