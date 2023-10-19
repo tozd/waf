@@ -60,12 +60,12 @@ type Service struct {
 	Version        string
 	BuildTimestamp string
 	Revision       string
-	Router         *Router
 
 	// It should be kept all lower case so that it is easier to
 	// compare against in the case insensitive manner.
 	MetadataHeaderPrefix string
 
+	router       *Router
 	reverseProxy *httputil.ReverseProxy
 }
 
@@ -417,10 +417,10 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 }
 
 func (s *Service) RouteWith(router *Router, development string) (http.Handler, errors.E) {
-	if s.Router != nil {
+	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
-	s.Router = router
+	s.router = router
 
 	errE := s.configureRoutes(router)
 	if errE != nil {

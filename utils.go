@@ -95,7 +95,7 @@ func (s *Service) InternalServerError(w http.ResponseWriter, req *http.Request, 
 }
 
 func (s *Service) error(w http.ResponseWriter, req *http.Request, code int) {
-	s.Router.Error(w, req, code)
+	s.router.Error(w, req, code)
 }
 
 func (s *Service) makeReverseProxy(development string) errors.E {
