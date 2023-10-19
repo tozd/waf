@@ -59,7 +59,7 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 			}
 
 			if site.CertFile != "" && site.KeyFile != "" {
-				manager := CertificateManager{
+				manager := certificateManager{
 					CertFile: site.CertFile,
 					KeyFile:  site.KeyFile,
 					Logger:   logger,
@@ -75,7 +75,7 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 			} else if c.TLS.Email != "" && c.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
 			} else if c.TLS.CertFile != "" && c.TLS.KeyFile != "" {
-				manager := CertificateManager{
+				manager := certificateManager{
 					CertFile: c.TLS.CertFile,
 					KeyFile:  c.TLS.KeyFile,
 					Logger:   logger,
@@ -126,7 +126,7 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 		if c.TLS.Domain != "" && c.TLS.Email != "" && c.TLS.Cache != "" {
 			letsEncryptDomainsList = append(letsEncryptDomainsList, c.TLS.Domain)
 		} else if c.TLS.CertFile != "" && c.TLS.KeyFile != "" {
-			manager := CertificateManager{
+			manager := certificateManager{
 				CertFile: c.TLS.CertFile,
 				KeyFile:  c.TLS.KeyFile,
 				Logger:   logger,

@@ -13,7 +13,7 @@ const (
 	certificateReloadInterval = 24 * time.Hour
 )
 
-type CertificateManager struct {
+type certificateManager struct {
 	CertFile    string
 	KeyFile     string
 	Logger      zerolog.Logger
@@ -23,7 +23,7 @@ type CertificateManager struct {
 	done        chan bool
 }
 
-func (c *CertificateManager) Start() errors.E {
+func (c *certificateManager) Start() errors.E {
 	err := c.reloadCertificate()
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (c *CertificateManager) Start() errors.E {
 	return nil
 }
 
-func (c *CertificateManager) reloadCertificate() errors.E {
+func (c *certificateManager) reloadCertificate() errors.E {
 	certificate, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
 	if err != nil {
 		return errors.WithStack(err)
@@ -57,12 +57,12 @@ func (c *CertificateManager) reloadCertificate() errors.E {
 	return nil
 }
 
-func (c *CertificateManager) Stop() {
+func (c *certificateManager) Stop() {
 	c.ticker.Stop()
 	c.done <- true
 }
 
-func (c *CertificateManager) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (c *certificateManager) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.certificate, nil
