@@ -43,8 +43,10 @@ type routes struct {
 }
 
 type Site struct {
-	Domain string `json:"domain,omitempty"`
-	Title  string `json:"title"`
+	Domain   string `json:"domain"         yaml:"domain"`
+	Title    string `json:"title"          yaml:"title"`
+	CertFile string `json:"cert,omitempty" yaml:"cert,omitempty"`
+	KeyFile  string `json:"key,omitempty"  yaml:"key,omitempty"`
 	// Maps between content types, paths, and content/etags.
 	compressedFiles      map[string]map[string][]byte
 	compressedFilesEtags map[string]map[string]string
@@ -663,8 +665,6 @@ func (s *Service) getSiteContext(site Site) siteContext {
 
 func (s *Service) getSite(req *http.Request) (Site, errors.E) {
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
-		return site, nil
-	} else if site, ok := s.Sites[""]; len(s.Sites) == 1 && ok {
 		return site, nil
 	}
 	return Site{}, errors.Errorf(`site not found for host "%s"`, req.Host)

@@ -2,6 +2,7 @@ package waf
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"log"
 	"net/http"
 	"time"
@@ -18,44 +19,65 @@ const (
 	listenAddr = ":8080"
 )
 
-type site struct {
-	Domain    string `json:"domain" yaml:"domain"`
-	Title     string `json:"title" yaml:"title"`
-	CertFile  string `json:"cert,omitempty" yaml:"cert,omitempty"`
-	KeyFile   string `json:"key,omitempty" yaml:"key,omitempty"`
-	SizeField bool   `json:"sizeField,omitempty" yaml:"sizeField,omitempty"`
-}
-
-type Config struct {
-	Development bool   `short:"d" help:"Run in development mode and proxy unknown requests." yaml:"development"`
-	ProxyTo     string `short:"P" placeholder:"URL" default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." yaml:"proxyTo"`
+//nolint:lll
+type Server struct {
+	Development bool   `help:"Run in development mode and proxy unknown requests." short:"d"                                                                    yaml:"development"`
+	ProxyTo     string `default:"${defaultProxyTo}"                                help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL"  short:"P" yaml:"proxyTo"`
 	TLS         struct {
-		CertFile string `short:"k" group:"File certificate:" name:"cert" placeholder:"PATH" type:"existingfile" help:"Default  certificate for TLS, when not using Let's Encrypt." yaml:"cert"`
-		KeyFile  string `short:"K" group:"File certificate:" name:"key" placeholder:"PATH" type:"existingfile" help:"Default certificate's private key, when not using Let's Encrypt." yaml:"key"`
-		Domain   string `short:"D" group:"Let's Encrypt:" placeholder:"STRING" help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." yaml:"domain"`
-		Email    string `short:"E" group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." yaml:"email"`
-		Cache    string `short:"C" group:"Let's Encrypt:" type:"path" placeholder:"PATH" default:"${defaultTLSCache}" help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." yaml:"cache"`
+		CertFile string `group:"File certificate:"    help:"Default  certificate for TLS, when not using Let's Encrypt."                           name:"cert"                                                          placeholder:"PATH" short:"k"     type:"existingfile" yaml:"cert"`
+		KeyFile  string `group:"File certificate:"    help:"Default certificate's private key, when not using Let's Encrypt."                      name:"key"                                                           placeholder:"PATH" short:"K"     type:"existingfile" yaml:"key"`
+		Domain   string `group:"Let's Encrypt:"       help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING"                                                 short:"D"          yaml:"domain"`
+		Email    string `group:"Let's Encrypt:"       help:"Contact e-mail to use with Let's Encrypt."                                             short:"E"                                                            yaml:"email"`
+		Cache    string `default:"${defaultTLSCache}" group:"Let's Encrypt:"                                                                       help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." placeholder:"PATH" short:"C"     type:"path"         yaml:"cache"`
 	} `embed:"" prefix:"tls." yaml:"tls"`
-	Title string `short:"T" group:"Sites:" placeholder:"NAME" default:"${defaultTitle}" help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." yaml:"title"`
+	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." placeholder:"NAME" short:"T" yaml:"title"`
 }
 
-func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
-	development := c.ProxyTo
-	if !c.Development {
+func validForDomain(manager *certificateManager, domain string) (bool, errors.E) {
+	certificate, err := manager.GetCertificate(nil)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	// certificate.Leaf is nil, so we have to parse leaf ourselves.
+	// See: https://github.com/golang/go/issues/35504
+	leaf, err := x509.ParseCertificate(certificate.Certificate[0])
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	found := false
+	if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
+		found = leaf.Subject.CommonName == domain
+	}
+	for _, san := range leaf.DNSNames {
+		if san == domain {
+			found = true
+			break
+		}
+	}
+
+	return found, nil
+}
+
+func (s *Server) Run(logger zerolog.Logger, sites map[string]Site) errors.E { //nolint:maintidx
+	development := s.ProxyTo
+	if !s.Development {
 		development = ""
 	}
 
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
-	sitesMap := map[string]Site{}
 
-	if len(sites) > 0 {
+	if len(sites) > 0 { //nolint:nestif
 		fileGetCertificateFunctions := map[string]func(*tls.ClientHelloInfo) (*tls.Certificate, error){}
 
-		for i, site := range sites {
+		for domain, site := range sites {
 			if site.Domain == "" {
-				return errors.Errorf(`domain is required for site at index %d`, i)
+				return errors.Errorf(`site's domain is required`)
+			}
+			if domain != site.Domain {
+				return errors.Errorf(`domain "%s" does not match site's domain "%s"`, domain, site.Domain)
 			}
 
 			if site.CertFile != "" && site.KeyFile != "" {
@@ -72,12 +94,20 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 				defer manager.Stop()
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
-			} else if c.TLS.Email != "" && c.TLS.Cache != "" {
+
+				ok, err := validForDomain(&manager, site.Domain)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+				}
+			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
-			} else if c.TLS.CertFile != "" && c.TLS.KeyFile != "" {
+			} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 				manager := certificateManager{
-					CertFile: c.TLS.CertFile,
-					KeyFile:  c.TLS.KeyFile,
+					CertFile: s.TLS.CertFile,
+					KeyFile:  s.TLS.KeyFile,
 					Logger:   logger,
 				}
 
@@ -88,16 +118,16 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 				defer manager.Stop()
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
+
+				ok, err := validForDomain(&manager, site.Domain)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+				}
 			} else {
 				return errors.Errorf(`missing file or Let's Encrypt's certificate configuration for site "%s"`, site.Domain)
-			}
-
-			if _, ok := sitesMap[site.Domain]; ok {
-				return errors.Errorf(`duplicate site for domain "%s"`, site.Domain)
-			}
-			sitesMap[site.Domain] = Site{
-				Domain: site.Domain,
-				Title:  site.Title,
 			}
 		}
 
@@ -122,51 +152,81 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 				return nil, nil //nolint:nilnil
 			}
 		}
+	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
+		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
+
+		sites = map[string]Site{
+			s.TLS.Domain: {
+				Domain: s.TLS.Domain,
+				Title:  s.Title,
+			},
+		}
+	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
+		manager := certificateManager{
+			CertFile: s.TLS.CertFile,
+			KeyFile:  s.TLS.KeyFile,
+			Logger:   logger,
+		}
+
+		errE := manager.Start()
+		if errE != nil {
+			return errE
+		}
+		defer manager.Stop()
+
+		fileGetCertificate = manager.GetCertificate
+
+		// We have to determine domain names this certificate is valid for.
+		certificate, err := manager.GetCertificate(nil)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		// certificate.Leaf is nil, so we have to parse leaf ourselves.
+		// See: https://github.com/golang/go/issues/35504
+		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		sites = map[string]Site{}
+		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
+			sites[leaf.Subject.CommonName] = Site{
+				Domain: leaf.Subject.CommonName,
+				Title:  s.Title,
+			}
+		}
+		for _, san := range leaf.DNSNames {
+			sites[san] = Site{
+				Domain: san,
+				Title:  s.Title,
+			}
+		}
+
+		if len(sites) == 0 {
+			return errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
+		}
 	} else {
-		if c.TLS.Domain != "" && c.TLS.Email != "" && c.TLS.Cache != "" {
-			letsEncryptDomainsList = append(letsEncryptDomainsList, c.TLS.Domain)
-		} else if c.TLS.CertFile != "" && c.TLS.KeyFile != "" {
-			manager := certificateManager{
-				CertFile: c.TLS.CertFile,
-				KeyFile:  c.TLS.KeyFile,
-				Logger:   logger,
-			}
-
-			err := manager.Start()
-			if err != nil {
-				return err
-			}
-			defer manager.Stop()
-
-			fileGetCertificate = manager.GetCertificate
-		} else {
-			return errors.New("missing file or Let's Encrypt's certificate configuration")
-		}
-
-		sitesMap[""] = Site{
-			Domain: "",
-			Title:  c.Title,
-		}
+		return errors.New("missing file or Let's Encrypt's certificate configuration")
 	}
 
 	if len(letsEncryptDomainsList) > 0 {
 		manager := autocert.Manager{
-			Cache:      autocert.DirCache(c.TLS.Cache),
+			Cache:      autocert.DirCache(s.TLS.Cache),
 			Prompt:     autocert.AcceptTOS,
-			Email:      c.TLS.Email,
+			Email:      s.TLS.Email,
 			HostPolicy: autocert.HostWhitelist(letsEncryptDomainsList...),
 		}
 
 		letsEncryptGetCertificate = manager.GetCertificate
 	}
 
-	s, err := NewService(logger, cli.Version, cli.BuildTimestamp, cli.Revision, sitesMap, development)
+	service, err := NewService(logger, cli.Version, cli.BuildTimestamp, cli.Revision, sites, development)
 	if err != nil {
 		return err
 	}
 
 	router := NewRouter()
-	handler, err := s.RouteWith(router, cli.Version)
+	handler, err := service.RouteWith(router, cli.Version)
 	if err != nil {
 		return err
 	}
@@ -179,7 +239,7 @@ func Run(c Config, sites []site, logger zerolog.Logger) errors.E {
 		Addr:              listenAddr,
 		Handler:           handler,
 		ErrorLog:          log.New(logger, "", 0),
-		ConnContext:       s.ConnContext,
+		ConnContext:       service.ConnContext,
 		ReadHeaderTimeout: time.Minute,
 		TLSConfig: &tls.Config{
 			MinVersion:       tls.VersionTLS12,
