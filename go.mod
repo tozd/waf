@@ -18,12 +18,6 @@ require (
 )
 
 require (
-	github.com/alecthomas/kong v0.8.1 // indirect
-	gitlab.com/tozd/go/zerolog v0.3.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
@@ -45,7 +39,6 @@ require (
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/whilp/git-urls v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
-	gitlab.com/tozd/go/cli v0.1.1
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
