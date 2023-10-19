@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"gitlab.com/tozd/go/cli"
 	"gitlab.com/tozd/go/errors"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -59,7 +58,7 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Run(logger zerolog.Logger, sites map[string]Site) errors.E { //nolint:maintidx
+func (s *Server) Run(logger zerolog.Logger, sites map[string]Site, router *Router, service *Service) errors.E { //nolint:maintidx
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
@@ -219,13 +218,8 @@ func (s *Server) Run(logger zerolog.Logger, sites map[string]Site) errors.E { //
 	if !s.Development {
 		development = ""
 	}
-	service, err := NewService(logger, cli.Version, cli.BuildTimestamp, cli.Revision, sites, development)
-	if err != nil {
-		return err
-	}
 
-	router := NewRouter()
-	handler, err := service.RouteWith(router, cli.Version)
+	handler, err := service.RouteWith(router, development)
 	if err != nil {
 		return err
 	}

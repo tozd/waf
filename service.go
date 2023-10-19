@@ -55,7 +55,6 @@ type Site struct {
 type Service struct {
 	Log            zerolog.Logger
 	Sites          map[string]Site
-	Development    string
 	Version        string
 	BuildTimestamp string
 	Revision       string
@@ -68,11 +67,10 @@ type Service struct {
 	reverseProxy *httputil.ReverseProxy
 }
 
-func NewService(log zerolog.Logger, version, buildTimestamp, revision string, sites map[string]Site, development string) (*Service, errors.E) {
+func NewService(log zerolog.Logger, version, buildTimestamp, revision string, sites map[string]Site) (*Service, errors.E) {
 	s := &Service{
 		Log:            log,
 		Sites:          sites,
-		Development:    development,
 		Version:        version,
 		BuildTimestamp: buildTimestamp,
 		Revision:       revision,
@@ -428,7 +426,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 	return nil
 }
 
-func (s *Service) RouteWith(router *Router, version string) (http.Handler, errors.E) {
+func (s *Service) RouteWith(router *Router, development string) (http.Handler, errors.E) {
 	if s.Router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
@@ -439,7 +437,7 @@ func (s *Service) RouteWith(router *Router, version string) (http.Handler, error
 		return nil, errE
 	}
 
-	if s.Development != "" {
+	if development != "" {
 		errE := s.renderAndCompressContext()
 		if errE != nil {
 			return nil, errE
@@ -448,7 +446,7 @@ func (s *Service) RouteWith(router *Router, version string) (http.Handler, error
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.makeReverseProxy()
+		errE = s.makeReverseProxy(development)
 		if errE != nil {
 			return nil, errE
 		}
@@ -500,8 +498,8 @@ func (s *Service) RouteWith(router *Router, version string) (http.Handler, error
 		}
 		metrics.Dur("t", duration)
 		l := zerolog.Ctx(req.Context()).WithLevel(level)
-		if version != "" {
-			l = l.Str("version", version)
+		if s.Version != "" {
+			l = l.Str("version", s.Version)
 		}
 		if code != 0 {
 			l = l.Int("code", code)

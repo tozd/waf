@@ -98,8 +98,8 @@ func (s *Service) error(w http.ResponseWriter, req *http.Request, code int) {
 	s.Router.Error(w, req, code)
 }
 
-func (s *Service) makeReverseProxy() errors.E {
-	target, err := url.Parse(s.Development)
+func (s *Service) makeReverseProxy(development string) errors.E {
+	target, err := url.Parse(development)
 	if err != nil {
 		return errors.WithStack(err)
 	}
