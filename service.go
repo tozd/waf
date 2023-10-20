@@ -587,7 +587,7 @@ func (s *Service) renderAndCompressFiles() errors.E {
 func (s *Service) renderAndCompressContext() errors.E {
 	for domain, site := range s.Sites {
 		// In development, this method could be called first and compressedFiles are not yet
-		// initialized (as requests for other files are proxied to Vite), while in production
+		// initialized (as requests for other files are proxied), while in production
 		// compressedFiles has already been initialized and populated by built static files.
 		if site.compressedFiles == nil {
 			site.compressedFiles = make(map[string]map[string][]byte)
