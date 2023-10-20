@@ -34,10 +34,12 @@ type Route struct {
 }
 
 type Site struct {
-	Domain   string `json:"domain"         yaml:"domain"`
-	Title    string `json:"title"          yaml:"title"`
-	CertFile string `json:"cert,omitempty" yaml:"cert,omitempty"`
-	KeyFile  string `json:"key,omitempty"  yaml:"key,omitempty"`
+	Domain string `json:"domain" yaml:"domain"`
+	Title  string `json:"title"  yaml:"title"`
+
+	// We do not expose certificate and key file paths in JSON.
+	CertFile string `json:"-" yaml:"cert,omitempty"`
+	KeyFile  string `json:"-" yaml:"key,omitempty"`
 
 	// Maps between content types, paths, and content/etags.
 	// They are per site because they can include rendered per-site content.
@@ -637,20 +639,32 @@ func (s *Service) computeEtags() errors.E {
 	return nil
 }
 
-type siteContext struct {
-	Site           Site   `json:"site"`
+type buildContext struct {
 	Version        string `json:"version,omitempty"`
 	BuildTimestamp string `json:"buildTimestamp,omitempty"`
 	Revision       string `json:"revision,omitempty"`
 }
 
+type siteContext struct {
+	Site  Site          `json:"site"`
+	Build *buildContext `json:"build,omitempty"`
+}
+
 func (s *Service) getSiteContext(site Site) siteContext {
-	return siteContext{
-		Site:           site,
-		Version:        s.Version,
-		BuildTimestamp: s.BuildTimestamp,
-		Revision:       s.Revision,
+	c := siteContext{
+		Site:  site,
+		Build: nil,
 	}
+
+	if c.Build.Version != "" || s.BuildTimestamp != "" || s.Revision != "" {
+		c.Build = &buildContext{
+			Version:        s.Version,
+			BuildTimestamp: s.BuildTimestamp,
+			Revision:       s.Revision,
+		}
+	}
+
+	return c
 }
 
 func (s *Service) getSite(req *http.Request) (Site, errors.E) {
