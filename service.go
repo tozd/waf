@@ -54,6 +54,7 @@ type Service struct {
 
 	Files  fs.ReadFileFS
 	Routes []Route
+	Sites  map[string]Site
 
 	// Build metadata.
 	Version        string
@@ -67,7 +68,6 @@ type Service struct {
 	IsImmutableFile func(path string) bool
 	SkipStaticFile  func(path string) bool
 
-	sites        map[string]Site
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
 }
@@ -413,12 +413,11 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 	return nil
 }
 
-func (s *Service) RouteWith(router *Router, sites map[string]Site, development string) (http.Handler, errors.E) {
+func (s *Service) RouteWith(router *Router, development string) (http.Handler, errors.E) {
 	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
 	s.router = router
-	s.sites = sites
 
 	errE := s.configureRoutes(s.router)
 	if errE != nil {
@@ -528,7 +527,7 @@ func (s *Service) RouteWith(router *Router, sites map[string]Site, development s
 
 func (s *Service) renderAndCompressFiles() errors.E {
 	// Each site might render HTML files differently.
-	for domain, site := range s.sites {
+	for domain, site := range s.Sites {
 		if site.compressedFiles != nil {
 			return errors.New("renderAndCompressFiles called more than once")
 		}
@@ -575,14 +574,14 @@ func (s *Service) renderAndCompressFiles() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.sites[domain] = site
+		s.Sites[domain] = site
 	}
 
 	return nil
 }
 
 func (s *Service) renderAndCompressContext() errors.E {
-	for domain, site := range s.sites {
+	for domain, site := range s.Sites {
 		// In development, this method could be called first and compressedFiles are not yet
 		// initialized (as requests for other files are proxied), while in production
 		// compressedFiles has already been initialized and populated by built static files.
@@ -610,14 +609,14 @@ func (s *Service) renderAndCompressContext() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.sites[domain] = site
+		s.Sites[domain] = site
 	}
 
 	return nil
 }
 
 func (s *Service) computeEtags() errors.E {
-	for domain, site := range s.sites {
+	for domain, site := range s.Sites {
 		if site.compressedFilesEtags != nil {
 			return errors.New("computeEtags called more than once")
 		}
@@ -637,7 +636,7 @@ func (s *Service) computeEtags() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.sites[domain] = site
+		s.Sites[domain] = site
 	}
 
 	return nil
@@ -672,7 +671,7 @@ func (s *Service) getSiteContext(site Site) siteContext {
 }
 
 func (s *Service) getSite(req *http.Request) (Site, errors.E) {
-	if site, ok := s.sites[req.Host]; req.Host != "" && ok {
+	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
 	return Site{}, errors.Errorf(`site not found for host "%s"`, req.Host)

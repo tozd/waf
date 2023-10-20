@@ -35,6 +35,9 @@ type Server struct {
 		Cache    string `default:"${defaultTLSCache}" group:"Let's Encrypt:"                                                                       help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." placeholder:"PATH" short:"C"     type:"path"         yaml:"cache"`
 	} `embed:"" prefix:"tls." yaml:"tls"`
 	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." placeholder:"NAME" short:"T" yaml:"title"`
+
+	fileGetCertificate        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
 func validForDomain(manager *certificateManager, domain string) (bool, errors.E) {
@@ -63,9 +66,7 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Run(router *Router, service *Service, sites map[string]Site) errors.E { //nolint:maintidx
-	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+func (s *Server) Configure(sites map[string]Site) (map[string]Site, errors.E) {
 	letsEncryptDomainsList := []string{}
 
 	if len(sites) > 0 { //nolint:nestif
@@ -73,10 +74,10 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 		for domain, site := range sites {
 			if site.Domain == "" {
-				return errors.Errorf(`site's domain is required`)
+				return sites, errors.Errorf(`site's domain is required`)
 			}
 			if domain != site.Domain {
-				return errors.Errorf(`domain "%s" does not match site's domain "%s"`, domain, site.Domain)
+				return sites, errors.Errorf(`domain "%s" does not match site's domain "%s"`, domain, site.Domain)
 			}
 
 			if site.CertFile != "" && site.KeyFile != "" {
@@ -88,7 +89,7 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 				err := manager.Start()
 				if err != nil {
-					return err
+					return sites, err
 				}
 				defer manager.Stop()
 
@@ -96,10 +97,10 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 				ok, err := validForDomain(&manager, site.Domain)
 				if err != nil {
-					return err
+					return sites, err
 				}
 				if !ok {
-					return errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+					return sites, errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
 				}
 			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
@@ -112,7 +113,7 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 				err := manager.Start()
 				if err != nil {
-					return err
+					return sites, err
 				}
 				defer manager.Stop()
 
@@ -120,18 +121,18 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 				ok, err := validForDomain(&manager, site.Domain)
 				if err != nil {
-					return err
+					return sites, err
 				}
 				if !ok {
-					return errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+					return sites, errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
 				}
 			} else {
-				return errors.Errorf(`missing file or Let's Encrypt's certificate configuration for site "%s"`, site.Domain)
+				return sites, errors.Errorf(`missing file or Let's Encrypt's certificate configuration for site "%s"`, site.Domain)
 			}
 		}
 
 		if len(fileGetCertificateFunctions) > 0 {
-			fileGetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			s.fileGetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				// Note that this conversion is necessary because some server names in the handshakes
 				// started by some clients (such as cURL) are not converted to Punycode, which will
 				// prevent us from obtaining certificates for them. In addition, we should also treat
@@ -169,22 +170,22 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 
 		errE := manager.Start()
 		if errE != nil {
-			return errE
+			return sites, errE
 		}
 		defer manager.Stop()
 
-		fileGetCertificate = manager.GetCertificate
+		s.fileGetCertificate = manager.GetCertificate
 
 		// We have to determine domain names this certificate is valid for.
 		certificate, err := manager.GetCertificate(nil)
 		if err != nil {
-			return errors.WithStack(err)
+			return sites, errors.WithStack(err)
 		}
 		// certificate.Leaf is nil, so we have to parse leaf ourselves.
 		// See: https://github.com/golang/go/issues/35504
 		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
 		if err != nil {
-			return errors.WithStack(err)
+			return sites, errors.WithStack(err)
 		}
 
 		sites = map[string]Site{}
@@ -202,10 +203,10 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 		}
 
 		if len(sites) == 0 {
-			return errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
+			return sites, errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
 		}
 	} else {
-		return errors.New("missing file or Let's Encrypt's certificate configuration")
+		return sites, errors.New("missing file or Let's Encrypt's certificate configuration")
 	}
 
 	if len(letsEncryptDomainsList) > 0 {
@@ -216,19 +217,21 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 			HostPolicy: autocert.HostWhitelist(letsEncryptDomainsList...),
 		}
 
-		letsEncryptGetCertificate = manager.GetCertificate
+		s.letsEncryptGetCertificate = manager.GetCertificate
 	}
 
+	return sites, nil
+}
+
+func (s *Server) InDevelopment() string {
 	development := s.ProxyTo
 	if !s.Development {
 		development = ""
 	}
+	return development
+}
 
-	handler, err := service.RouteWith(router, sites, development)
-	if err != nil {
-		return err
-	}
-
+func (s *Server) Run(handler http.Handler) errors.E {
 	// TODO: Implement graceful shutdown.
 	// TODO: Add request timeouts so that malicious client cannot make too slow requests or read too slowly the response.
 	//       Currently this is not possible, because ReadTimeout and WriteTimeout count in handler processing time as well.
@@ -258,25 +261,25 @@ func (s *Server) Run(router *Router, service *Service, sites map[string]Site) er
 		},
 	}
 
-	if fileGetCertificate != nil && letsEncryptGetCertificate != nil {
+	if s.fileGetCertificate != nil && s.letsEncryptGetCertificate != nil {
 		server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			c, err := fileGetCertificate(hello)
+			c, err := s.fileGetCertificate(hello)
 			if err != nil {
 				return c, err
 			} else if c != nil {
 				return c, nil
 			}
 
-			return letsEncryptGetCertificate(hello)
+			return s.letsEncryptGetCertificate(hello)
 		}
 		server.TLSConfig.NextProtos = []string{"h2", "http/1.1", acme.ALPNProto}
-	} else if fileGetCertificate != nil {
-		server.TLSConfig.GetCertificate = fileGetCertificate
-	} else if letsEncryptGetCertificate != nil {
-		server.TLSConfig.GetCertificate = letsEncryptGetCertificate
+	} else if s.fileGetCertificate != nil {
+		server.TLSConfig.GetCertificate = s.fileGetCertificate
+	} else if s.letsEncryptGetCertificate != nil {
+		server.TLSConfig.GetCertificate = s.letsEncryptGetCertificate
 		server.TLSConfig.NextProtos = []string{"h2", "http/1.1", acme.ALPNProto}
 	} else {
-		panic(errors.New("no GetCertificate"))
+		panic(errors.New("server not configured"))
 	}
 
 	s.Logger.Info().Msgf("starting on %s", listenAddr)
