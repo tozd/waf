@@ -13,6 +13,9 @@ const (
 	certificateReloadInterval = 24 * time.Hour
 )
 
+// certificateManager loads certificate and key from file paths and reloads them
+// daily. So if certificate is rotated at least a day before expiration,
+// a new certificate will be picked up automatically.
 type certificateManager struct {
 	CertFile    string
 	KeyFile     string
