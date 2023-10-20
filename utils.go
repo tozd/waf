@@ -131,6 +131,7 @@ func (s *Service) serveStaticFiles(router *Router) errors.E {
 	immutableH := logHandlerName(staticName, s.ImmutableFile)
 
 	for _, site := range s.Sites {
+		// We can use any compression to obtain all static paths, so we use compressionIdentity.
 		for path := range site.compressedFiles[compressionIdentity] {
 			if path == "/index.html" || path == "/index.json" {
 				continue
