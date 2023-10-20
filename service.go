@@ -65,6 +65,8 @@ type Service struct {
 	// compare against in the case insensitive manner.
 	MetadataHeaderPrefix string
 
+	Development string
+
 	IsImmutableFile func(path string) bool
 	SkipStaticFile  func(path string) bool
 
@@ -413,7 +415,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 	return nil
 }
 
-func (s *Service) RouteWith(router *Router, development string) (http.Handler, errors.E) {
+func (s *Service) RouteWith(router *Router) (http.Handler, errors.E) {
 	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
@@ -424,7 +426,7 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		return nil, errE
 	}
 
-	if development != "" {
+	if s.Development != "" {
 		errE := s.renderAndCompressContext()
 		if errE != nil {
 			return nil, errE
@@ -433,7 +435,7 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.makeReverseProxy(development)
+		errE = s.makeReverseProxy()
 		if errE != nil {
 			return nil, errE
 		}

@@ -93,8 +93,8 @@ func (s *Service) InternalServerError(w http.ResponseWriter, req *http.Request, 
 	Error(w, req, http.StatusInternalServerError)
 }
 
-func (s *Service) makeReverseProxy(development string) errors.E {
-	target, err := url.Parse(development)
+func (s *Service) makeReverseProxy() errors.E {
+	target, err := url.Parse(s.Development)
 	if err != nil {
 		return errors.WithStack(err)
 	}
