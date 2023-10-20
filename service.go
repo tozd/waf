@@ -84,7 +84,7 @@ type Service[SiteT hasSite] struct {
 	reverseProxy *httputil.ReverseProxy
 }
 
-func (s *Service[SiteT]) RouteWith(router *Router, service interface{}) (http.Handler, errors.E) {
+func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Handler, errors.E) {
 	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
