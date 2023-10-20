@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
 
@@ -74,34 +73,6 @@ type Service[SiteT hasSite] struct {
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
-}
-
-func logHandlerName(name string, h Handler) Handler {
-	if name == "" {
-		return h
-	}
-
-	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		logger := zerolog.Ctx(req.Context())
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(zerolog.MessageFieldName, name)
-		})
-		h(w, req, params)
-	}
-}
-
-func autoName(h Handler) string {
-	fn := runtime.FuncForPC(reflect.ValueOf(h).Pointer())
-	if fn == nil {
-		return ""
-	}
-	name := fn.Name()
-	i := strings.LastIndex(name, ".")
-	if i != -1 {
-		name = name[i+1:]
-	}
-	name = strings.TrimSuffix(name, "-fm")
-	return name
 }
 
 func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {

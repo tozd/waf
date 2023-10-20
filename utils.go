@@ -18,7 +18,10 @@ import (
 	"net/textproto"
 	"net/url"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -478,4 +481,32 @@ func (c *metricsConn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
 	atomic.AddInt64(c.written, int64(n))
 	return n, err
+}
+
+func logHandlerName(name string, h Handler) Handler {
+	if name == "" {
+		return h
+	}
+
+	return func(w http.ResponseWriter, req *http.Request, params Params) {
+		logger := zerolog.Ctx(req.Context())
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str(zerolog.MessageFieldName, name)
+		})
+		h(w, req, params)
+	}
+}
+
+func autoName(h Handler) string {
+	fn := runtime.FuncForPC(reflect.ValueOf(h).Pointer())
+	if fn == nil {
+		return ""
+	}
+	name := fn.Name()
+	i := strings.LastIndex(name, ".")
+	if i != -1 {
+		name = name[i+1:]
+	}
+	name = strings.TrimSuffix(name, "-fm")
+	return name
 }
