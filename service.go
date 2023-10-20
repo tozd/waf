@@ -319,10 +319,8 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// TODO: Move to Router struct, accepting interface{} as an object on which to search for handlers.
-
-func (s *Service) configureRoutes() errors.E {
-	v := reflect.ValueOf(s)
+func (s *Service) configureRoutes(service interface{}) errors.E {
+	v := reflect.ValueOf(service)
 
 	for _, route := range s.Routes {
 		if !route.Get && !route.API {
@@ -415,13 +413,13 @@ func (s *Service) configureRoutes() errors.E {
 	return nil
 }
 
-func (s *Service) RouteWith(router *Router) (http.Handler, errors.E) {
+func (s *Service) RouteWith(router *Router, service interface{}) (http.Handler, errors.E) {
 	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
 	s.router = router
 
-	errE := s.configureRoutes()
+	errE := s.configureRoutes(service)
 	if errE != nil {
 		return nil, errE
 	}
