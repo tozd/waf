@@ -434,7 +434,6 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		}
 		router.NotFound = logHandlerName(autoName(s.Proxy), s.Proxy)
 		router.MethodNotAllowed = logHandlerName(autoName(s.Proxy), s.Proxy)
-		router.NotAcceptable = logHandlerName(autoName(s.Proxy), s.Proxy)
 	} else {
 		errE := s.renderAndCompressFiles()
 		if errE != nil {
@@ -454,7 +453,6 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		}
 		router.NotFound = logHandlerName(autoName(s.NotFound), s.NotFound)
 		router.MethodNotAllowed = logHandlerName(autoName(s.MethodNotAllowed), s.MethodNotAllowed)
-		router.NotAcceptable = logHandlerName(autoName(s.NotAcceptable), s.NotAcceptable)
 	}
 	router.Panic = s.handlePanic
 

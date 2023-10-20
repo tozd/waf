@@ -111,7 +111,6 @@ type Handler func(http.ResponseWriter, *http.Request, Params)
 type Router struct {
 	NotFound         Handler
 	MethodNotAllowed Handler
-	NotAcceptable    Handler
 	Panic            func(w http.ResponseWriter, req *http.Request, err interface{})
 	EncodeQuery      func(qs url.Values) string
 
