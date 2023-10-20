@@ -58,15 +58,15 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Run(logger zerolog.Logger, sites map[string]Site, router *Router, service *Service) errors.E { //nolint:maintidx
+func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) errors.E { //nolint:maintidx
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
 
-	if len(sites) > 0 { //nolint:nestif
+	if len(service.Sites) > 0 { //nolint:nestif
 		fileGetCertificateFunctions := map[string]func(*tls.ClientHelloInfo) (*tls.Certificate, error){}
 
-		for domain, site := range sites {
+		for domain, site := range service.Sites {
 			if site.Domain == "" {
 				return errors.Errorf(`site's domain is required`)
 			}
@@ -149,7 +149,7 @@ func (s *Server) Run(logger zerolog.Logger, sites map[string]Site, router *Route
 	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
 		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
 
-		sites = map[string]Site{
+		service.Sites = map[string]Site{
 			s.TLS.Domain: {
 				Domain: s.TLS.Domain,
 				Title:  s.Title,
@@ -182,21 +182,21 @@ func (s *Server) Run(logger zerolog.Logger, sites map[string]Site, router *Route
 			return errors.WithStack(err)
 		}
 
-		sites = map[string]Site{}
+		service.Sites = map[string]Site{}
 		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
-			sites[leaf.Subject.CommonName] = Site{
+			service.Sites[leaf.Subject.CommonName] = Site{
 				Domain: leaf.Subject.CommonName,
 				Title:  s.Title,
 			}
 		}
 		for _, san := range leaf.DNSNames {
-			sites[san] = Site{
+			service.Sites[san] = Site{
 				Domain: san,
 				Title:  s.Title,
 			}
 		}
 
-		if len(sites) == 0 {
+		if len(service.Sites) == 0 {
 			return errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
 		}
 	} else {
