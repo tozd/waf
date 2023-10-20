@@ -2,7 +2,6 @@ package waf
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -643,44 +642,6 @@ func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request, _ 
 
 func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.serveStaticFile(w, req, req.URL.Path, true)
-}
-
-func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
-	if errors.Is(err, context.Canceled) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "canceled")
-		})
-		return
-	} else if errors.Is(err, context.DeadlineExceeded) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "deadline exceeded")
-		})
-		return
-	}
-
-	s.InternalServerError(w, req, nil)
-}
-
-func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
-
-	s.BadRequest(w, req, nil)
-}
-
-func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
-
-	s.NotFound(w, req, nil)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
