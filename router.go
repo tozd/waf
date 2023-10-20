@@ -119,12 +119,6 @@ type Router struct {
 	matchers []matcher
 }
 
-func NewRouter() *Router {
-	return &Router{
-		routes: make(map[string]*route),
-	}
-}
-
 func (r *Router) Handle(name, method, path string, api bool, handler Handler) errors.E {
 	ro, ok := r.routes[name]
 	if !ok {
@@ -141,6 +135,9 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			Path:        path,
 			Segments:    segments,
 			APIHandlers: make(map[string]Handler),
+		}
+		if r.routes == nil {
+			r.routes = make(map[string]*route)
 		}
 		r.routes[name] = ro
 		r.matchers = append(r.matchers, matcher{
@@ -263,14 +260,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) path(name string, params Params, qs url.Values, api bool) (string, errors.E) {
-	route, ok := r.routes[name]
+	ro, ok := r.routes[name]
 	if !ok {
 		return "", errors.Errorf(`route with name "%s" does not exist`, name)
 	}
-	if api && len(route.APIHandlers) == 0 {
+	if api && len(ro.APIHandlers) == 0 {
 		return "", errors.Errorf(`route with name "%s" has no API handlers`, name)
 	}
-	if !api && route.GetHandler == nil {
+	if !api && ro.GetHandler == nil {
 		return "", errors.Errorf(`route with name "%s" has no get handler`, name)
 	}
 
@@ -280,7 +277,7 @@ func (r *Router) path(name string, params Params, qs url.Values, api bool) (stri
 		res.WriteString("/api")
 	}
 
-	for _, segment := range route.Segments {
+	for _, segment := range ro.Segments {
 		if !segment.Parameter {
 			res.WriteString("/")
 			res.WriteString(segment.Value)
