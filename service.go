@@ -26,6 +26,8 @@ import (
 	"gitlab.com/tozd/identifier"
 )
 
+const contextPath = "/index.json"
+
 type Route struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
@@ -62,7 +64,9 @@ type Service struct {
 	// It should be kept all lower case so that it is easier to
 	// compare against in the case insensitive manner.
 	MetadataHeaderPrefix string
-	IsImmutableFile      func(path string) bool
+
+	IsImmutableFile func(path string) bool
+	SkipStaticFile  func(path string) bool
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
@@ -600,7 +604,7 @@ func (s *Service) renderAndCompressContext() errors.E {
 				return errE
 			}
 
-			site.compressedFiles[compression]["/index.json"] = data
+			site.compressedFiles[compression][contextPath] = data
 		}
 
 		// Map cannot be modified directly, so we modify the copy
