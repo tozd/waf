@@ -62,6 +62,7 @@ type Service struct {
 	// It should be kept all lower case so that it is easier to
 	// compare against in the case insensitive manner.
 	MetadataHeaderPrefix string
+	IsImmutableFile      func(path string) bool
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy

@@ -19,7 +19,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -135,7 +134,7 @@ func (s *Service) serveStaticFiles(router *Router) errors.E {
 
 			var n string
 			var h Handler
-			if strings.HasPrefix(path, "/assets/") {
+			if s.IsImmutableFile != nil && s.IsImmutableFile(path) {
 				n = fmt.Sprintf("%s:%s", immutableName, path)
 				h = immutableH
 			} else {
