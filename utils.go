@@ -75,27 +75,23 @@ func getHost(hostPort string) string {
 func (s *Service) NotFound(w http.ResponseWriter, req *http.Request, _ Params) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
 	// is different from what http.NotFound uses, and we want to use the same pattern.
-	s.error(w, req, http.StatusNotFound)
+	Error(w, req, http.StatusNotFound)
 }
 
 func (s *Service) MethodNotAllowed(w http.ResponseWriter, req *http.Request, _ Params) {
-	s.error(w, req, http.StatusMethodNotAllowed)
+	Error(w, req, http.StatusMethodNotAllowed)
 }
 
 func (s *Service) NotAcceptable(w http.ResponseWriter, req *http.Request, _ Params) {
-	s.error(w, req, http.StatusNotAcceptable)
+	Error(w, req, http.StatusNotAcceptable)
 }
 
 func (s *Service) BadRequest(w http.ResponseWriter, req *http.Request, _ Params) {
-	s.error(w, req, http.StatusBadRequest)
+	Error(w, req, http.StatusBadRequest)
 }
 
 func (s *Service) InternalServerError(w http.ResponseWriter, req *http.Request, _ Params) {
-	s.error(w, req, http.StatusInternalServerError)
-}
-
-func (s *Service) error(w http.ResponseWriter, req *http.Request, code int) {
-	s.router.Error(w, req, code)
+	Error(w, req, http.StatusInternalServerError)
 }
 
 func (s *Service) makeReverseProxy(development string) errors.E {

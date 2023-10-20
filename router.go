@@ -41,6 +41,13 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 	return segments, nil
 }
 
+func Error(w http.ResponseWriter, _ *http.Request, code int) {
+	http.Error(w,
+		http.StatusText(code),
+		code,
+	)
+}
+
 // TODO: Support custom regex in params.
 //       See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#custom-regex-in-params
 
@@ -186,13 +193,6 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) Error(w http.ResponseWriter, _ *http.Request, code int) {
-	http.Error(w,
-		http.StatusText(code),
-		code,
-	)
-}
-
 // TODO: Compile all regexes into one large regex.
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -230,7 +230,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				if r.MethodNotAllowed != nil {
 					r.MethodNotAllowed(w, req, params)
 				} else {
-					r.Error(w, req, http.StatusMethodNotAllowed)
+					Error(w, req, http.StatusMethodNotAllowed)
 				}
 				return
 			}
@@ -245,7 +245,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				if r.MethodNotAllowed != nil {
 					r.MethodNotAllowed(w, req, params)
 				} else {
-					r.Error(w, req, http.StatusMethodNotAllowed)
+					Error(w, req, http.StatusMethodNotAllowed)
 				}
 				return
 			}
@@ -259,7 +259,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if r.NotFound != nil {
 		r.NotFound(w, req, nil)
 	} else {
-		r.Error(w, req, http.StatusNotFound)
+		Error(w, req, http.StatusNotFound)
 	}
 }
 
