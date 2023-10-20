@@ -38,7 +38,7 @@ func (c *certificateManager) Start() errors.E {
 			case <-c.ticker.C:
 				err := c.reloadCertificate()
 				if err != nil {
-					c.Logger.Error().Err(err).Fields(errors.AllDetails(err)).Str("certFile", c.CertFile).Str("keyFile", c.KeyFile).Send()
+					c.Logger.Error().Err(err).Str("certFile", c.CertFile).Str("keyFile", c.KeyFile).Send()
 				}
 			}
 		}

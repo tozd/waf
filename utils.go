@@ -164,7 +164,7 @@ func (s *Service) serveStaticFiles(router *Router) errors.E {
 func (s *Service) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err).Fields(errors.AllDetails(err))
+		return c.Err(err)
 	})
 	if errors.Is(err, context.Canceled) {
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
@@ -192,7 +192,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err inte
 	}
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		if e != nil {
-			return c.Err(e).Fields(errors.AllDetails(e))
+			return c.Err(e)
 		}
 		return c.Interface("panic", err)
 	})
@@ -203,7 +203,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err inte
 func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err).Fields(errors.AllDetails(err))
+		return c.Err(err)
 	})
 
 	s.BadRequest(w, req, nil)
@@ -212,7 +212,7 @@ func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, 
 func (s *Service) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err).Fields(errors.AllDetails(err))
+		return c.Err(err)
 	})
 
 	s.NotFound(w, req, nil)
