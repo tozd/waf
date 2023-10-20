@@ -63,15 +63,15 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Run(router *Router, service *Service) errors.E { //nolint:maintidx
+func (s *Server) Run(router *Router, service *Service, sites map[string]Site) errors.E { //nolint:maintidx
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
 
-	if len(service.Sites) > 0 { //nolint:nestif
+	if len(sites) > 0 { //nolint:nestif
 		fileGetCertificateFunctions := map[string]func(*tls.ClientHelloInfo) (*tls.Certificate, error){}
 
-		for domain, site := range service.Sites {
+		for domain, site := range sites {
 			if site.Domain == "" {
 				return errors.Errorf(`site's domain is required`)
 			}
@@ -154,7 +154,7 @@ func (s *Server) Run(router *Router, service *Service) errors.E { //nolint:maint
 	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
 		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
 
-		service.Sites = map[string]Site{
+		sites = map[string]Site{
 			s.TLS.Domain: {
 				Domain: s.TLS.Domain,
 				Title:  s.Title,
@@ -187,21 +187,21 @@ func (s *Server) Run(router *Router, service *Service) errors.E { //nolint:maint
 			return errors.WithStack(err)
 		}
 
-		service.Sites = map[string]Site{}
+		sites = map[string]Site{}
 		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
-			service.Sites[leaf.Subject.CommonName] = Site{
+			sites[leaf.Subject.CommonName] = Site{
 				Domain: leaf.Subject.CommonName,
 				Title:  s.Title,
 			}
 		}
 		for _, san := range leaf.DNSNames {
-			service.Sites[san] = Site{
+			sites[san] = Site{
 				Domain: san,
 				Title:  s.Title,
 			}
 		}
 
-		if len(service.Sites) == 0 {
+		if len(sites) == 0 {
 			return errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
 		}
 	} else {
@@ -224,7 +224,7 @@ func (s *Server) Run(router *Router, service *Service) errors.E { //nolint:maint
 		development = ""
 	}
 
-	handler, err := service.RouteWith(router, development)
+	handler, err := service.RouteWith(router, sites, development)
 	if err != nil {
 		return err
 	}
