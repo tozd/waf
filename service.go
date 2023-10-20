@@ -26,16 +26,11 @@ import (
 	"gitlab.com/tozd/identifier"
 )
 
-//go:embed routes.json
-var routesConfiguration []byte
-
-type routes struct {
-	Routes []struct {
-		Name string `json:"name"`
-		Path string `json:"path"`
-		API  bool   `json:"api,omitempty"`
-		Get  bool   `json:"get,omitempty"`
-	} `json:"routes"`
+type Route struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	API  bool   `json:"api,omitempty"`
+	Get  bool   `json:"get,omitempty"`
 }
 
 type Site struct {
@@ -53,6 +48,7 @@ type Site struct {
 type Service struct {
 	Logger         zerolog.Logger
 	Files          fs.ReadFileFS
+	Routes         []Route
 	Sites          map[string]Site
 	Version        string
 	BuildTimestamp string
@@ -314,15 +310,9 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 // TODO: Move to Router struct, accepting interface{} as an object on which to search for handlers.
 
 func (s *Service) configureRoutes(router *Router) errors.E {
-	var rs routes
-	errE := x.UnmarshalWithoutUnknownFields(routesConfiguration, &rs)
-	if errE != nil {
-		return errE
-	}
-
 	v := reflect.ValueOf(s)
 
-	for _, route := range rs.Routes {
+	for _, route := range s.Routes {
 		if !route.Get && !route.API {
 			errE := errors.New(`at least one of "get" and "api" has to be true`)
 			errors.Details(errE)["name"] = route.Name
