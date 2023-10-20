@@ -10,15 +10,18 @@ import (
 	"html/template"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/textproto"
 	"net/url"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	eddo "github.com/golang/gddo/httputil"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
 	servertiming "github.com/mitchellh/go-server-timing"
@@ -436,10 +439,10 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 }
 
 func (s *Service[SiteT]) serveStaticFiles() errors.E {
-	staticName := autoName(s.StaticFile)
-	staticH := logHandlerName(staticName, s.StaticFile)
-	immutableName := autoName(s.ImmutableFile)
-	immutableH := logHandlerName(staticName, s.ImmutableFile)
+	staticName := autoName(s.staticFile)
+	staticH := logHandlerName(staticName, s.staticFile)
+	immutableName := autoName(s.immutableFile)
+	immutableH := logHandlerName(staticName, s.immutableFile)
 
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
@@ -567,6 +570,79 @@ func (s *Service[SiteT]) getSite(req *http.Request) (SiteT, errors.E) {
 		return site, nil
 	}
 	return *new(SiteT), errors.Errorf(`site not found for host "%s"`, req.Host)
+}
+
+// TODO: Use Vite's manifest.json to send preload headers.
+func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
+	contentEncoding := eddo.NegotiateContentEncoding(req, allCompressions)
+	if contentEncoding == "" {
+		s.NotAcceptable(w, req, nil)
+		return
+	}
+
+	siteT, err := s.getSite(req)
+	if err != nil {
+		s.notFoundWithError(w, req, err)
+		return
+	}
+
+	site := siteT.GetSite()
+
+	data, ok := site.compressedFiles[contentEncoding][path]
+	if !ok {
+		s.internalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+		return
+	}
+
+	if len(data) <= minCompressionSize {
+		contentEncoding = compressionIdentity
+		data, ok = site.compressedFiles[contentEncoding][path]
+		if !ok {
+			s.internalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+			return
+		}
+	}
+
+	etag, ok := site.compressedFilesEtags[contentEncoding][path]
+	if !ok {
+		s.internalServerErrorWithError(w, req, errors.Errorf(`no etag for compression %s and file "%s"`, contentEncoding, path))
+		return
+	}
+
+	contentType := mime.TypeByExtension(filepath.Ext(path))
+	if contentType == "" {
+		s.internalServerErrorWithError(w, req, errors.Errorf(`unable to determine content type for file "%s"`, path))
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	if contentEncoding != compressionIdentity {
+		w.Header().Set("Content-Encoding", contentEncoding)
+	} else {
+		// TODO: Always set Content-Length.
+		//       See: https://github.com/golang/go/pull/50904
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	}
+	if immutable {
+		w.Header().Set("Cache-Control", "public,max-age=31536000,immutable,stale-while-revalidate=86400")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+	w.Header().Add("Vary", "Accept-Encoding")
+	w.Header().Set("Etag", etag)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	// See: https://github.com/golang/go/issues/50905
+	// See: https://github.com/golang/go/pull/50903
+	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(data))
+}
+
+func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.serveStaticFile(w, req, req.URL.Path, false)
+}
+
+func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.serveStaticFile(w, req, req.URL.Path, true)
 }
 
 func (s *Service[SiteT]) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {

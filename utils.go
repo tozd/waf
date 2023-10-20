@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync/atomic"
+	"unicode"
 
 	"github.com/andybalholm/brotli"
 	"github.com/rs/zerolog"
@@ -172,5 +173,12 @@ func autoName(h Handler) string {
 		name = name[i+1:]
 	}
 	name = strings.TrimSuffix(name, "-fm")
+
+	// Make sure the first letter is upper case. We have some internal handlers
+	// but we want uniform look in logs.
+	rs := []rune(name)
+	rs[0] = unicode.ToUpper(rs[0])
+	name = string(rs)
+
 	return name
 }
