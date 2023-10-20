@@ -45,7 +45,7 @@ const (
 	minCompressionSize = 1024
 )
 
-var allCompressions = []string{compressionBrotli, compressionGzip, compressionDeflate, compressionIdentity}
+var allCompressions = []string{compressionBrotli, compressionGzip, compressionDeflate, compressionIdentity} //nolint:gochecknoglobals
 
 // contextKey is a value for use with context.WithValue. It's used as
 // a pointer so it fits in an interface{} without allocation.
@@ -54,10 +54,10 @@ type contextKey struct {
 }
 
 // connectionIDContextKey provides a random ID for each HTTP connection.
-var connectionIDContextKey = &contextKey{"connection-id"}
+var connectionIDContextKey = &contextKey{"connection-id"} //nolint:gochecknoglobals
 
 // requestIDContextKey provides a random ID for each HTTP request.
-var requestIDContextKey = &contextKey{"request-id"}
+var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
 
 func getHost(hostPort string) string {
 	if hostPort == "" {
