@@ -488,14 +488,19 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 		}
 		metrics.Dur("t", duration)
 		l := zerolog.Ctx(req.Context()).WithLevel(level)
-		if s.Version != "" {
-			l = l.Str("version", s.Version)
-		}
-		if s.BuildTimestamp != "" {
-			l = l.Str("buildTimestamp", s.BuildTimestamp)
-		}
-		if s.Revision != "" {
-			l = l.Str("revision", s.Revision)
+		if s.Revision != "" || s.BuildTimestamp != "" || s.Version != "" {
+			build := zerolog.Dict()
+			// In alphabetical order, so that it is the same as JSON marshal.
+			if s.Revision != "" {
+				build = build.Str("r", s.Revision)
+			}
+			if s.BuildTimestamp != "" {
+				build = build.Str("t", s.BuildTimestamp)
+			}
+			if s.Version != "" {
+				build = build.Str("v", s.Version)
+			}
+			l = l.Dict("build", build)
 		}
 		if code != 0 {
 			l = l.Int("code", code)
