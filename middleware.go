@@ -237,7 +237,7 @@ func (s *Service[SiteT]) parseForm(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		err := req.ParseForm()
 		if err != nil {
-			s.badRequestWithError(w, req, errors.WithStack(err))
+			s.BadRequestWithError(w, req, errors.WithStack(err))
 			return
 		}
 		next.ServeHTTP(w, req)

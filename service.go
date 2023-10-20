@@ -503,7 +503,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 	default:
 		e, err := x.MarshalWithoutEscapeHTML(data)
 		if err != nil {
-			s.internalServerErrorWithError(w, req, errors.WithStack(err))
+			s.InternalServerErrorWithError(w, req, errors.WithStack(err))
 			return
 		}
 		encoded = e
@@ -519,7 +519,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 
 	encoded, errE := compress(contentEncoding, encoded)
 	if errE != nil {
-		s.internalServerErrorWithError(w, req, errE)
+		s.InternalServerErrorWithError(w, req, errE)
 		return
 	}
 
@@ -582,7 +582,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 
 	siteT, err := s.Site(req)
 	if err != nil {
-		s.notFoundWithError(w, req, err)
+		s.NotFoundWithError(w, req, err)
 		return
 	}
 
@@ -590,7 +590,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 
 	data, ok := site.compressedFiles[contentEncoding][path]
 	if !ok {
-		s.internalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+		s.InternalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
 		return
 	}
 
@@ -598,20 +598,20 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		contentEncoding = compressionIdentity
 		data, ok = site.compressedFiles[contentEncoding][path]
 		if !ok {
-			s.internalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+			s.InternalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
 			return
 		}
 	}
 
 	etag, ok := site.compressedFilesEtags[contentEncoding][path]
 	if !ok {
-		s.internalServerErrorWithError(w, req, errors.Errorf(`no etag for compression %s and file "%s"`, contentEncoding, path))
+		s.InternalServerErrorWithError(w, req, errors.Errorf(`no etag for compression %s and file "%s"`, contentEncoding, path))
 		return
 	}
 
 	contentType := mime.TypeByExtension(filepath.Ext(path))
 	if contentType == "" {
-		s.internalServerErrorWithError(w, req, errors.Errorf(`unable to determine content type for file "%s"`, path))
+		s.InternalServerErrorWithError(w, req, errors.Errorf(`unable to determine content type for file "%s"`, path))
 		return
 	}
 
@@ -645,7 +645,7 @@ func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request,
 	s.serveStaticFile(w, req, req.URL.Path, true)
 }
 
-func (s *Service[SiteT]) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
@@ -665,7 +665,7 @@ func (s *Service[SiteT]) internalServerErrorWithError(w http.ResponseWriter, req
 	s.InternalServerError(w, req, nil)
 }
 
-func (s *Service[SiteT]) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
@@ -674,7 +674,7 @@ func (s *Service[SiteT]) badRequestWithError(w http.ResponseWriter, req *http.Re
 	s.BadRequest(w, req, nil)
 }
 
-func (s *Service[SiteT]) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
