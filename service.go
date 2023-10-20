@@ -490,7 +490,7 @@ func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, e
 	return out.Bytes(), nil
 }
 
-func (s *Service[SiteT]) writeJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
+func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
 
