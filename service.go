@@ -44,15 +44,15 @@ type Site struct {
 	CertFile string `json:"cert,omitempty" yaml:"cert,omitempty"`
 	KeyFile  string `json:"key,omitempty"  yaml:"key,omitempty"`
 
-	Files fs.ReadFileFS `json:"-" yaml:"-"`
-
 	// Maps between content types, paths, and content/etags.
+	// They are per site because they can include rendered per-site content.
 	compressedFiles      map[string]map[string][]byte
 	compressedFilesEtags map[string]map[string]string
 }
 
 type Service struct {
 	Logger         zerolog.Logger
+	Files          fs.ReadFileFS
 	Sites          map[string]Site
 	Version        string
 	BuildTimestamp string
@@ -528,6 +528,7 @@ func (s *Service) RouteWith(router *Router, development string) (http.Handler, e
 }
 
 func (s *Service) renderAndCompressFiles() errors.E {
+	// Each site might render HTML files differently.
 	for domain, site := range s.Sites {
 		if site.compressedFiles != nil {
 			return errors.New("renderAndCompressFiles called more than once")
@@ -538,7 +539,7 @@ func (s *Service) renderAndCompressFiles() errors.E {
 		for _, compression := range allCompressions {
 			site.compressedFiles[compression] = make(map[string][]byte)
 
-			err := fs.WalkDir(site.Files, ".", func(path string, d fs.DirEntry, err error) error {
+			err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return errors.WithStack(err)
 				}
@@ -546,7 +547,7 @@ func (s *Service) renderAndCompressFiles() errors.E {
 					return nil
 				}
 
-				data, err := site.Files.ReadFile(path)
+				data, err := s.Files.ReadFile(path)
 				if err != nil {
 					return errors.WithStack(err)
 				}
