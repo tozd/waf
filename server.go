@@ -235,7 +235,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 		Addr:              listenAddr,
 		Handler:           handler,
 		ErrorLog:          log.New(logger, "", 0),
-		ConnContext:       s.ConnContext,
+		ConnContext:       s.connContext,
 		ReadHeaderTimeout: time.Minute,
 		TLSConfig: &tls.Config{
 			MinVersion:       tls.VersionTLS12,
@@ -282,6 +282,6 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 	return errors.WithStack(server.ListenAndServeTLS("", ""))
 }
 
-func (s *Server) ConnContext(ctx context.Context, _ net.Conn) context.Context {
+func (s *Server) connContext(ctx context.Context, _ net.Conn) context.Context {
 	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
 }
