@@ -119,7 +119,7 @@ func (s *Service) Proxy(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
 
-func (s *Service) serveStaticFiles(router *Router) errors.E {
+func (s *Service) serveStaticFiles() errors.E {
 	staticName := autoName(s.StaticFile)
 	staticH := logHandlerName(staticName, s.StaticFile)
 	immutableName := autoName(s.ImmutableFile)
@@ -142,7 +142,7 @@ func (s *Service) serveStaticFiles(router *Router) errors.E {
 				h = staticH
 			}
 
-			err := router.Handle(n, http.MethodGet, path, false, h)
+			err := s.router.Handle(n, http.MethodGet, path, false, h)
 			if err != nil {
 				return err
 			}

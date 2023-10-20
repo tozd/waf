@@ -321,7 +321,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 
 // TODO: Move to Router struct, accepting interface{} as an object on which to search for handlers.
 
-func (s *Service) configureRoutes(router *Router) errors.E {
+func (s *Service) configureRoutes() errors.E {
 	v := reflect.ValueOf(s)
 
 	for _, route := range s.Routes {
@@ -353,7 +353,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 				return errE
 			}
 			h = logHandlerName(handlerName, h)
-			errE := router.Handle(route.Name, http.MethodGet, route.Path, false, h)
+			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
 			if errE != nil {
 				errors.Details(errE)["handler"] = handlerName
 				errors.Details(errE)["name"] = route.Name
@@ -386,7 +386,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 					return errE
 				}
 				h = logHandlerName(handlerName, h)
-				errE := router.Handle(route.Name, method, route.Path, true, h)
+				errE := s.router.Handle(route.Name, method, route.Path, true, h)
 				if errE != nil {
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["name"] = route.Name
@@ -394,7 +394,7 @@ func (s *Service) configureRoutes(router *Router) errors.E {
 					return errE
 				}
 				if method == http.MethodGet {
-					errE := router.Handle(route.Name, http.MethodHead, route.Path, true, h)
+					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
 					if errE != nil {
 						errors.Details(errE)["handler"] = handlerName
 						errors.Details(errE)["name"] = route.Name
@@ -421,7 +421,7 @@ func (s *Service) RouteWith(router *Router) (http.Handler, errors.E) {
 	}
 	s.router = router
 
-	errE := s.configureRoutes(s.router)
+	errE := s.configureRoutes()
 	if errE != nil {
 		return nil, errE
 	}
@@ -454,7 +454,7 @@ func (s *Service) RouteWith(router *Router) (http.Handler, errors.E) {
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.serveStaticFiles(s.router)
+		errE = s.serveStaticFiles()
 		if errE != nil {
 			return nil, errE
 		}
