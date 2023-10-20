@@ -23,6 +23,8 @@ const (
 
 //nolint:lll
 type Server struct {
+	Logger zerolog.Logger `kong:"-" yaml:"-"`
+
 	Development bool   `help:"Run in development mode and proxy unknown requests." short:"d"                                                                    yaml:"development"`
 	ProxyTo     string `default:"${defaultProxyTo}"                                help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL"  short:"P" yaml:"proxyTo"`
 	TLS         struct {
@@ -61,7 +63,7 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) errors.E { //nolint:maintidx
+func (s *Server) Run(router *Router, service *Service) errors.E { //nolint:maintidx
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	letsEncryptDomainsList := []string{}
@@ -81,7 +83,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 				manager := certificateManager{
 					CertFile: site.CertFile,
 					KeyFile:  site.KeyFile,
-					Logger:   logger,
+					Logger:   s.Logger,
 				}
 
 				err := manager.Start()
@@ -105,7 +107,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 				manager := certificateManager{
 					CertFile: s.TLS.CertFile,
 					KeyFile:  s.TLS.KeyFile,
-					Logger:   logger,
+					Logger:   s.Logger,
 				}
 
 				err := manager.Start()
@@ -162,7 +164,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 		manager := certificateManager{
 			CertFile: s.TLS.CertFile,
 			KeyFile:  s.TLS.KeyFile,
-			Logger:   logger,
+			Logger:   s.Logger,
 		}
 
 		errE := manager.Start()
@@ -234,7 +236,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 	server := &http.Server{
 		Addr:              listenAddr,
 		Handler:           handler,
-		ErrorLog:          log.New(logger, "", 0),
+		ErrorLog:          log.New(s.Logger, "", 0),
 		ConnContext:       s.connContext,
 		ReadHeaderTimeout: time.Minute,
 		TLSConfig: &tls.Config{
@@ -277,7 +279,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 		panic(errors.New("no GetCertificate"))
 	}
 
-	logger.Info().Msgf("starting on %s", listenAddr)
+	s.Logger.Info().Msgf("starting on %s", listenAddr)
 
 	return errors.WithStack(server.ListenAndServeTLS("", ""))
 }
