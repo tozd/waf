@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
-	"embed"
 	"encoding/base64"
 	"fmt"
 	"io/fs"
@@ -30,9 +29,6 @@ import (
 //go:embed routes.json
 var routesConfiguration []byte
 
-//go:embed dist
-var distFiles embed.FS
-
 type routes struct {
 	Routes []struct {
 		Name string `json:"name"`
@@ -48,8 +44,9 @@ type Site struct {
 	CertFile string `json:"cert,omitempty" yaml:"cert,omitempty"`
 	KeyFile  string `json:"key,omitempty"  yaml:"key,omitempty"`
 
+	Files fs.ReadFileFS `json:"-" yaml:"-"`
+
 	// Maps between content types, paths, and content/etags.
-	// They are per site because they can include rendered per-site content.
 	compressedFiles      map[string]map[string][]byte
 	compressedFilesEtags map[string]map[string]string
 }
@@ -541,7 +538,7 @@ func (s *Service) renderAndCompressFiles() errors.E {
 		for _, compression := range allCompressions {
 			site.compressedFiles[compression] = make(map[string][]byte)
 
-			err := fs.WalkDir(distFiles, "dist", func(path string, d fs.DirEntry, err error) error {
+			err := fs.WalkDir(site.Files, ".", func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return errors.WithStack(err)
 				}
@@ -549,11 +546,11 @@ func (s *Service) renderAndCompressFiles() errors.E {
 					return nil
 				}
 
-				data, err := distFiles.ReadFile(path)
+				data, err := site.Files.ReadFile(path)
 				if err != nil {
 					return errors.WithStack(err)
 				}
-				path = strings.TrimPrefix(path, "dist")
+				path = strings.TrimPrefix(path, ".")
 
 				var errE errors.E
 				if strings.HasSuffix(path, ".html") {
