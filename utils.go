@@ -424,7 +424,7 @@ func (s *Service) staticFile(w http.ResponseWriter, req *http.Request, path stri
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(data))
 }
 
-func (s *Service) ConnContext(ctx context.Context, c net.Conn) context.Context {
+func (s *Service) ConnContext(ctx context.Context, _ net.Conn) context.Context {
 	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
 }
 

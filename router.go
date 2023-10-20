@@ -183,7 +183,7 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) Error(w http.ResponseWriter, req *http.Request, code int) {
+func (r *Router) Error(w http.ResponseWriter, _ *http.Request, code int) {
 	http.Error(w,
 		http.StatusText(code),
 		code,
