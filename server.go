@@ -1,14 +1,17 @@
 package waf
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
+	"gitlab.com/tozd/identifier"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/net/idna"
@@ -232,7 +235,7 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 		Addr:              listenAddr,
 		Handler:           handler,
 		ErrorLog:          log.New(logger, "", 0),
-		ConnContext:       service.ConnContext,
+		ConnContext:       s.ConnContext,
 		ReadHeaderTimeout: time.Minute,
 		TLSConfig: &tls.Config{
 			MinVersion:       tls.VersionTLS12,
@@ -277,4 +280,8 @@ func (s *Server) Run(logger zerolog.Logger, router *Router, service *Service) er
 	logger.Info().Msgf("starting on %s", listenAddr)
 
 	return errors.WithStack(server.ListenAndServeTLS("", ""))
+}
+
+func (s *Server) ConnContext(ctx context.Context, _ net.Conn) context.Context {
+	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
 }

@@ -419,10 +419,6 @@ func (s *Service) staticFile(w http.ResponseWriter, req *http.Request, path stri
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(data))
 }
 
-func (s *Service) ConnContext(ctx context.Context, _ net.Conn) context.Context {
-	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
-}
-
 func idFromRequest(req *http.Request) (identifier.Identifier, bool) {
 	if req == nil {
 		return identifier.Identifier{}, false
