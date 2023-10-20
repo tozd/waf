@@ -22,7 +22,7 @@ const (
 )
 
 //nolint:lll
-type Server struct {
+type Server[SiteT hasSite] struct {
 	Logger zerolog.Logger `kong:"-" yaml:"-"`
 
 	Development bool   `help:"Run in development mode and proxy unknown requests." short:"d"                                                                    yaml:"development"`
@@ -66,13 +66,15 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server) Configure(sites map[string]Site) (map[string]Site, errors.E) {
+func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, errors.E) {
 	letsEncryptDomainsList := []string{}
 
 	if len(sites) > 0 { //nolint:nestif
 		fileGetCertificateFunctions := map[string]func(*tls.ClientHelloInfo) (*tls.Certificate, error){}
 
-		for domain, site := range sites {
+		for domain, siteT := range sites {
+			site := siteT.GetSite()
+
 			if site.Domain == "" {
 				return sites, errors.Errorf(`site's domain is required`)
 			}
@@ -155,11 +157,14 @@ func (s *Server) Configure(sites map[string]Site) (map[string]Site, errors.E) {
 	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
 		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
 
-		sites = map[string]Site{
-			s.TLS.Domain: {
-				Domain: s.TLS.Domain,
-				Title:  s.Title,
-			},
+		st := *new(SiteT)
+		site := st.GetSite()
+		*site = Site{
+			Domain: s.TLS.Domain,
+			Title:  s.Title,
+		}
+		sites = map[string]SiteT{
+			s.TLS.Domain: st,
 		}
 	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 		manager := certificateManager{
@@ -188,18 +193,24 @@ func (s *Server) Configure(sites map[string]Site) (map[string]Site, errors.E) {
 			return sites, errors.WithStack(err)
 		}
 
-		sites = map[string]Site{}
+		sites = map[string]SiteT{}
 		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
-			sites[leaf.Subject.CommonName] = Site{
+			st := *new(SiteT)
+			site := st.GetSite()
+			*site = Site{
 				Domain: leaf.Subject.CommonName,
 				Title:  s.Title,
 			}
+			sites[leaf.Subject.CommonName] = st
 		}
 		for _, san := range leaf.DNSNames {
-			sites[san] = Site{
+			st := *new(SiteT)
+			site := st.GetSite()
+			*site = Site{
 				Domain: san,
 				Title:  s.Title,
 			}
+			sites[san] = st
 		}
 
 		if len(sites) == 0 {
@@ -223,7 +234,7 @@ func (s *Server) Configure(sites map[string]Site) (map[string]Site, errors.E) {
 	return sites, nil
 }
 
-func (s *Server) InDevelopment() string {
+func (s *Server[SiteT]) InDevelopment() string {
 	development := s.ProxyTo
 	if !s.Development {
 		development = ""
@@ -231,7 +242,7 @@ func (s *Server) InDevelopment() string {
 	return development
 }
 
-func (s *Server) Run(handler http.Handler) errors.E {
+func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 	// TODO: Implement graceful shutdown.
 	// TODO: Add request timeouts so that malicious client cannot make too slow requests or read too slowly the response.
 	//       Currently this is not possible, because ReadTimeout and WriteTimeout count in handler processing time as well.
@@ -287,6 +298,6 @@ func (s *Server) Run(handler http.Handler) errors.E {
 	return errors.WithStack(server.ListenAndServeTLS("", ""))
 }
 
-func (s *Server) connContext(ctx context.Context, _ net.Conn) context.Context {
+func (s *Server[SiteT]) connContext(ctx context.Context, _ net.Conn) context.Context {
 	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
 }

@@ -71,29 +71,29 @@ func getHost(hostPort string) string {
 }
 
 // NotFound is a HTTP request handler which returns a 404 error to the client.
-func (s *Service) NotFound(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request, _ Params) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
 	// is different from what http.NotFound uses, and we want to use the same pattern.
 	Error(w, req, http.StatusNotFound)
 }
 
-func (s *Service) MethodNotAllowed(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request, _ Params) {
 	Error(w, req, http.StatusMethodNotAllowed)
 }
 
-func (s *Service) NotAcceptable(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) NotAcceptable(w http.ResponseWriter, req *http.Request, _ Params) {
 	Error(w, req, http.StatusNotAcceptable)
 }
 
-func (s *Service) BadRequest(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request, _ Params) {
 	Error(w, req, http.StatusBadRequest)
 }
 
-func (s *Service) InternalServerError(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Request, _ Params) {
 	Error(w, req, http.StatusInternalServerError)
 }
 
-func (s *Service) makeReverseProxy() errors.E {
+func (s *Service[SiteT]) makeReverseProxy() errors.E {
 	target, err := url.Parse(s.Development)
 	if err != nil {
 		return errors.WithStack(err)
@@ -115,17 +115,19 @@ func (s *Service) makeReverseProxy() errors.E {
 	return nil
 }
 
-func (s *Service) Proxy(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
 
-func (s *Service) serveStaticFiles() errors.E {
+func (s *Service[SiteT]) serveStaticFiles() errors.E {
 	staticName := autoName(s.StaticFile)
 	staticH := logHandlerName(staticName, s.StaticFile)
 	immutableName := autoName(s.ImmutableFile)
 	immutableH := logHandlerName(staticName, s.ImmutableFile)
 
-	for _, site := range s.Sites {
+	for _, siteT := range s.Sites {
+		site := siteT.GetSite()
+
 		// We can use any compression to obtain all static paths, so we use compressionIdentity.
 		for path := range site.compressedFiles[compressionIdentity] {
 			if (s.SkipStaticFile != nil && s.SkipStaticFile(path)) || path == contextPath {
@@ -156,7 +158,7 @@ func (s *Service) serveStaticFiles() errors.E {
 	return nil
 }
 
-func (s *Service) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
@@ -176,7 +178,7 @@ func (s *Service) internalServerErrorWithError(w http.ResponseWriter, req *http.
 	s.InternalServerError(w, req, nil)
 }
 
-func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
+func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
 	logger := hlog.FromRequest(req)
 	var e error
 	switch ee := err.(type) {
@@ -195,7 +197,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, req *http.Request, err inte
 	s.InternalServerError(w, req, nil)
 }
 
-func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
@@ -204,7 +206,7 @@ func (s *Service) badRequestWithError(w http.ResponseWriter, req *http.Request, 
 	s.BadRequest(w, req, nil)
 }
 
-func (s *Service) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+func (s *Service[SiteT]) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
@@ -213,7 +215,7 @@ func (s *Service) notFoundWithError(w http.ResponseWriter, req *http.Request, er
 	s.NotFound(w, req, nil)
 }
 
-func (s *Service) render(path string, data []byte, site Site) ([]byte, errors.E) {
+func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, errors.E) {
 	t, err := template.New(path).Parse(string(data))
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -273,7 +275,7 @@ func compress(compression string, data []byte) ([]byte, errors.E) {
 	return data, nil
 }
 
-func (s *Service) writeJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
+func (s *Service[SiteT]) writeJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
 
@@ -348,27 +350,29 @@ func (s *Service) writeJSON(w http.ResponseWriter, req *http.Request, contentEnc
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
 }
 
-func (s *Service) StaticFile(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) StaticFile(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.staticFile(w, req, req.URL.Path, false)
 }
 
-func (s *Service) ImmutableFile(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) ImmutableFile(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.staticFile(w, req, req.URL.Path, true)
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.
-func (s *Service) staticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
+func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
 	contentEncoding := eddo.NegotiateContentEncoding(req, allCompressions)
 	if contentEncoding == "" {
 		s.NotAcceptable(w, req, nil)
 		return
 	}
 
-	site, err := s.getSite(req)
+	siteT, err := s.getSite(req)
 	if err != nil {
 		s.notFoundWithError(w, req, err)
 		return
 	}
+
+	site := siteT.GetSite()
 
 	data, ok := site.compressedFiles[contentEncoding][path]
 	if !ok {
@@ -427,7 +431,7 @@ func idFromRequest(req *http.Request) (identifier.Identifier, bool) {
 	return id, ok
 }
 
-func (s *Service) parseForm(next http.Handler) http.Handler {
+func (s *Service[SiteT]) parseForm(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		err := req.ParseForm()
 		if err != nil {

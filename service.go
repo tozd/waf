@@ -49,12 +49,20 @@ type Site struct {
 	compressedFilesEtags map[string]map[string]string
 }
 
-type Service struct {
+func (s *Site) GetSite() *Site {
+	return s
+}
+
+type hasSite interface {
+	GetSite() *Site
+}
+
+type Service[SiteT hasSite] struct {
 	Logger zerolog.Logger
 
 	Files  fs.ReadFileFS
 	Routes []Route
-	Sites  map[string]Site
+	Sites  map[string]SiteT
 
 	// Build metadata.
 	Version        string
@@ -319,7 +327,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func (s *Service) configureRoutes(service interface{}) errors.E {
+func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	v := reflect.ValueOf(service)
 
 	for _, route := range s.Routes {
@@ -413,7 +421,7 @@ func (s *Service) configureRoutes(service interface{}) errors.E {
 	return nil
 }
 
-func (s *Service) RouteWith(router *Router, service interface{}) (http.Handler, errors.E) {
+func (s *Service[SiteT]) RouteWith(router *Router, service interface{}) (http.Handler, errors.E) {
 	if s.router != nil {
 		panic(errors.New("RouteWith called more than once"))
 	}
@@ -525,9 +533,11 @@ func (s *Service) RouteWith(router *Router, service interface{}) (http.Handler, 
 	return c.Then(s.router), nil
 }
 
-func (s *Service) renderAndCompressFiles() errors.E {
+func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 	// Each site might render HTML files differently.
-	for domain, site := range s.Sites {
+	for domain, siteT := range s.Sites {
+		site := siteT.GetSite()
+
 		if site.compressedFiles != nil {
 			return errors.New("renderAndCompressFiles called more than once")
 		}
@@ -553,7 +563,7 @@ func (s *Service) renderAndCompressFiles() errors.E {
 
 				var errE errors.E
 				if strings.HasSuffix(path, ".html") {
-					data, errE = s.render(path, data, site)
+					data, errE = s.render(path, data, siteT)
 					if errE != nil {
 						return errE
 					}
@@ -574,14 +584,16 @@ func (s *Service) renderAndCompressFiles() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.Sites[domain] = site
+		s.Sites[domain] = siteT
 	}
 
 	return nil
 }
 
-func (s *Service) renderAndCompressContext() errors.E {
-	for domain, site := range s.Sites {
+func (s *Service[SiteT]) renderAndCompressContext() errors.E {
+	for domain, siteT := range s.Sites {
+		site := siteT.GetSite()
+
 		// In development, this method could be called first and compressedFiles are not yet
 		// initialized (as requests for other files are proxied), while in production
 		// compressedFiles has already been initialized and populated by built static files.
@@ -594,7 +606,7 @@ func (s *Service) renderAndCompressContext() errors.E {
 				site.compressedFiles[compression] = make(map[string][]byte)
 			}
 
-			data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(site))
+			data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
 			if errE != nil {
 				return errE
 			}
@@ -609,14 +621,16 @@ func (s *Service) renderAndCompressContext() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.Sites[domain] = site
+		s.Sites[domain] = siteT
 	}
 
 	return nil
 }
 
-func (s *Service) computeEtags() errors.E {
-	for domain, site := range s.Sites {
+func (s *Service[SiteT]) computeEtags() errors.E {
+	for domain, siteT := range s.Sites {
+		site := siteT.GetSite()
+
 		if site.compressedFilesEtags != nil {
 			return errors.New("computeEtags called more than once")
 		}
@@ -636,7 +650,7 @@ func (s *Service) computeEtags() errors.E {
 
 		// Map cannot be modified directly, so we modify the copy
 		// and store it back into the map.
-		s.Sites[domain] = site
+		s.Sites[domain] = siteT
 	}
 
 	return nil
@@ -648,13 +662,13 @@ type buildContext struct {
 	Revision       string `json:"revision,omitempty"`
 }
 
-type siteContext struct {
-	Site  Site          `json:"site"`
+type siteContext[SiteT hasSite] struct {
+	Site  SiteT         `json:"site"`
 	Build *buildContext `json:"build,omitempty"`
 }
 
-func (s *Service) getSiteContext(site Site) siteContext {
-	c := siteContext{
+func (s *Service[SiteT]) getSiteContext(site SiteT) siteContext[SiteT] {
+	c := siteContext[SiteT]{
 		Site:  site,
 		Build: nil,
 	}
@@ -670,9 +684,9 @@ func (s *Service) getSiteContext(site Site) siteContext {
 	return c
 }
 
-func (s *Service) getSite(req *http.Request) (Site, errors.E) {
+func (s *Service[SiteT]) getSite(req *http.Request) (SiteT, errors.E) {
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
-	return Site{}, errors.Errorf(`site not found for host "%s"`, req.Host)
+	return *new(SiteT), errors.Errorf(`site not found for host "%s"`, req.Host)
 }
