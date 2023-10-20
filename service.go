@@ -565,7 +565,7 @@ func (s *Service[SiteT]) writeJSON(w http.ResponseWriter, req *http.Request, con
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
 }
 
-func (s *Service[SiteT]) getSite(req *http.Request) (SiteT, errors.E) {
+func (s *Service[SiteT]) Site(req *http.Request) (SiteT, errors.E) {
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
@@ -580,7 +580,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	siteT, err := s.getSite(req)
+	siteT, err := s.Site(req)
 	if err != nil {
 		s.notFoundWithError(w, req, err)
 		return
