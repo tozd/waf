@@ -12,6 +12,7 @@ import (
 	"github.com/felixge/httpsnoop"
 	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
+	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
 
@@ -230,4 +231,15 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+func (s *Service[SiteT]) parseForm(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			s.badRequestWithError(w, req, errors.WithStack(err))
+			return
+		}
+		next.ServeHTTP(w, req)
+	})
 }

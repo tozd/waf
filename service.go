@@ -1,16 +1,25 @@
 package waf
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/textproto"
+	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
 	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
@@ -73,100 +82,6 @@ type Service[SiteT hasSite] struct {
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
-}
-
-func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
-	v := reflect.ValueOf(service)
-
-	for _, route := range s.Routes {
-		if !route.Get && !route.API {
-			errE := errors.New(`at least one of "get" and "api" has to be true`)
-			errors.Details(errE)["name"] = route.Name
-			errors.Details(errE)["path"] = route.Path
-			return errE
-		}
-
-		if route.Get {
-			handlerName := route.Name
-			m := v.MethodByName(handlerName)
-			if !m.IsValid() {
-				errE := errors.New("handler not found")
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-			s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: handler found")
-			// We cannot use Handler here because it is a named type.
-			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
-			if !ok {
-				errE := errors.Errorf("invalid route handler type: %T", m.Interface())
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-			h = logHandlerName(handlerName, h)
-			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
-			if errE != nil {
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-		}
-		if route.API {
-			foundAnyAPIHandler := false
-			// MethodHead is handled by MethodGet handled.
-			for _, method := range []string{
-				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
-				http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace,
-			} {
-				handlerName := fmt.Sprintf("%sAPI%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
-				m := v.MethodByName(handlerName)
-				if !m.IsValid() {
-					s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
-					continue
-				}
-				s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
-				foundAnyAPIHandler = true
-				// We cannot use Handler here because it is a named type.
-				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
-				if !ok {
-					errE := errors.Errorf("invalid route handler type: %T", m.Interface())
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["name"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-				h = logHandlerName(handlerName, h)
-				errE := s.router.Handle(route.Name, method, route.Path, true, h)
-				if errE != nil {
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["name"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-				if method == http.MethodGet {
-					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
-					if errE != nil {
-						errors.Details(errE)["handler"] = handlerName
-						errors.Details(errE)["name"] = route.Name
-						errors.Details(errE)["path"] = route.Path
-						return errE
-					}
-				}
-			}
-			if !foundAnyAPIHandler {
-				errE := errors.Errorf("no route API handler found")
-				errors.Details(errE)["name"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s *Service[SiteT]) RouteWith(router *Router, service interface{}) (http.Handler, errors.E) {
@@ -279,6 +194,100 @@ func (s *Service[SiteT]) RouteWith(router *Router, service interface{}) (http.Ha
 	c = c.Append(urlHandler("path", "query"))
 
 	return c.Then(s.router), nil
+}
+
+func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
+	v := reflect.ValueOf(service)
+
+	for _, route := range s.Routes {
+		if !route.Get && !route.API {
+			errE := errors.New(`at least one of "get" and "api" has to be true`)
+			errors.Details(errE)["name"] = route.Name
+			errors.Details(errE)["path"] = route.Path
+			return errE
+		}
+
+		if route.Get {
+			handlerName := route.Name
+			m := v.MethodByName(handlerName)
+			if !m.IsValid() {
+				errE := errors.New("handler not found")
+				errors.Details(errE)["handler"] = handlerName
+				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["path"] = route.Path
+				return errE
+			}
+			s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: handler found")
+			// We cannot use Handler here because it is a named type.
+			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
+			if !ok {
+				errE := errors.Errorf("invalid route handler type: %T", m.Interface())
+				errors.Details(errE)["handler"] = handlerName
+				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["path"] = route.Path
+				return errE
+			}
+			h = logHandlerName(handlerName, h)
+			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
+			if errE != nil {
+				errors.Details(errE)["handler"] = handlerName
+				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["path"] = route.Path
+				return errE
+			}
+		}
+		if route.API {
+			foundAnyAPIHandler := false
+			// MethodHead is handled by MethodGet handled.
+			for _, method := range []string{
+				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+				http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace,
+			} {
+				handlerName := fmt.Sprintf("%sAPI%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
+				m := v.MethodByName(handlerName)
+				if !m.IsValid() {
+					s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
+					continue
+				}
+				s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
+				foundAnyAPIHandler = true
+				// We cannot use Handler here because it is a named type.
+				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
+				if !ok {
+					errE := errors.Errorf("invalid route handler type: %T", m.Interface())
+					errors.Details(errE)["handler"] = handlerName
+					errors.Details(errE)["name"] = route.Name
+					errors.Details(errE)["path"] = route.Path
+					return errE
+				}
+				h = logHandlerName(handlerName, h)
+				errE := s.router.Handle(route.Name, method, route.Path, true, h)
+				if errE != nil {
+					errors.Details(errE)["handler"] = handlerName
+					errors.Details(errE)["name"] = route.Name
+					errors.Details(errE)["path"] = route.Path
+					return errE
+				}
+				if method == http.MethodGet {
+					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
+					if errE != nil {
+						errors.Details(errE)["handler"] = handlerName
+						errors.Details(errE)["name"] = route.Name
+						errors.Details(errE)["path"] = route.Path
+						return errE
+					}
+				}
+			}
+			if !foundAnyAPIHandler {
+				errE := errors.Errorf("no route API handler found")
+				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["path"] = route.Path
+				return errE
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
@@ -404,9 +413,215 @@ func (s *Service[SiteT]) computeEtags() errors.E {
 	return nil
 }
 
+func (s *Service[SiteT]) makeReverseProxy() errors.E {
+	target, err := url.Parse(s.Development)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	singleHostDirector := httputil.NewSingleHostReverseProxy(target).Director
+	director := func(req *http.Request) {
+		singleHostDirector(req)
+		// TODO: Map origin and other headers.
+	}
+
+	// TODO: Map response cookies, other headers which include origin, and redirect locations.
+	s.reverseProxy = &httputil.ReverseProxy{
+		Director:      director,
+		Transport:     cleanhttp.DefaultPooledTransport(),
+		FlushInterval: -1,
+		ErrorLog:      log.New(s.Logger, "", 0),
+	}
+	return nil
+}
+
+func (s *Service[SiteT]) serveStaticFiles() errors.E {
+	staticName := autoName(s.StaticFile)
+	staticH := logHandlerName(staticName, s.StaticFile)
+	immutableName := autoName(s.ImmutableFile)
+	immutableH := logHandlerName(staticName, s.ImmutableFile)
+
+	for _, siteT := range s.Sites {
+		site := siteT.GetSite()
+
+		// We can use any compression to obtain all static paths, so we use compressionIdentity.
+		for path := range site.compressedFiles[compressionIdentity] {
+			if (s.SkipStaticFile != nil && s.SkipStaticFile(path)) || path == contextPath {
+				continue
+			}
+
+			var n string
+			var h Handler
+			if s.IsImmutableFile != nil && s.IsImmutableFile(path) {
+				n = fmt.Sprintf("%s:%s", immutableName, path)
+				h = immutableH
+			} else {
+				n = fmt.Sprintf("%s:%s", staticName, path)
+				h = staticH
+			}
+
+			err := s.router.Handle(n, http.MethodGet, path, false, h)
+			if err != nil {
+				return err
+			}
+		}
+
+		// We can use any site to obtain all static paths,
+		// so we break here after the first site.
+		break
+	}
+
+	return nil
+}
+
+func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, errors.E) {
+	t, err := template.New(path).Parse(string(data))
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	var out bytes.Buffer
+	err = t.Execute(&out, s.getSiteContext(site))
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return out.Bytes(), nil
+}
+
+func (s *Service[SiteT]) writeJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
+	ctx := req.Context()
+	timing := servertiming.FromContext(ctx)
+
+	m := timing.NewMetric("j").Start()
+
+	var encoded []byte
+	switch d := data.(type) {
+	case json.RawMessage:
+		encoded = []byte(d)
+	default:
+		e, err := x.MarshalWithoutEscapeHTML(data)
+		if err != nil {
+			s.internalServerErrorWithError(w, req, errors.WithStack(err))
+			return
+		}
+		encoded = e
+	}
+
+	m.Stop()
+
+	if len(encoded) <= minCompressionSize {
+		contentEncoding = compressionIdentity
+	}
+
+	m = timing.NewMetric("c").Start()
+
+	encoded, errE := compress(contentEncoding, encoded)
+	if errE != nil {
+		s.internalServerErrorWithError(w, req, errE)
+		return
+	}
+
+	m.Stop()
+
+	hash := sha256.New()
+	_, _ = hash.Write(encoded)
+
+	for key, value := range metadata {
+		w.Header()[textproto.CanonicalMIMEHeaderKey(s.MetadataHeaderPrefix+key)] = value
+		_, _ = hash.Write([]byte(key))
+		for _, v := range value {
+			_, _ = hash.Write([]byte(v))
+		}
+	}
+
+	etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
+
+	logger := hlog.FromRequest(req)
+	if len(metadata) > 0 {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return logValues(c, "metadata", metadata)
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if contentEncoding != compressionIdentity {
+		w.Header().Set("Content-Encoding", contentEncoding)
+	} else {
+		// TODO: Always set Content-Length.
+		//       See: https://github.com/golang/go/pull/50904
+		w.Header().Set("Content-Length", strconv.Itoa(len(encoded)))
+	}
+	if len(w.Header().Values("Cache-Control")) == 0 {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+	w.Header().Add("Vary", "Accept-Encoding")
+	w.Header().Set("Etag", etag)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	// See: https://github.com/golang/go/issues/50905
+	// See: https://github.com/golang/go/pull/50903
+	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
+}
+
 func (s *Service[SiteT]) getSite(req *http.Request) (SiteT, errors.E) {
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
 	return *new(SiteT), errors.Errorf(`site not found for host "%s"`, req.Host)
+}
+
+func (s *Service[SiteT]) internalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Err(err)
+	})
+	if errors.Is(err, context.Canceled) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "canceled")
+		})
+		return
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "deadline exceeded")
+		})
+		return
+	}
+
+	s.InternalServerError(w, req, nil)
+}
+
+func (s *Service[SiteT]) badRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Err(err)
+	})
+
+	s.BadRequest(w, req, nil)
+}
+
+func (s *Service[SiteT]) notFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+	logger := hlog.FromRequest(req)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Err(err)
+	})
+
+	s.NotFound(w, req, nil)
+}
+
+func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
+	logger := hlog.FromRequest(req)
+	var e error
+	switch ee := err.(type) {
+	case error:
+		e = errors.WithStack(ee)
+	case string:
+		e = errors.New(ee)
+	}
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		if e != nil {
+			return c.Err(e)
+		}
+		return c.Interface("panic", err)
+	})
+
+	s.InternalServerError(w, req, nil)
 }
