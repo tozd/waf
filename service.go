@@ -46,10 +46,13 @@ type Site struct {
 }
 
 type Service struct {
-	Logger         zerolog.Logger
-	Files          fs.ReadFileFS
-	Routes         []Route
-	Sites          map[string]Site
+	Logger zerolog.Logger
+
+	Files  fs.ReadFileFS
+	Routes []Route
+	Sites  map[string]Site
+
+	// Build metadata.
 	Version        string
 	BuildTimestamp string
 	Revision       string
