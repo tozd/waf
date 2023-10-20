@@ -2,6 +2,7 @@ package waf
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -105,6 +106,8 @@ type Router struct {
 	MethodNotAllowed Handler
 	NotAcceptable    Handler
 	Panic            func(w http.ResponseWriter, req *http.Request, err interface{})
+	EncodeQuery      func(qs url.Values) string
+
 	// A map between route name and routes.
 	routes   map[string]*route
 	matchers []matcher
@@ -260,7 +263,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) path(name string, params Params, query string, api bool) (string, errors.E) {
+func (r *Router) path(name string, params Params, qs url.Values, api bool) (string, errors.E) {
 	route, ok := r.routes[name]
 	if !ok {
 		return "", errors.Errorf(`route with name "%s" does not exist`, name)
@@ -304,18 +307,22 @@ func (r *Router) path(name string, params Params, query string, api bool) (strin
 		}
 	}
 
-	if query != "" {
+	if len(qs) > 0 {
 		res.WriteString("?")
-		res.WriteString(query)
+		if r.EncodeQuery != nil {
+			res.WriteString(r.EncodeQuery(qs))
+		} else {
+			res.WriteString(qs.Encode())
+		}
 	}
 
 	return res.String(), nil
 }
 
-func (r *Router) Path(name string, params Params, query string) (string, errors.E) {
-	return r.path(name, params, query, false)
+func (r *Router) Path(name string, params Params, qs url.Values) (string, errors.E) {
+	return r.path(name, params, qs, false)
 }
 
-func (r *Router) APIPath(name string, params Params, query string) (string, errors.E) {
-	return r.path(name, params, query, true)
+func (r *Router) APIPath(name string, params Params, qs url.Values) (string, errors.E) {
+	return r.path(name, params, qs, true)
 }
