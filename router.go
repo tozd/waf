@@ -144,6 +144,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			Name:        name,
 			Path:        path,
 			Segments:    segments,
+			GetHandler:  nil,
 			APIHandlers: make(map[string]Handler),
 		}
 		if r.routes == nil {

@@ -47,7 +47,8 @@ func createTempCertificateFiles(certPath, keyPath string) error {
 		return err
 	}
 	defer certFile.Close()
-	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
+	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	if err != nil {
 		return err
 	}
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -18,7 +19,9 @@ import (
 )
 
 const (
-	listenAddr = ":8080"
+	listenAddr        = ":8080"
+	readHeaderTimeout = 10 * time.Second
+	idleTimeout       = 10 * time.Minute
 )
 
 //nolint:lll
@@ -66,7 +69,7 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 	return found, nil
 }
 
-func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, errors.E) {
+func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	letsEncryptDomainsList := []string{}
 
 	if len(sites) > 0 { //nolint:nestif
@@ -87,9 +90,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 			if site.CertFile != "" && site.KeyFile != "" {
 				manager := certificateManager{
-					CertFile: site.CertFile,
-					KeyFile:  site.KeyFile,
-					Logger:   s.Logger,
+					CertFile:    site.CertFile,
+					KeyFile:     site.KeyFile,
+					Logger:      s.Logger,
+					certificate: nil,
+					mu:          sync.RWMutex{},
+					ticker:      nil,
+					done:        nil,
 				}
 
 				err := manager.Start()
@@ -114,9 +121,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
 			} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 				manager := certificateManager{
-					CertFile: s.TLS.CertFile,
-					KeyFile:  s.TLS.KeyFile,
-					Logger:   s.Logger,
+					CertFile:    s.TLS.CertFile,
+					KeyFile:     s.TLS.KeyFile,
+					Logger:      s.Logger,
+					certificate: nil,
+					mu:          sync.RWMutex{},
+					ticker:      nil,
+					done:        nil,
 				}
 
 				err := manager.Start()
@@ -173,17 +184,25 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 		st := *new(SiteT)
 		site := st.GetSite()
 		*site = Site{
-			Domain: s.TLS.Domain,
-			Title:  s.Title,
+			Domain:               s.TLS.Domain,
+			Title:                s.Title,
+			CertFile:             "",
+			KeyFile:              "",
+			compressedFiles:      nil,
+			compressedFilesEtags: nil,
 		}
 		sites = map[string]SiteT{
 			s.TLS.Domain: st,
 		}
 	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 		manager := certificateManager{
-			CertFile: s.TLS.CertFile,
-			KeyFile:  s.TLS.KeyFile,
-			Logger:   s.Logger,
+			CertFile:    s.TLS.CertFile,
+			KeyFile:     s.TLS.KeyFile,
+			Logger:      s.Logger,
+			certificate: nil,
+			mu:          sync.RWMutex{},
+			ticker:      nil,
+			done:        nil,
 		}
 
 		errE := manager.Start()
@@ -211,8 +230,12 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			st := *new(SiteT)
 			site := st.GetSite()
 			*site = Site{
-				Domain: leaf.Subject.CommonName,
-				Title:  s.Title,
+				Domain:               leaf.Subject.CommonName,
+				Title:                s.Title,
+				CertFile:             "",
+				KeyFile:              "",
+				compressedFiles:      nil,
+				compressedFilesEtags: nil,
 			}
 			sites[leaf.Subject.CommonName] = st
 		}
@@ -220,8 +243,12 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			st := *new(SiteT)
 			site := st.GetSite()
 			*site = Site{
-				Domain: san,
-				Title:  s.Title,
+				Domain:               san,
+				Title:                s.Title,
+				CertFile:             "",
+				KeyFile:              "",
+				compressedFiles:      nil,
+				compressedFilesEtags: nil,
 			}
 			sites[san] = st
 		}
@@ -237,10 +264,15 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 	if len(letsEncryptDomainsList) > 0 {
 		manager := autocert.Manager{
-			Cache:      autocert.DirCache(s.TLS.Cache),
-			Prompt:     autocert.AcceptTOS,
-			Email:      s.TLS.Email,
-			HostPolicy: autocert.HostWhitelist(letsEncryptDomainsList...),
+			Prompt:                 autocert.AcceptTOS,
+			Cache:                  autocert.DirCache(s.TLS.Cache),
+			HostPolicy:             autocert.HostWhitelist(letsEncryptDomainsList...),
+			RenewBefore:            0,
+			Client:                 nil,
+			Email:                  s.TLS.Email,
+			ForceRSA:               false,
+			ExtraExtensions:        nil,
+			ExternalAccountBinding: nil,
 		}
 
 		s.letsEncryptGetCertificate = manager.GetCertificate
@@ -263,11 +295,9 @@ func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 	//       Currently this is not possible, because ReadTimeout and WriteTimeout count in handler processing time as well.
 	//       Moreover, when they timeout, they do not cancel the handler itself. See: https://github.com/golang/go/issues/16100
 	server := &http.Server{
-		Addr:              listenAddr,
-		Handler:           handler,
-		ErrorLog:          log.New(s.Logger, "", 0),
-		ConnContext:       s.connContext,
-		ReadHeaderTimeout: time.Minute,
+		Addr:                         listenAddr,
+		Handler:                      handler,
+		DisableGeneralOptionsHandler: false,
 		TLSConfig: &tls.Config{
 			MinVersion:       tls.VersionTLS12,
 			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -285,6 +315,16 @@ func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 			},
 		},
+		ReadTimeout:       0,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      0,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    0,
+		TLSNextProto:      nil,
+		ConnState:         nil,
+		ErrorLog:          log.New(s.Logger, "", 0),
+		BaseContext:       nil,
+		ConnContext:       s.connContext,
 	}
 
 	if s.fileGetCertificate != nil && s.letsEncryptGetCertificate != nil {

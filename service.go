@@ -440,10 +440,14 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 
 	// TODO: Map response cookies, other headers which include origin, and redirect locations.
 	s.reverseProxy = &httputil.ReverseProxy{
-		Director:      director,
-		Transport:     cleanhttp.DefaultPooledTransport(),
-		FlushInterval: -1,
-		ErrorLog:      log.New(s.Logger, "", 0),
+		Rewrite:        nil,
+		Director:       director,
+		Transport:      cleanhttp.DefaultPooledTransport(),
+		FlushInterval:  -1,
+		ErrorLog:       log.New(s.Logger, "", 0),
+		BufferPool:     nil,
+		ModifyResponse: nil,
+		ErrorHandler:   nil,
 	}
 	return nil
 }
@@ -575,7 +579,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
 }
 
-func (s *Service[SiteT]) Site(req *http.Request) (SiteT, errors.E) {
+func (s *Service[SiteT]) Site(req *http.Request) (SiteT, errors.E) { //nolint:ireturn
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}

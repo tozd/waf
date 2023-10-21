@@ -162,7 +162,11 @@ func accessHandler(f func(req *http.Request, code int, size int64, duration time
 			// We initialize Metrics ourselves so that if Code is never set it is logged as zero.
 			// This allows one to detect calls which has been canceled early and websocket upgrades.
 			// See: https://github.com/felixge/httpsnoop/issues/17
-			m := httpsnoop.Metrics{}
+			m := httpsnoop.Metrics{
+				Code:     0,
+				Duration: 0,
+				Written:  0,
+			}
 			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
 				next.ServeHTTP(ww, req)
 			})
@@ -181,7 +185,7 @@ func accessHandler(f func(req *http.Request, code int, size int64, duration time
 func removeMetadataHeaders(metadataHeaderPrefix string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{
+			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 				WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 					return func(code int) {
 						if code == http.StatusNotModified {
@@ -207,7 +211,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 			var websocket bool
 			var read int64
 			var written int64
-			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{
+			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 				Hijack: func(next httpsnoop.HijackFunc) httpsnoop.HijackFunc {
 					return func() (net.Conn, *bufio.ReadWriter, error) {
 						conn, bufrw, err := next()
