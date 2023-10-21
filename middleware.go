@@ -31,7 +31,8 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// httpVersionHandler is similar to hlog.ProtoHandler, but it does not store the HTTP prefix.
+// httpVersionHandler is similar to hlog.ProtoHandler, but it does not store the "HTTP/"
+// prefix in the protocol name.
 func httpVersionHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -136,15 +137,15 @@ func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func contentEncodingHandler(fieldKey string) func(next http.Handler) http.Handler {
+func headerFieldHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			next.ServeHTTP(w, req)
-			contentEncoding := w.Header().Get("Content-Encoding")
-			if contentEncoding != "" {
+			value := w.Header().Get(headerName)
+			if value != "" {
 				logger := zerolog.Ctx(req.Context())
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, contentEncoding)
+					return c.Str(fieldKey, value)
 				})
 			}
 		})
