@@ -185,7 +185,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(hlog.RefererHandler("referer"))
 	c = c.Append(connectionIDHandler("connection"))
 	c = c.Append(requestIDHandler("request", "Request-ID"))
-	c = c.Append(protocolHandler("proto"))
+	c = c.Append(httpVersionHandler("proto"))
 	c = c.Append(hostHandler("host"))
 	c = c.Append(etagHandler("etag"))
 	c = c.Append(contentEncodingHandler("encoding"))

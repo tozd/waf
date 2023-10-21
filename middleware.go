@@ -31,7 +31,8 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func protocolHandler(fieldKey string) func(next http.Handler) http.Handler {
+// httpVersionHandler is similar to hlog.ProtoHandler, but it does not store the HTTP prefix.
+func httpVersionHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			proto := strings.TrimPrefix(req.Proto, "HTTP/")
@@ -44,7 +45,7 @@ func protocolHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// remoteAddrHandler is similar to hlog.remoteAddrHandler, but logs only an IP, not a port.
+// remoteAddrHandler is similar to hlog.RemoteAddrHandler, but logs only an IP, not a port.
 func remoteAddrHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -60,6 +61,7 @@ func remoteAddrHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
+// hostHandler is similar to hlog.HostHandler, but it does not log the port.
 func hostHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -75,7 +77,7 @@ func hostHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// requestIDHandler is similar to hlog.requestIDHandler, but uses identifier.NewRandom() for ID.
+// requestIDHandler is similar to hlog.RequestIDHandler, but uses identifier.NewRandom() for ID.
 func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -100,7 +102,7 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 	}
 }
 
-// urlHandler is similar to hlog.urlHandler, but it adds path and separate query string fields.
+// urlHandler is similar to hlog.UrlHandler, but it adds path and separate query string fields.
 // It should be after the parseForm middleware as it uses req.Form.
 func urlHandler(pathKey, queryKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
