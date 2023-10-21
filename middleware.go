@@ -137,7 +137,7 @@ func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func headerFieldHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
+func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			next.ServeHTTP(w, req)

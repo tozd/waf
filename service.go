@@ -188,7 +188,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(httpVersionHandler("proto"))
 	c = c.Append(hostHandler("host"))
 	c = c.Append(etagHandler("etag"))
-	c = c.Append(headerFieldHandler("encoding", "Content-Encoding"))
+	c = c.Append(responseHeaderHandler("encoding", "Content-Encoding"))
 	// parseForm should be as late as possible because it can fail
 	// and we want other fields to be logged.
 	c = c.Append(s.parseForm)
