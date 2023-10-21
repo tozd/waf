@@ -10,6 +10,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/mitchellh/go-server-timing v1.0.1
 	github.com/rs/zerolog v1.31.1-0.20231014103838-6ed7439d9c6c
+	github.com/stretchr/testify v1.8.4
 	gitlab.com/tozd/go/errors v0.8.0
 	gitlab.com/tozd/go/x v0.0.0-20231018212754-db1da04ceaa8
 	gitlab.com/tozd/identifier v0.1.0
@@ -22,6 +23,7 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/btcsuite/btcutil v1.0.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
@@ -35,6 +37,7 @@ require (
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/whilp/git-urls v1.0.0 // indirect
@@ -42,4 +45,5 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
