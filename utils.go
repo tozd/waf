@@ -66,7 +66,7 @@ func compress(compression string, data []byte) ([]byte, errors.E) {
 			err = closeErr
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.WithMessage(err, compression)
 		}
 		data = buf.Bytes()
 	case compressionGzip:
@@ -77,27 +77,29 @@ func compress(compression string, data []byte) ([]byte, errors.E) {
 			err = closeErr
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.WithMessage(err, compression)
 		}
 		data = buf.Bytes()
 	case compressionDeflate:
 		var buf bytes.Buffer
 		writer, err := flate.NewWriter(&buf, -1)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.WithMessage(err, compression)
 		}
 		_, err = writer.Write(data)
 		if closeErr := writer.Close(); err == nil {
 			err = closeErr
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.WithMessage(err, compression)
 		}
 		data = buf.Bytes()
 	case compressionIdentity:
 		// Nothing.
 	default:
-		return nil, errors.Errorf("unknown compression: %s", compression)
+		errE := errors.New("unknown compression")
+		errors.Details(errE)["compression"] = compression
+		return nil, errE
 	}
 	return data, nil
 }

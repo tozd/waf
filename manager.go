@@ -52,7 +52,10 @@ func (c *certificateManager) Start() errors.E {
 func (c *certificateManager) reloadCertificate() errors.E {
 	certificate, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
 	if err != nil {
-		return errors.WithStack(err)
+		errE := errors.WithMessage(err, "error loading key pair")
+		errors.Details(errE)["certFile"] = c.CertFile
+		errors.Details(errE)["keyFile"] = c.KeyFile
+		return errE
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()

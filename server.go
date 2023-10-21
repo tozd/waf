@@ -76,10 +76,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			site := siteT.GetSite()
 
 			if site.Domain == "" {
-				return sites, errors.Errorf(`site's domain is required`)
+				return sites, errors.New("site's domain is required")
 			}
 			if domain != site.Domain {
-				return sites, errors.Errorf(`domain "%s" does not match site's domain "%s"`, domain, site.Domain)
+				err := errors.New("domain does not match site's domain")
+				errors.Details(err)["domain1"] = domain
+				errors.Details(err)["domain2"] = site.Domain
+				return sites, err
 			}
 
 			if site.CertFile != "" && site.KeyFile != "" {
@@ -91,7 +94,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 				err := manager.Start()
 				if err != nil {
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
 				}
 				defer manager.Stop()
 
@@ -99,10 +102,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 				ok, err := validForDomain(&manager, site.Domain)
 				if err != nil {
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
 				}
 				if !ok {
-					return sites, errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+					err := errors.New("certificate is not valid for domain")
+					errors.Details(err)["certFile"] = site.CertFile
+					errors.Details(err)["domain"] = site.Domain
+					return sites, err
 				}
 			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
@@ -115,7 +121,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 				err := manager.Start()
 				if err != nil {
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
 				}
 				defer manager.Stop()
 
@@ -123,13 +129,18 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 				ok, err := validForDomain(&manager, site.Domain)
 				if err != nil {
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
 				}
 				if !ok {
-					return sites, errors.Errorf(`certificate "%s" is not valid for domain "%s"`, site.CertFile, site.Domain)
+					err := errors.New("certificate is not valid for domain")
+					errors.Details(err)["certFile"] = s.TLS.CertFile
+					errors.Details(err)["domain"] = site.Domain
+					return sites, err
 				}
 			} else {
-				return sites, errors.Errorf(`missing file or Let's Encrypt's certificate configuration for site "%s"`, site.Domain)
+				err := errors.New("missing file or Let's Encrypt's certificate configuration")
+				errors.Details(err)["domain"] = site.Domain
+				return sites, err
 			}
 		}
 
@@ -145,7 +156,9 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 				// idna.Punycode.ToASCII (or just idna.ToASCII) here.
 				name, err := idna.Lookup.ToASCII(hello.ServerName)
 				if err != nil {
-					return nil, errors.Errorf(`server name contains invalid character: %s`, hello.ServerName)
+					errE := errors.WithMessage(err, "server name contains invalid character")
+					errors.Details(errE)["name"] = hello.ServerName
+					return nil, errE
 				}
 				f, ok := fileGetCertificateFunctions[name]
 				if ok {
@@ -175,7 +188,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 
 		errE := manager.Start()
 		if errE != nil {
-			return sites, errE
+			return sites, errors.WithDetails(errE, "certFile", s.TLS.CertFile)
 		}
 		defer manager.Stop()
 
@@ -184,13 +197,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 		// We have to determine domain names this certificate is valid for.
 		certificate, err := manager.GetCertificate(nil)
 		if err != nil {
-			return sites, errors.WithStack(err)
+			return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
 		}
 		// certificate.Leaf is nil, so we have to parse leaf ourselves.
 		// See: https://github.com/golang/go/issues/35504
 		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
 		if err != nil {
-			return sites, errors.WithStack(err)
+			return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
 		}
 
 		sites = map[string]SiteT{}
@@ -214,7 +227,9 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 		}
 
 		if len(sites) == 0 {
-			return sites, errors.Errorf(`certificate "%s" is not valid for any domain`, s.TLS.CertFile)
+			err := errors.New("certificate is not valid for any domain")
+			errors.Details(err)["certFile"] = s.TLS.CertFile
+			return sites, err
 		}
 	} else {
 		return sites, errors.New("missing file or Let's Encrypt's certificate configuration")

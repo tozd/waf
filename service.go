@@ -223,10 +223,11 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			// We cannot use Handler here because it is a named type.
 			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 			if !ok {
-				errE := errors.Errorf("invalid route handler type: %T", m.Interface())
+				errE := errors.New("invalid route handler type")
 				errors.Details(errE)["handler"] = handlerName
 				errors.Details(errE)["name"] = route.Name
 				errors.Details(errE)["path"] = route.Path
+				errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 				return errE
 			}
 			h = logHandlerName(handlerName, h)
@@ -256,10 +257,11 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				// We cannot use Handler here because it is a named type.
 				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 				if !ok {
-					errE := errors.Errorf("invalid route handler type: %T", m.Interface())
+					errE := errors.New("invalid route handler type")
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["name"] = route.Name
 					errors.Details(errE)["path"] = route.Path
+					errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 					return errE
 				}
 				h = logHandlerName(handlerName, h)
@@ -281,7 +283,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				}
 			}
 			if !foundAnyAPIHandler {
-				errE := errors.Errorf("no route API handler found")
+				errE := errors.New("no route API handler found")
 				errors.Details(errE)["name"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
@@ -316,7 +318,9 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 
 				data, err := s.Files.ReadFile(path)
 				if err != nil {
-					return errors.WithStack(err)
+					errE := errors.WithStack(err)
+					errors.Details(errE)["path"] = path
+					return errE
 				}
 				path = strings.TrimPrefix(path, ".")
 
@@ -324,6 +328,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				if strings.HasSuffix(path, ".html") {
 					data, errE = s.render(path, data, siteT)
 					if errE != nil {
+						errors.Details(errE)["path"] = path
 						return errE
 					}
 				}
@@ -416,9 +421,15 @@ func (s *Service[SiteT]) computeEtags() errors.E {
 }
 
 func (s *Service[SiteT]) makeReverseProxy() errors.E {
+	if s.reverseProxy != nil {
+		return errors.New("makeReverseProxy called more than once")
+	}
+
 	target, err := url.Parse(s.Development)
 	if err != nil {
-		return errors.WithStack(err)
+		errE := errors.WithStack(err)
+		errors.Details(errE)["url"] = s.Development
+		return errE
 	}
 
 	singleHostDirector := httputil.NewSingleHostReverseProxy(target).Director
@@ -464,7 +475,7 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 
 			err := s.router.Handle(n, http.MethodGet, path, false, h)
 			if err != nil {
-				return err
+				return errors.WithDetails(err, "path", path)
 			}
 		}
 
@@ -479,12 +490,12 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, errors.E) {
 	t, err := template.New(path).Parse(string(data))
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.WithDetails(err, "path", path)
 	}
 	var out bytes.Buffer
 	err = t.Execute(&out, s.getSiteContext(site))
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.WithDetails(err, "path", path)
 	}
 	return out.Bytes(), nil
 }
@@ -568,7 +579,9 @@ func (s *Service[SiteT]) Site(req *http.Request) (SiteT, errors.E) {
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
-	return *new(SiteT), errors.Errorf(`site not found for host "%s"`, req.Host)
+	err := errors.New("site not found for host")
+	errors.Details(err)["host"] = req.Host
+	return *new(SiteT), err
 }
 
 func (s *Service[SiteT]) Path(name string, params Params, qs url.Values) (string, errors.E) {
@@ -597,7 +610,10 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 
 	data, ok := site.compressedFiles[contentEncoding][path]
 	if !ok {
-		s.InternalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+		err := errors.New("no data for compression and path")
+		errors.Details(err)["compression"] = contentEncoding
+		errors.Details(err)["path"] = path
+		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
@@ -605,20 +621,28 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		contentEncoding = compressionIdentity
 		data, ok = site.compressedFiles[contentEncoding][path]
 		if !ok {
-			s.InternalServerErrorWithError(w, req, errors.Errorf(`no data for compression %s and file "%s"`, contentEncoding, path))
+			err := errors.New("no data for compression and path")
+			errors.Details(err)["compression"] = contentEncoding
+			errors.Details(err)["path"] = path
+			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
 	}
 
 	etag, ok := site.compressedFilesEtags[contentEncoding][path]
 	if !ok {
-		s.InternalServerErrorWithError(w, req, errors.Errorf(`no etag for compression %s and file "%s"`, contentEncoding, path))
+		err := errors.New("no etag for compression and path")
+		errors.Details(err)["compression"] = contentEncoding
+		errors.Details(err)["path"] = path
+		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
 	contentType := mime.TypeByExtension(filepath.Ext(path))
 	if contentType == "" {
-		s.InternalServerErrorWithError(w, req, errors.Errorf(`unable to determine content type for file "%s"`, path))
+		err := errors.New("unable to determine content type for file")
+		errors.Details(err)["path"] = path
+		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 

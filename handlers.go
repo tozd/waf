@@ -45,6 +45,7 @@ func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Re
 
 	s.BadRequest(w, req, nil)
 }
+
 func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Request, _ Params) {
 	Error(w, req, http.StatusInternalServerError)
 }

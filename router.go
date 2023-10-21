@@ -16,7 +16,9 @@ type pathSegment struct {
 
 func parsePath(path string) ([]pathSegment, errors.E) {
 	if !strings.HasPrefix(path, "/") {
-		return nil, errors.Errorf(`path does not start with "/": %s`, path)
+		errE := errors.New(`path does not start with "/"`)
+		errors.Details(errE)["path"] = path
+		return nil, errE
 	}
 	p := strings.TrimPrefix(path, "/")
 	segments := []pathSegment{}
@@ -27,7 +29,9 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 	parts := strings.Split(p, "/")
 	for _, part := range parts {
 		if part == "" {
-			return nil, errors.Errorf(`path has an empty part`)
+			errE := errors.New("path has an empty part")
+			errors.Details(errE)["path"] = path
+			return nil, errE
 		}
 		var segment pathSegment
 		if strings.HasPrefix(part, ":") {
@@ -72,7 +76,7 @@ func compileRegexp(segments []pathSegment) (*regexp.Regexp, func([]string) Param
 	expr.WriteString("$")
 	re, err := regexp.Compile(expr.String())
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, errors.WithDetails(err, "regexp", expr.String())
 	}
 	return re, func(match []string) Params {
 		p := make(map[string]string, len(match)-1)
@@ -124,11 +128,17 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 	if !ok {
 		segments, err := parsePath(path)
 		if err != nil {
-			return errors.WithMessagef(err, `parsing path "%s" failed for route "%s"`, path, name)
+			err = errors.WithMessage(err, "parsing path failed")
+			errors.Details(err)["path"] = path
+			errors.Details(err)["route"] = name
+			return err
 		}
 		re, get, err := compileRegexp(segments)
 		if err != nil {
-			return errors.WithMessagef(err, `compiling regexp for path "%s" failed for route "%s"`, path, name)
+			err = errors.WithMessage(err, "compiling regexp failed")
+			errors.Details(err)["path"] = path
+			errors.Details(err)["route"] = name
+			return err
 		}
 		ro = &route{
 			Name:        name,
@@ -148,7 +158,11 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 	}
 
 	if ro.Path != path {
-		return errors.Errorf(`route with name "%s" but different paths "%s" vs. "%s"`, name, ro.Path, path)
+		err := errors.New("route with different paths")
+		errors.Details(err)["route"] = name
+		errors.Details(err)["path1"] = ro.Path
+		errors.Details(err)["path1"] = path
+		return err
 	}
 
 	for _, rr := range r.routes {
@@ -157,24 +171,38 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 		}
 
 		if rr.Path == path {
-			return errors.Errorf(`route with path "%s" but different names "%s" vs. "%s"`, path, rr.Name, name)
+			err := errors.New("route with different paths")
+			errors.Details(err)["route1"] = name
+			errors.Details(err)["route2"] = rr.Name
+			errors.Details(err)["path"] = path
+			return err
 		}
 	}
 
 	if api {
 		_, ok := ro.APIHandlers[method]
 		if ok {
-			return errors.Errorf(`route "%s" for "%s" has already handler for method "%s"`, name, path, method)
+			err := errors.New("API handler already exists")
+			errors.Details(err)["route"] = name
+			errors.Details(err)["path"] = path
+			errors.Details(err)["method"] = method
+			return err
 		}
 
 		ro.APIHandlers[method] = handler
 	} else {
 		if method != http.MethodGet {
-			return errors.Errorf(`non-API handler for route "%s" for "%s" must use GET HTTP method`, name, path)
+			err := errors.New("non-API handler must use GET HTTP method")
+			errors.Details(err)["route"] = name
+			errors.Details(err)["path"] = path
+			return err
 		}
 
 		if ro.GetHandler != nil {
-			return errors.Errorf(`non-API handler for route "%s" for "%s" already exists`, name, path)
+			err := errors.New("non-API handler already exists")
+			errors.Details(err)["route"] = name
+			errors.Details(err)["path"] = path
+			return err
 		}
 
 		ro.GetHandler = handler
@@ -262,13 +290,19 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *Router) path(name string, params Params, qs url.Values, api bool) (string, errors.E) {
 	ro, ok := r.routes[name]
 	if !ok {
-		return "", errors.Errorf(`route with name "%s" does not exist`, name)
+		err := errors.New("route does not exist")
+		errors.Details(err)["route"] = name
+		return "", err
 	}
 	if api && len(ro.APIHandlers) == 0 {
-		return "", errors.Errorf(`route with name "%s" has no API handlers`, name)
+		err := errors.New("route has no API handlers")
+		errors.Details(err)["route"] = name
+		return "", err
 	}
 	if !api && ro.GetHandler == nil {
-		return "", errors.Errorf(`route with name "%s" has no get handler`, name)
+		err := errors.New("route has no GET handler")
+		errors.Details(err)["route"] = name
+		return "", err
 	}
 
 	var res strings.Builder
@@ -286,7 +320,10 @@ func (r *Router) path(name string, params Params, qs url.Values, api bool) (stri
 
 		val := params[segment.Value]
 		if val == "" {
-			return "", errors.Errorf(`parameter "%s" for route "%s" is missing`, segment.Value, name)
+			err := errors.New("parameter is missing")
+			errors.Details(err)["name"] = segment.Value
+			errors.Details(err)["route"] = name
+			return "", err
 		}
 
 		res.WriteString("/")
