@@ -300,9 +300,7 @@ func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 		Addr:                         listenAddr,
 		Handler:                      handler,
 		DisableGeneralOptionsHandler: false,
-		TLSConfig: &tls.Config{
-			MinVersion:       tls.VersionTLS12,
-			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+		TLSConfig: &tls.Config{ //nolint:exhaustruct
 			CipherSuites: []uint16{
 				tls.TLS_AES_128_GCM_SHA256,
 				tls.TLS_AES_256_GCM_SHA384,
@@ -316,6 +314,8 @@ func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
 				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 			},
+			MinVersion:       tls.VersionTLS12,
+			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 		},
 		ReadTimeout:       0,
 		ReadHeaderTimeout: readHeaderTimeout,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"io"
 	"net"
 	"net/http"
 	"reflect"
@@ -141,13 +142,21 @@ type metricsConn struct {
 func (c *metricsConn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
 	atomic.AddInt64(c.read, int64(n))
-	return n, err
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
 }
 
 func (c *metricsConn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
 	atomic.AddInt64(c.written, int64(n))
-	return n, err
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
 }
 
 func logHandlerName(name string, h Handler) Handler {
