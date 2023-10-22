@@ -34,6 +34,14 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 			errors.Details(errE)["path"] = path
 			return nil, errE
 		}
+		// TODO: Support custom regex in params. For now we prevent them.
+		//
+		//	See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#Custom-regex-in-params
+		if strings.ContainsAny(part, "=*+()?") {
+			errE := errors.New("path contains unsupported characters")
+			errors.Details(errE)["path"] = path
+			return nil, errE
+		}
 		var segment pathSegment
 		if strings.HasPrefix(part, ":") {
 			segment.Value = strings.TrimPrefix(part, ":")
@@ -45,9 +53,6 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 	}
 	return segments, nil
 }
-
-// TODO: Support custom regex in params.
-//       See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#custom-regex-in-params
 
 func compileRegexp(segments []pathSegment) (*regexp.Regexp, func([]string) Params, errors.E) {
 	matchMap := make(map[int]string)

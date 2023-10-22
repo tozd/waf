@@ -47,6 +47,46 @@ func TestParsePath(t *testing.T) {
 			expectedResult: nil,
 			expectedError:  "path has an empty part",
 		},
+		{
+			inputPath:      "/users/*filepath", // Not supported by Vue Router, but by httprouter.
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/:orderId(\\d+)",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/:chapters+",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/:chapters*",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/:chapters(\\d+)+",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/:chapters(\\d+)*",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/users/:userId?",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
+		{
+			inputPath:      "/users/:userId(\\d+)?",
+			expectedResult: nil,
+			expectedError:  "path contains unsupported characters",
+		},
 	}
 
 	for _, tt := range tests {
