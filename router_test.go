@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -377,10 +378,10 @@ func TestRouterPath(t *testing.T) {
 			path:          "/users/:id/posts",
 			api:           false,
 			params:        Params{"id": "123"},
-			qs:            url.Values{"param1": {"value1"}, "param2": {"value2"}},
+			qs:            url.Values{"param1": {"value1"}, "param2": {"value2 % !@#"}},
 			inputAPI:      false,
 			encodeQuery:   nil,
-			expectedPath:  "/users/123/posts?param1=value1&param2=value2",
+			expectedPath:  "/users/123/posts?param1=value1&param2=value2+%25+%21%40%23",
 			expectedError: "",
 		},
 		{
@@ -388,10 +389,10 @@ func TestRouterPath(t *testing.T) {
 			path:          "/users/:id/posts",
 			api:           true,
 			params:        Params{"id": "123"},
-			qs:            url.Values{"param1": {"value1"}, "param2": {"value2"}},
+			qs:            url.Values{"param1": {"value1"}, "param2": {"value2 % !@#"}},
 			inputAPI:      true,
 			encodeQuery:   nil,
-			expectedPath:  "/api/users/123/posts?param1=value1&param2=value2",
+			expectedPath:  "/api/users/123/posts?param1=value1&param2=value2+%25+%21%40%23",
 			expectedError: "",
 		},
 		{
@@ -471,6 +472,27 @@ func TestRouterPath(t *testing.T) {
 			expectedPath:  "",
 			expectedError: "route has no GET handler",
 		},
+		{
+			description: "Path with custom query string",
+			path:        "/users/:id/posts",
+			api:         false,
+			params:      Params{"id": "123"},
+			qs:          url.Values{"param1": {"value1"}, "param2": {"value2"}},
+			inputAPI:    false,
+			encodeQuery: func(qs url.Values) string {
+				var buf strings.Builder
+				buf.WriteString(url.QueryEscape("param2"))
+				buf.WriteByte('=')
+				buf.WriteString(url.QueryEscape(qs.Get("param2")))
+				buf.WriteByte('&')
+				buf.WriteString(url.QueryEscape("param1"))
+				buf.WriteByte('=')
+				buf.WriteString(url.QueryEscape(qs.Get("param1")))
+				return buf.String()
+			},
+			expectedPath:  "/users/123/posts?param2=value2&param1=value1",
+			expectedError: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -479,7 +501,9 @@ func TestRouterPath(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Router{}
+			r := &Router{
+				EncodeQuery: tt.encodeQuery,
+			}
 
 			err := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
 			require.NoError(t, err)
