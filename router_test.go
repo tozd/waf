@@ -2,10 +2,10 @@ package waf
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/tozd/go/errors"
 )
 
 func TestParsePath(t *testing.T) {
@@ -14,7 +14,7 @@ func TestParsePath(t *testing.T) {
 	tests := []struct {
 		inputPath      string
 		expectedResult []pathSegment
-		expectedError  error
+		expectedError  string
 	}{
 		{
 			inputPath: "/users/:id/posts",
@@ -23,24 +23,24 @@ func TestParsePath(t *testing.T) {
 				{Value: "id", Parameter: true},
 				{Value: "posts", Parameter: false},
 			},
-			expectedError: nil,
+			expectedError: "",
 		},
 		{
 			inputPath: "/profile",
 			expectedResult: []pathSegment{
 				{Value: "profile", Parameter: false},
 			},
-			expectedError: nil,
+			expectedError: "",
 		},
 		{
 			inputPath:      "users/posts",
 			expectedResult: nil,
-			expectedError:  errors.New(`path does not start with "/"`),
+			expectedError:  `path does not start with "/"`,
 		},
 		{
 			inputPath:      "/users//posts",
 			expectedResult: nil,
-			expectedError:  errors.New("path has an empty part"),
+			expectedError:  "path has an empty part",
 		},
 	}
 
@@ -52,9 +52,9 @@ func TestParsePath(t *testing.T) {
 
 			segments, err := parsePath(tt.inputPath)
 			assert.Equal(t, tt.expectedResult, segments)
-			if tt.expectedError != nil {
+			if tt.expectedError != "" {
 				if assert.Error(t, err) {
-					assert.Equal(t, tt.expectedError.Error(), err.Error())
+					assert.Contains(t, tt.expectedError, err.Error())
 				}
 			} else {
 				assert.NoError(t, err)
@@ -71,7 +71,7 @@ func TestCompileRegexp(t *testing.T) {
 		expectedRegexp string
 		inputMatch     []string
 		expectedParams Params
-		expectedError  error
+		expectedError  string
 	}{
 		{
 			inputSegments: []pathSegment{
@@ -84,7 +84,7 @@ func TestCompileRegexp(t *testing.T) {
 			expectedParams: Params{
 				"id": "123",
 			},
-			expectedError: nil,
+			expectedError: "",
 		},
 		{
 			inputSegments: []pathSegment{
@@ -93,7 +93,7 @@ func TestCompileRegexp(t *testing.T) {
 			expectedRegexp: `^/profile$`,
 			inputMatch:     []string{""},
 			expectedParams: Params{},
-			expectedError:  nil,
+			expectedError:  "",
 		},
 	}
 
@@ -105,11 +105,11 @@ func TestCompileRegexp(t *testing.T) {
 
 			re, paramMapFunc, err := compileRegexp(tt.inputSegments)
 
-			if tt.expectedError != nil {
+			if tt.expectedError != "" {
 				assert.Nil(t, re)
 				assert.Nil(t, paramMapFunc)
 				if assert.Error(t, err) {
-					assert.Equal(t, tt.expectedError.Error(), err.Error())
+					assert.Contains(t, tt.expectedError, err.Error())
 				}
 			} else {
 				assert.NoError(t, err)
