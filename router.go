@@ -117,6 +117,18 @@ type Router struct {
 }
 
 func (r *Router) Handle(name, method, path string, api bool, handler Handler) errors.E {
+	if name == "" {
+		err := errors.New("name cannot be empty")
+		errors.Details(err)["path"] = path
+		errors.Details(err)["route"] = name
+		return err
+	}
+	if handler == nil {
+		err := errors.New("handler cannot be nil")
+		errors.Details(err)["path"] = path
+		errors.Details(err)["route"] = name
+		return err
+	}
 	ro, ok := r.routes[name]
 	if !ok {
 		segments, err := parsePath(path)
