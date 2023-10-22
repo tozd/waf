@@ -3,9 +3,11 @@ package waf
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -288,6 +290,18 @@ func TestRouterHandle(t *testing.T) {
 			expectedError: "parsing path failed",
 		},
 		{
+			description: "Adding a handler with duplicate params in path",
+			routes: []testRoute{
+				{
+					routeName: "DuplicateParams",
+					method:    http.MethodGet,
+					path:      "/users/:id/posts/:id",
+					api:       false,
+				},
+			},
+			expectedError: "duplicate parameter",
+		},
+		{
 			description: "Adding a handler with empty name",
 			routes: []testRoute{
 				{
@@ -325,5 +339,170 @@ func TestRouterHandle(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRouterPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		description   string
+		path          string
+		api           bool
+		encodeQuery   func(qs url.Values) string
+		params        Params
+		qs            url.Values
+		inputAPI      bool
+		expectedPath  string
+		expectedError string
+	}{
+		{
+			description:   "Non-API path",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{"id": "123"},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "/users/123/posts",
+			expectedError: "",
+		},
+		{
+			description:   "API path",
+			path:          "/users/:id/posts",
+			api:           true,
+			params:        Params{"id": "123"},
+			qs:            url.Values{},
+			inputAPI:      true,
+			encodeQuery:   nil,
+			expectedPath:  "/api/users/123/posts",
+			expectedError: "",
+		},
+		{
+			description:   "Non-API path with query string",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{"id": "123"},
+			qs:            url.Values{"param1": {"value1"}, "param2": {"value2"}},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "/users/123/posts?param1=value1&param2=value2",
+			expectedError: "",
+		},
+		{
+			description:   "API path with query string",
+			path:          "/users/:id/posts",
+			api:           true,
+			params:        Params{"id": "123"},
+			qs:            url.Values{"param1": {"value1"}, "param2": {"value2"}},
+			inputAPI:      true,
+			encodeQuery:   nil,
+			expectedPath:  "/api/users/123/posts?param1=value1&param2=value2",
+			expectedError: "",
+		},
+		{
+			description:   "Path with missing parameters",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "",
+			expectedError: "parameter is missing",
+		},
+		{
+			description:   "Path with extra parameters",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{"id": "123", "extra": "foobar"},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "",
+			expectedError: "extra parameters",
+		},
+		{
+			description:   "Root path",
+			path:          "/",
+			api:           false,
+			params:        Params{},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "/",
+			expectedError: "",
+		},
+		{
+			description:   "Root path",
+			path:          "/",
+			api:           true,
+			params:        Params{},
+			qs:            url.Values{},
+			inputAPI:      true,
+			encodeQuery:   nil,
+			expectedPath:  "/api/",
+			expectedError: "",
+		},
+		{
+			description:   "Non-API path but API requested",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{},
+			qs:            url.Values{},
+			inputAPI:      true,
+			encodeQuery:   nil,
+			expectedPath:  "",
+			expectedError: "route has no API handlers",
+		},
+		{
+			description:   "API path but non-API requested",
+			path:          "/users/:id/posts",
+			api:           true,
+			params:        Params{},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "",
+			expectedError: "route has no GET handler",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.description, func(t *testing.T) {
+			t.Parallel()
+
+			r := &Router{}
+
+			err := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
+			require.NoError(t, err)
+
+			path, err := r.path("PathName", tt.params, tt.qs, tt.inputAPI)
+
+			if tt.expectedError != "" {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), tt.expectedError)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedPath, path)
+			}
+		})
+	}
+}
+
+func TestRouterPathMissing(t *testing.T) {
+	t.Parallel()
+
+	r := &Router{}
+
+	err := r.Handle("PathName", http.MethodGet, "/", false, func(http.ResponseWriter, *http.Request, Params) {})
+	require.NoError(t, err)
+
+	_, err = r.path("PathNameMissing", nil, nil, false)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "route does not exist")
 	}
 }

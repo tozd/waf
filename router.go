@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -93,6 +94,7 @@ type route struct {
 	Name       string
 	Path       string
 	Segments   []pathSegment
+	Parameters mapset.Set[string]
 	GetHandler Handler
 	// A map between methods and API handlers.
 	APIHandlers map[string]Handler
@@ -145,10 +147,23 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			errors.Details(err)["route"] = name
 			return err
 		}
+		parameters := mapset.NewThreadUnsafeSet[string]()
+		for _, segment := range segments {
+			if segment.Parameter {
+				if !parameters.Add(segment.Value) {
+					err := errors.New("duplicate parameter")
+					errors.Details(err)["name"] = segment.Value
+					errors.Details(err)["path"] = path
+					errors.Details(err)["route"] = name
+					return err
+				}
+			}
+		}
 		ro = &route{
 			Name:        name,
 			Path:        path,
 			Segments:    segments,
+			Parameters:  parameters,
 			GetHandler:  nil,
 			APIHandlers: make(map[string]Handler),
 		}
@@ -334,6 +349,18 @@ func (r *Router) path(name string, params Params, qs url.Values, api bool) (stri
 
 		res.WriteString("/")
 		res.WriteString(val)
+	}
+
+	if len(params) > ro.Parameters.Cardinality() {
+		paramsSet := mapset.NewThreadUnsafeSet[string]()
+		for key := range params {
+			paramsSet.Add(key)
+		}
+		extraParameters := paramsSet.Difference(ro.Parameters)
+		err := errors.New("extra parameters")
+		errors.Details(err)["extra"] = extraParameters.ToSlice()
+		errors.Details(err)["route"] = name
+		return "", err
 	}
 
 	if api {

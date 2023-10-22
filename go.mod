@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/andybalholm/brotli v1.0.6
+	github.com/deckarep/golang-set/v2 v2.3.1
 	github.com/felixge/httpsnoop v1.0.3
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/hashicorp/go-cleanhttp v0.5.2
