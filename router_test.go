@@ -56,9 +56,7 @@ func TestParsePath(t *testing.T) {
 			segments, err := parsePath(tt.inputPath)
 			assert.Equal(t, tt.expectedResult, segments)
 			if tt.expectedError != "" {
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.expectedError)
-				}
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -111,9 +109,7 @@ func TestCompileRegexp(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.Nil(t, re)
 				assert.Nil(t, paramMapFunc)
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.expectedError)
-				}
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if assert.NotNil(t, re) {
@@ -329,9 +325,7 @@ func TestRouterHandle(t *testing.T) {
 			}
 
 			if tt.expectedError != "" {
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.expectedError)
-				}
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				for _, route := range tt.routes {
@@ -482,9 +476,7 @@ func TestRouterPath(t *testing.T) {
 			path, err := r.path("PathName", tt.params, tt.qs, tt.inputAPI)
 
 			if tt.expectedError != "" {
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.expectedError)
-				}
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedPath, path)
@@ -502,7 +494,5 @@ func TestRouterPathMissing(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = r.path("PathNameMissing", nil, nil, false)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "route does not exist")
-	}
+	assert.ErrorContains(t, err, "route does not exist")
 }
