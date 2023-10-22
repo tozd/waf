@@ -291,9 +291,11 @@ func (s *Server[SiteT]) InDevelopment() string {
 
 func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
 	// TODO: Implement graceful shutdown.
-	// TODO: Add request timeouts so that malicious client cannot make too slow requests or read too slowly the response.
-	//       Currently this is not possible, because ReadTimeout and WriteTimeout count in handler processing time as well.
-	//       Moreover, when they timeout, they do not cancel the handler itself. See: https://github.com/golang/go/issues/16100
+	// TODO: Add limits on max idle time and min speed for writing the whole response.
+	//       If a limit is reached, context should be canceled.
+	//       See: https://github.com/golang/go/issues/16100
+	//       See: https://github.com/golang/go/issues/21389
+	//       See: https://github.com/golang/go/issues/59602
 	server := &http.Server{
 		Addr:                         listenAddr,
 		Handler:                      handler,

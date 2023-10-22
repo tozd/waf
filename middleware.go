@@ -242,6 +242,9 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 
 func (s *Service[SiteT]) parseForm(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// TODO: Add limits on max time, max idle time, min speed, and max data for
+		//       reading the whole body when parsing form. If a limit is reached, context
+		//       should be canceled.
 		err := req.ParseForm()
 		if err != nil {
 			s.BadRequestWithError(w, req, errors.WithMessage(err, "error parsing form"))
