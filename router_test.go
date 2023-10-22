@@ -406,6 +406,17 @@ func TestRouterPath(t *testing.T) {
 			expectedError: "parameter is missing",
 		},
 		{
+			description:   "Path with empty parameters",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{"id": ""},
+			qs:            url.Values{},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "",
+			expectedError: "parameter is missing",
+		},
+		{
 			description:   "Path with extra parameters",
 			path:          "/users/:id/posts",
 			api:           false,
