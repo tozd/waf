@@ -103,6 +103,6 @@ func TestCertificateManager(t *testing.T) {
 	certManager.KeyFile = filepath.Join(tempDir, "non_existent_key.pem")
 	errE = certManager.reloadCertificate()
 	if assert.Error(t, errE) {
-		assert.Contains(t, "error loading key pair", errE.Error())
+		assert.Contains(t, errE.Error(), "error loading key pair")
 	}
 }

@@ -54,7 +54,7 @@ func TestParsePath(t *testing.T) {
 			assert.Equal(t, tt.expectedResult, segments)
 			if tt.expectedError != "" {
 				if assert.Error(t, err) {
-					assert.Contains(t, tt.expectedError, err.Error())
+					assert.Contains(t, err.Error(), tt.expectedError)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestCompileRegexp(t *testing.T) {
 				assert.Nil(t, re)
 				assert.Nil(t, paramMapFunc)
 				if assert.Error(t, err) {
-					assert.Contains(t, tt.expectedError, err.Error())
+					assert.Contains(t, err.Error(), tt.expectedError)
 				}
 			} else {
 				assert.NoError(t, err)
