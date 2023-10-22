@@ -44,6 +44,13 @@ var connectionIDContextKey = &contextKey{"connection-id"} //nolint:gochecknoglob
 // requestIDContextKey provides a random ID for each HTTP request.
 var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
 
+func Error(w http.ResponseWriter, _ *http.Request, code int) {
+	http.Error(w,
+		http.StatusText(code),
+		code,
+	)
+}
+
 func getHost(hostPort string) string {
 	if hostPort == "" {
 		return ""

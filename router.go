@@ -45,13 +45,6 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 	return segments, nil
 }
 
-func Error(w http.ResponseWriter, _ *http.Request, code int) {
-	http.Error(w,
-		http.StatusText(code),
-		code,
-	)
-}
-
 // TODO: Support custom regex in params.
 //       See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#custom-regex-in-params
 
