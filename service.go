@@ -152,10 +152,12 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		timing := servertiming.FromContext(req.Context())
 		metrics := zerolog.Dict()
 		for _, metric := range timing.Metrics {
-			metrics.Dur(metric.Name, metric.Duration)
+			if metric.Duration > 0 {
+				metrics.Dur(metric.Name, metric.Duration)
+			}
 		}
 		metrics.Dur("t", duration)
-		l := zerolog.Ctx(req.Context()).WithLevel(level) //nolint:zerologlint
+		l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
 		if s.Revision != "" || s.BuildTimestamp != "" || s.Version != "" {
 			build := zerolog.Dict()
 			// In alphabetical order, so that it is the same as JSON marshal.

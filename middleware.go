@@ -12,6 +12,7 @@ import (
 	"github.com/felixge/httpsnoop"
 	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
@@ -21,7 +22,7 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			id, ok := req.Context().Value(connectionIDContextKey).(identifier.Identifier)
 			if ok {
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, id.String())
 				})
@@ -37,7 +38,7 @@ func httpVersionHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			proto := strings.TrimPrefix(req.Proto, "HTTP/")
-			logger := zerolog.Ctx(req.Context())
+			logger := hlog.FromRequest(req)
 			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 				return c.Str(fieldKey, proto)
 			})
@@ -52,7 +53,7 @@ func remoteAddrHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ip := getHost(req.RemoteAddr)
 			if ip != "" {
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, ip)
 				})
@@ -68,7 +69,7 @@ func hostHandler(fieldKey string) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			host := getHost(req.Host)
 			if host != "" {
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, host)
 				})
@@ -108,7 +109,7 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 func urlHandler(pathKey, queryKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			logger := zerolog.Ctx(req.Context())
+			logger := hlog.FromRequest(req)
 			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 				c = c.Str(pathKey, req.URL.Path)
 				if len(req.Form) > 0 {
@@ -128,7 +129,7 @@ func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 			etag := w.Header().Get("Etag")
 			if etag != "" {
 				etag = strings.ReplaceAll(etag, `"`, "")
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, etag)
 				})
@@ -143,7 +144,7 @@ func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) 
 			next.ServeHTTP(w, req)
 			value := w.Header().Get(headerName)
 			if value != "" {
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					return c.Str(fieldKey, value)
 				})
@@ -171,6 +172,7 @@ func accessHandler(f func(req *http.Request, code int, size int64, duration time
 				next.ServeHTTP(ww, req)
 			})
 			milliseconds := float64(m.Duration) / float64(time.Millisecond)
+			// This writes the trailer.
 			w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
 			f(req, m.Code, m.Written, m.Duration)
 		})
@@ -229,7 +231,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 				},
 			}), req)
 			if websocket {
-				logger := zerolog.Ctx(req.Context())
+				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 					data := zerolog.Dict()
 					data.Int64("fromClient", read)

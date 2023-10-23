@@ -3,11 +3,15 @@ package waf
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
+	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +114,11 @@ func TestRequestIDHandler(t *testing.T) {
 	h = hlog.NewHandler(zerolog.New(out))(h)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	assert.Equal(t, `{"request":"`+w.Header().Get("Request-Id")+`"}`+"\n", out.String())
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, `{"request":"`+res.Header.Get("Request-Id")+`"}`+"\n", out.String())
 }
 
 func TestURLHandler(t *testing.T) {
@@ -168,4 +176,57 @@ func TestResponseHeaderHandler(t *testing.T) {
 	h3 := hlog.NewHandler(zerolog.New(out))(h2)
 	h3.ServeHTTP(w, r)
 	assert.Equal(t, `{"encoding":"gzip"}`+"\n", out.String())
+}
+
+func TestAccessHandler(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		handler  http.Handler
+		expected string
+	}{
+		{
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}),
+			`{"code":200,"size":0}`,
+		},
+		{
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			}),
+			`{"code":0,"size":0}`,
+		},
+		{
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Error(w, r, http.StatusNotFound)
+			}),
+			`{"code":404,"size":10}`,
+		},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			w := httptest.NewRecorder()
+			r := &http.Request{}
+			h := accessHandler(func(r *http.Request, code int, size int64, duration time.Duration) {
+				l := hlog.FromRequest(r).Log()
+				l.Int("code", code).Int64("size", size).Msg("")
+				assert.Positive(t, duration)
+			})(tt.handler)
+			h = hlog.NewHandler(zerolog.New(out))(h)
+			h.ServeHTTP(w, r)
+			assert.Equal(t, tt.expected+"\n", out.String())
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close()
+			})
+			trailer := res.Trailer.Get(servertiming.HeaderKey)
+			assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
+		})
+	}
 }

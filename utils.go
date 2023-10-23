@@ -15,6 +15,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
 
 	"gitlab.com/tozd/identifier"
@@ -172,7 +173,7 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 
 	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		logger := zerolog.Ctx(req.Context())
+		logger := hlog.FromRequest(req)
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str(zerolog.MessageFieldName, name)
 		})
