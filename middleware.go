@@ -125,15 +125,17 @@ func urlHandler(pathKey, queryKey string) func(next http.Handler) http.Handler {
 func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			defer func() {
+				etag := w.Header().Get("Etag")
+				if etag != "" {
+					etag = strings.ReplaceAll(etag, `"`, "")
+					logger := hlog.FromRequest(req)
+					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+						return c.Str(fieldKey, etag)
+					})
+				}
+			}()
 			next.ServeHTTP(w, req)
-			etag := w.Header().Get("Etag")
-			if etag != "" {
-				etag = strings.ReplaceAll(etag, `"`, "")
-				logger := hlog.FromRequest(req)
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, etag)
-				})
-			}
 		})
 	}
 }
@@ -141,14 +143,16 @@ func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
 func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			defer func() {
+				value := w.Header().Get(headerName)
+				if value != "" {
+					logger := hlog.FromRequest(req)
+					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+						return c.Str(fieldKey, value)
+					})
+				}
+			}()
 			next.ServeHTTP(w, req)
-			value := w.Header().Get(headerName)
-			if value != "" {
-				logger := hlog.FromRequest(req)
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, value)
-				})
-			}
 		})
 	}
 }
@@ -168,13 +172,15 @@ func accessHandler(f func(req *http.Request, code int, size int64, duration time
 				Duration: 0,
 				Written:  0,
 			}
+			defer func() {
+				milliseconds := float64(m.Duration) / float64(time.Millisecond)
+				// This writes the trailer.
+				w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
+				f(req, m.Code, m.Written, m.Duration)
+			}()
 			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
 				next.ServeHTTP(ww, req)
 			})
-			milliseconds := float64(m.Duration) / float64(time.Millisecond)
-			// This writes the trailer.
-			w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
-			f(req, m.Code, m.Written, m.Duration)
 		})
 	}
 }
@@ -213,6 +219,17 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 			var websocket bool
 			var read int64
 			var written int64
+			defer func() {
+				if websocket {
+					logger := hlog.FromRequest(req)
+					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+						data := zerolog.Dict()
+						data.Int64("fromClient", read)
+						data.Int64("toClient", written)
+						return c.Dict(fieldKey, data)
+					})
+				}
+			}()
 			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 				Hijack: func(next httpsnoop.HijackFunc) httpsnoop.HijackFunc {
 					return func() (net.Conn, *bufio.ReadWriter, error) {
@@ -230,15 +247,6 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 					}
 				},
 			}), req)
-			if websocket {
-				logger := hlog.FromRequest(req)
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					data := zerolog.Dict()
-					data.Int64("fromClient", read)
-					data.Int64("toClient", written)
-					return c.Dict(fieldKey, data)
-				})
-			}
 		})
 	}
 }
