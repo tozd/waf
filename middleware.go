@@ -19,11 +19,11 @@ import (
 func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			id, ok := req.Context().Value(connectionIDContextKey).(string)
+			id, ok := req.Context().Value(connectionIDContextKey).(identifier.Identifier)
 			if ok {
 				logger := zerolog.Ctx(req.Context())
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, id)
+					return c.Str(fieldKey, id.String())
 				})
 			}
 			next.ServeHTTP(w, req)
@@ -83,7 +83,7 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
-			id, ok := idFromRequest(req)
+			id, ok := RequestID(req)
 			if !ok {
 				id = identifier.New()
 				ctx = context.WithValue(ctx, requestIDContextKey, id)
@@ -219,6 +219,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 							return conn, bufrw, err
 						}
 						websocket = true
+						// TODO: Do we have to test conn for *net.TCPConn and *tls.Conn concrete types and then wrap them instead?
 						return &metricsConn{
 							Conn:    conn,
 							read:    &read,

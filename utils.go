@@ -112,7 +112,7 @@ func compress(compression string, data []byte) ([]byte, errors.E) {
 	return data, nil
 }
 
-func idFromRequest(req *http.Request) (identifier.Identifier, bool) {
+func RequestID(req *http.Request) (identifier.Identifier, bool) {
 	if req == nil {
 		return identifier.Identifier{}, false
 	}
