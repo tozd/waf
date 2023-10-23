@@ -308,3 +308,103 @@ func TestWebsocketHandler(t *testing.T) {
 	assert.Equal(t, 232, resp.StatusCode)
 	assert.Equal(t, `{"ws":{"fromClient":0,"toClient":`+strconv.Itoa(len(response))+`}}`+"\n", string(out))
 }
+
+func TestParseForm(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		queryString string
+		postBody    string
+		postValues  url.Values
+		formValues  url.Values
+		expectedLog string
+	}{
+		{
+			"key1=value1&key2=value2",
+			"key3=value3&key4=value4",
+			url.Values{"key3": []string{"value3"}, "key4": []string{"value4"}},
+			url.Values{"key1": []string{"value1"}, "key2": []string{"value2"}, "key3": []string{"value3"}, "key4": []string{"value4"}},
+			`{"query":{"key1":["value1"],"key2":["value2"]}}`,
+		},
+		{
+			"key1=value1;key2=value2",
+			"key3=value3&key4=value4",
+			url.Values{"key3": []string{"value3"}, "key4": []string{"value4"}},
+			url.Values{"key3": []string{"value3"}, "key4": []string{"value4"}},
+			`{"error":"error parsing query string: invalid semicolon separator in query","rawQuery":"key1=value1;key2=value2"}`,
+		},
+		{
+			"key1=value1&key2=value2",
+			"key3=value3;key4=value4",
+			url.Values{},
+			url.Values{"key1": []string{"value1"}, "key2": []string{"value2"}},
+			`{"error":"error parsing POST form: invalid semicolon separator in query","query":{"key1":["value1"],"key2":["value2"]}}`,
+		},
+		{
+			"key1=value1;key2=value2",
+			"key3=value3;key4=value4",
+			url.Values{},
+			url.Values{},
+			`{"error":"error parsing POST form: invalid semicolon separator in query\nerror parsing query string: invalid semicolon separator in query","rawQuery":"key1=value1;key2=value2"}`, //nolint:lll
+		},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			w := httptest.NewRecorder()
+			s := Service[*Site]{
+				router: new(Router),
+			}
+			r := httptest.NewRequest(http.MethodPost, "/example?"+tt.queryString, strings.NewReader(tt.postBody))
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				l := hlog.FromRequest(r)
+				l.Log().Msg("")
+				w.WriteHeader(http.StatusOK)
+			}))
+			h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				h.ServeHTTP(w, r)
+				assert.Equal(t, tt.postValues, r.PostForm)
+				assert.Equal(t, tt.formValues, r.Form)
+				l := hlog.FromRequest(r)
+				l.Log().Msg("")
+			})
+			h3 := hlog.NewHandler(zerolog.New(out))(h2)
+			h3.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close()
+			})
+			// logValues do not produce deterministic JSON, so we use JSONEq here.
+			assert.JSONEq(t, tt.expectedLog, strings.Split(out.String(), "\n")[0])
+		})
+	}
+}
+
+func TestParseFormRedirect(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	w := httptest.NewRecorder()
+	s := Service[*Site]{
+		router: new(Router),
+	}
+	r := httptest.NewRequest(http.MethodPost, "/example?key2=value2&key1=value1", nil)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	h = hlog.NewHandler(zerolog.New(out))(h)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+	assert.Equal(t, "/example?key1=value1&key2=value2", res.Header.Get("Location"))
+}

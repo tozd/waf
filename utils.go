@@ -110,6 +110,8 @@ type valuesLogObjectMarshaler map[string][]string
 func (v valuesLogObjectMarshaler) MarshalZerologObject(e *zerolog.Event) {
 	for key, values := range v {
 		arr := zerolog.Arr()
+		// Directly iterating over a map does not produce deterministic order
+		// but it is faster than first sorting the keys and then iterating.
 		for _, val := range values {
 			arr.Str(val)
 		}

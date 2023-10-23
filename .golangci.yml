@@ -142,5 +142,6 @@ issues:
     - path: .*_test\.go
       linters:
         - exhaustruct
+        - goconst
         - testpackage
         - wrapcheck
