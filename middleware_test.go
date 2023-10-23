@@ -266,7 +266,7 @@ func TestRemoveMetadataHeaders(t *testing.T) {
 func TestWebsocketHandler(t *testing.T) {
 	t.Parallel()
 
-	response := []byte("HTTP/1.1 232 Test\nConnection: Closed\nContent-Length: 0\n\n")
+	response := []byte("HTTP/1.1 232 Test\r\nConnection: Closed\r\nContent-Length: 0\r\n\r\n")
 
 	var ts *httptest.Server
 	pipeR, pipeW, err := os.Pipe()
