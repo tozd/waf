@@ -104,3 +104,8 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
+
+// TemporaryRedirect redirects the client to a new URL while keeping the method and body not changed.
+func (s *Service[SiteT]) TemporaryRedirect(w http.ResponseWriter, req *http.Request, location string) {
+	http.Redirect(w, req, location, http.StatusTemporaryRedirect)
+}

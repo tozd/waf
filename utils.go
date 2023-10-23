@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -176,11 +177,57 @@ func autoName(f http.HandlerFunc) string {
 	}
 	name = strings.TrimSuffix(name, "-fm")
 
-	// Make sure the first letter is upper case. We have some internal handlers
-	// but we want uniform look in logs.
+	// Make sure the first letter is upper case. We also have internal handler
+	// functions and we want uniform look in logs.
 	rs := []rune(name)
 	rs[0] = unicode.ToUpper(rs[0])
 	name = string(rs)
 
 	return name
+}
+
+// parsePostForm parses and sets only PostForm on http.Request.
+//
+// See: https://github.com/golang/go/issues/63688
+func parsePostForm(r *http.Request) errors.E {
+	if r.PostForm != nil {
+		return nil
+	}
+
+	// We temporary make r.Form non-nil, so that only code path
+	// for populating r.PostForm runs when we call r.ParseForm.
+	form := r.Form
+	defer func() { r.Form = form }()
+	r.Form = make(url.Values)
+
+	return errors.WithStack(r.ParseForm())
+}
+
+// getQueryForm returns parsed query string. It does not
+// set it on http.Request.
+func getQueryForm(r *http.Request) (url.Values, errors.E) {
+	// Only if r.PostForm is empty, r.Form does not include
+	// values from r.PostForm. Otherwise we have to re-parse
+	// the query string even if r.Form is not nil.
+	if r.Form != nil && len(r.PostForm) == 0 {
+		return r.Form, nil
+	}
+
+	// We temporary make r.PostForm non-nil and r.Form nil
+	// (even if the latter is already nil), so that only code
+	// path for populating r.Form runs when we call r.ParseForm.
+	form, postForm := r.Form, r.PostForm
+	defer func() { r.Form, r.PostForm = form, postForm }()
+	r.PostForm = make(url.Values)
+	r.Form = nil
+
+	err := r.ParseForm()
+	return r.Form, errors.WithStack(err)
+}
+
+// Copied from net/http/request.go.
+func copyValues(dst, src url.Values) {
+	for k, vs := range src {
+		dst[k] = append(dst[k], vs...)
+	}
 }

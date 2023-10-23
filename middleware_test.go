@@ -128,14 +128,13 @@ func TestURLHandler(t *testing.T) {
 	r := &http.Request{
 		URL: &url.URL{Path: "/path", RawQuery: "foo=bar"},
 	}
-	s := Service[*Site]{}
-	h := s.parseForm(urlHandler("url", "query")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := urlHandler("url")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
-	})))
+	}))
 	h = hlog.NewHandler(zerolog.New(out))(h)
 	h.ServeHTTP(nil, r)
-	assert.Equal(t, `{"url":"/path","query":{"foo":["bar"]}}`+"\n", out.String())
+	assert.Equal(t, `{"url":"/path"}`+"\n", out.String())
 }
 
 func TestEtagHandler(t *testing.T) {

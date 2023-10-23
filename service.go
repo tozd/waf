@@ -182,6 +182,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(removeMetadataHeaders(s.MetadataHeaderPrefix))
 	c = c.Append(websocketHandler("ws"))
 	c = c.Append(hlog.MethodHandler("method"))
+	c = c.Append(urlHandler("path"))
 	c = c.Append(remoteAddrHandler("client"))
 	c = c.Append(hlog.UserAgentHandler("agent"))
 	c = c.Append(hlog.RefererHandler("referer"))
@@ -191,11 +192,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(hostHandler("host"))
 	c = c.Append(etagHandler("etag"))
 	c = c.Append(responseHeaderHandler("encoding", "Content-Encoding"))
-	// parseForm should be as late as possible because it can fail
-	// and we want other fields to be logged.
-	c = c.Append(s.parseForm)
-	// URLHandler should be after the parseForm middleware.
-	c = c.Append(urlHandler("path", "query"))
+	// parseForm should be last because it can fail or redirect and we want
+	// other fields to be logged. It also logs query string and redirects to
+	// canonical query strings.
+	c = c.Append(s.parseForm("query", "rawQuery"))
 
 	return c.Then(s.router), nil
 }

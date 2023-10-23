@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -104,18 +105,14 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 	}
 }
 
-// urlHandler is similar to hlog.UrlHandler, but it adds path and separate query string fields.
-// It should be after the parseForm middleware as it uses req.Form.
-func urlHandler(pathKey, queryKey string) func(next http.Handler) http.Handler {
+// urlHandler is similar to hlog.UrlHandler, but it logs only URL path.
+// Query string is logged in parseForm.
+func urlHandler(pathKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			logger := hlog.FromRequest(req)
 			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-				c = c.Str(pathKey, req.URL.Path)
-				if len(req.Form) > 0 {
-					c = logValues(c, queryKey, req.Form)
-				}
-				return c
+				return c.Str(pathKey, req.URL.Path)
 			})
 			next.ServeHTTP(w, req)
 		})
@@ -251,16 +248,75 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func (s *Service[SiteT]) parseForm(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// TODO: Add limits on max time, max idle time, min speed, and max data for
-		//       reading the whole body when parsing form. If a limit is reached, context
-		//       should be canceled.
-		err := req.ParseForm()
-		if err != nil {
-			s.BadRequestWithError(w, req, errors.WithMessage(err, "error parsing form"))
-			return
-		}
-		next.ServeHTTP(w, req)
-	})
+// parseForm parses POST form and query string in a manner equivalent with
+// http.Request's PostForm method, and logs parsed query string
+// with queryKey field if query string parsing is successful, or raw query
+// string with rawQueryKey field otherwise. After successful query string
+// parsing, it checks that provided query string is canonical, i.e., that
+// service's router's EncodeQuery encodes it in the same way. If not, it
+// redirects to that canonical URL.
+func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// TODO: Add limits on max time, max idle time, min speed, and max data for
+			//       reading the whole body when parsing form. If a limit is reached, context
+			//       should be canceled.
+			postErr := parsePostForm(req)
+			queryForm, queryErr := getQueryForm(req)
+			if queryErr != nil {
+				if len(req.URL.RawQuery) > 0 {
+					logger := hlog.FromRequest(req)
+					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+						return c.Str(rawQueryKey, req.URL.RawQuery)
+					})
+				}
+			} else if len(queryForm) > 0 {
+				logger := hlog.FromRequest(req)
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return logValues(c, queryKey, queryForm)
+				})
+			}
+
+			// Based on ParseForm method from net/http/request.go.
+			if req.Form == nil {
+				if len(req.PostForm) > 0 {
+					req.Form = make(url.Values)
+					copyValues(req.Form, req.PostForm)
+				}
+				if queryForm == nil {
+					queryForm = make(url.Values)
+				}
+				if req.Form == nil {
+					req.Form = queryForm
+				} else {
+					copyValues(req.Form, queryForm)
+				}
+			}
+
+			err := errors.Join(
+				errors.WithMessage(postErr, "error parsing POST form"),
+				errors.WithMessage(queryErr, "error parsing query string"),
+			)
+			if err != nil {
+				s.BadRequestWithError(w, req, err)
+				return
+			}
+
+			if len(queryForm) > 0 {
+				var qs string
+				if s.router.EncodeQuery != nil {
+					qs = s.router.EncodeQuery(queryForm)
+				} else {
+					qs = queryForm.Encode()
+				}
+				if qs != req.URL.RawQuery {
+					req.URL.RawQuery = qs
+					s.TemporaryRedirect(w, req, req.URL.String())
+					return
+				}
+			}
+
+			next.ServeHTTP(w, req)
+		})
+	}
 }
