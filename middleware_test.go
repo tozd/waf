@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -228,4 +231,80 @@ func TestAccessHandler(t *testing.T) {
 			assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
 		})
 	}
+}
+
+func TestRemoveMetadataHeaders(t *testing.T) {
+	t.Parallel()
+
+	w := httptest.NewRecorder()
+	r := &http.Request{}
+	h := removeMetadataHeaders("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("test-foobar", "1234")
+		w.WriteHeader(http.StatusOK)
+	}))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, "1234", res.Header.Get("test-foobar"))
+
+	w = httptest.NewRecorder()
+	r = &http.Request{}
+	h = removeMetadataHeaders("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("test-foobar", "1234")
+		w.WriteHeader(http.StatusNotModified)
+	}))
+	h.ServeHTTP(w, r)
+	res = w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, "", res.Header.Get("test-foobar"))
+}
+
+func TestWebsocketHandler(t *testing.T) {
+	t.Parallel()
+
+	response := []byte("HTTP/1.1 232 Test\nConnection: Closed\nContent-Length: 0\n\n")
+
+	var ts *httptest.Server
+	pipeR, pipeW, err := os.Pipe()
+	t.Cleanup(func() {
+		// We might double close but we do not care.
+		pipeR.Close()
+		pipeW.Close()
+	})
+	require.NoError(t, err)
+	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w) //nolint:bodyclose
+		netConn, _, e := rc.Hijack()
+		if e != nil {
+			Error(w, r, http.StatusInternalServerError)
+			return
+		}
+		defer func() {
+			netConn.Close()
+			ts.Config.ConnState(netConn, http.StateClosed)
+		}()
+		_, _ = netConn.Write(response)
+	}))
+	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
+		l := hlog.FromRequest(r)
+		l.Log().Msg("")
+		pipeW.Close()
+	})
+	h3 := hlog.NewHandler(zerolog.New(pipeW))(h2)
+	ts = httptest.NewServer(h3)
+	defer ts.Close()
+	resp, err := http.Get(ts.URL) //nolint:noctx
+	if assert.NoError(t, err) {
+		defer resp.Body.Close()
+	}
+	out, err := io.ReadAll(pipeR)
+	pipeR.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, 232, resp.StatusCode)
+	assert.Equal(t, `{"ws":{"fromClient":0,"toClient":`+strconv.Itoa(len(response))+`}}`+"\n", string(out))
 }
