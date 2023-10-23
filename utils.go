@@ -17,8 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
-
-	"gitlab.com/tozd/identifier"
 )
 
 const (
@@ -44,13 +42,6 @@ var connectionIDContextKey = &contextKey{"connection-id"} //nolint:gochecknoglob
 
 // requestIDContextKey provides a random ID for each HTTP request.
 var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
-
-func Error(w http.ResponseWriter, _ *http.Request, code int) {
-	http.Error(w,
-		http.StatusText(code),
-		code,
-	)
-}
 
 func getHost(hostPort string) string {
 	if hostPort == "" {
@@ -113,14 +104,6 @@ func compress(compression string, data []byte) ([]byte, errors.E) {
 	return data, nil
 }
 
-func RequestID(req *http.Request) (identifier.Identifier, bool) {
-	if req == nil {
-		return identifier.Identifier{}, false
-	}
-	id, ok := req.Context().Value(requestIDContextKey).(identifier.Identifier)
-	return id, ok
-}
-
 type valuesLogObjectMarshaler map[string][]string
 
 func (v valuesLogObjectMarshaler) MarshalZerologObject(e *zerolog.Event) {
@@ -181,8 +164,8 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 }
 
-func autoName(h Handler) string {
-	fn := runtime.FuncForPC(reflect.ValueOf(h).Pointer())
+func autoName(f http.HandlerFunc) string {
+	fn := runtime.FuncForPC(reflect.ValueOf(f).Pointer())
 	if fn == nil {
 		return ""
 	}

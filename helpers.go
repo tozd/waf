@@ -7,10 +7,32 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
+	"gitlab.com/tozd/identifier"
 )
 
+func Error(w http.ResponseWriter, _ *http.Request, code int) {
+	http.Error(w,
+		http.StatusText(code),
+		code,
+	)
+}
+
+func RequestID(req *http.Request) (identifier.Identifier, bool) {
+	if req == nil {
+		return identifier.Identifier{}, false
+	}
+	id, ok := req.Context().Value(requestIDContextKey).(identifier.Identifier)
+	return id, ok
+}
+
+func ToHandler(f http.HandlerFunc) Handler {
+	return func(w http.ResponseWriter, req *http.Request, _ Params) {
+		f(w, req)
+	}
+}
+
 // NotFound is a HTTP request handler which returns a 404 error to the client.
-func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
 	// is different from what http.NotFound uses, and we want to use the same pattern.
 	Error(w, req, http.StatusNotFound)
@@ -22,18 +44,18 @@ func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Requ
 		return c.Err(err)
 	})
 
-	s.NotFound(w, req, nil)
+	s.NotFound(w, req)
 }
 
-func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusMethodNotAllowed)
 }
 
-func (s *Service[SiteT]) NotAcceptable(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) NotAcceptable(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusNotAcceptable)
 }
 
-func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusBadRequest)
 }
 
@@ -43,10 +65,10 @@ func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Re
 		return c.Err(err)
 	})
 
-	s.BadRequest(w, req, nil)
+	s.BadRequest(w, req)
 }
 
-func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusInternalServerError)
 }
 
@@ -76,9 +98,9 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 		return c.Err(err)
 	})
 
-	s.InternalServerError(w, req, nil)
+	s.InternalServerError(w, req)
 }
 
-func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	s.reverseProxy.ServeHTTP(w, req)
 }

@@ -110,8 +110,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerName(autoName(s.Proxy), s.Proxy)
-		s.router.MethodNotAllowed = logHandlerName(autoName(s.Proxy), s.Proxy)
+		s.router.NotFound = logHandlerName(autoName(s.Proxy), ToHandler(s.Proxy))
+		s.router.MethodNotAllowed = logHandlerName(autoName(s.Proxy), ToHandler(s.Proxy))
 	} else {
 		errE := s.renderAndCompressFiles()
 		if errE != nil {
@@ -129,8 +129,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerName(autoName(s.NotFound), s.NotFound)
-		s.router.MethodNotAllowed = logHandlerName(autoName(s.MethodNotAllowed), s.MethodNotAllowed)
+		s.router.NotFound = logHandlerName(autoName(s.NotFound), ToHandler(s.NotFound))
+		s.router.MethodNotAllowed = logHandlerName(autoName(s.MethodNotAllowed), ToHandler(s.MethodNotAllowed))
 	}
 	s.router.Panic = s.handlePanic
 
@@ -456,9 +456,9 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 
 func (s *Service[SiteT]) serveStaticFiles() errors.E {
 	staticName := autoName(s.staticFile)
-	staticH := logHandlerName(staticName, s.staticFile)
+	staticH := logHandlerName(staticName, ToHandler(s.staticFile))
 	immutableName := autoName(s.immutableFile)
-	immutableH := logHandlerName(staticName, s.immutableFile)
+	immutableH := logHandlerName(staticName, ToHandler(s.immutableFile))
 
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
@@ -602,7 +602,7 @@ func (s *Service[SiteT]) APIPath(name string, params Params, qs url.Values) (str
 func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
 	contentEncoding := eddo.NegotiateContentEncoding(req, allCompressions)
 	if contentEncoding == "" {
-		s.NotAcceptable(w, req, nil)
+		s.NotAcceptable(w, req)
 		return
 	}
 
@@ -674,11 +674,11 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(data))
 }
 
-func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
 	s.serveStaticFile(w, req, req.URL.Path, false)
 }
 
-func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request) {
 	s.serveStaticFile(w, req, req.URL.Path, true)
 }
 
@@ -698,5 +698,5 @@ func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, e
 		return c.Interface("panic", err)
 	})
 
-	s.InternalServerError(w, req, nil)
+	s.InternalServerError(w, req)
 }
