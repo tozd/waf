@@ -52,20 +52,29 @@ func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Re
 
 func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := hlog.FromRequest(req)
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
+
+	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
 	if errors.Is(err, context.Canceled) {
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str("context", "canceled")
 		})
+		// Rationale: the client canceled the request and stopped reading the response, so in
+		// a way we are not prepared to wait indefinitely for the client to read the response.
+		Error(w, req, http.StatusRequestTimeout)
 		return
 	} else if errors.Is(err, context.DeadlineExceeded) {
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str("context", "deadline exceeded")
 		})
+		// Rationale: the client was reading the response too slowly, and we were
+		// not prepared to wait for so long.
+		Error(w, req, http.StatusRequestTimeout)
 		return
 	}
+
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Err(err)
+	})
 
 	s.InternalServerError(w, req, nil)
 }
