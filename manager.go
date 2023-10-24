@@ -14,6 +14,8 @@ const (
 	certificateReloadInterval = 24 * time.Hour
 )
 
+var errCertificateNotValid = errors.Base("certificate is not valid for domain")
+
 // certificateManager loads certificate and key from file paths and reloads them
 // daily. So if certificate is rotated at least a day before expiration,
 // a new certificate will be picked up automatically.
@@ -81,16 +83,16 @@ func (c *certificateManager) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certif
 	return c.certificate, nil
 }
 
-func (c *certificateManager) ValidForDomain(domain string) (bool, errors.E) {
+func (c *certificateManager) ValidForDomain(domain string) errors.E {
 	certificate, err := c.GetCertificate(nil)
 	if err != nil {
-		return false, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 	// certificate.Leaf is nil, so we have to parse leaf ourselves.
 	// See: https://github.com/golang/go/issues/35504
 	leaf, err := x509.ParseCertificate(certificate.Certificate[0])
 	if err != nil {
-		return false, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	found := false
@@ -104,5 +106,9 @@ func (c *certificateManager) ValidForDomain(domain string) (bool, errors.E) {
 		}
 	}
 
-	return found, nil
+	if !found {
+		return errors.WithDetails(errCertificateNotValid, "domain", domain)
+	}
+
+	return nil
 }

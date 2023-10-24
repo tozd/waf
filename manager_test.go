@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createTempCertificateFiles(certPath, keyPath string) error {
+func createTempCertificateFiles(certPath, keyPath string, domains []string) error {
 	// Generate a new ECDSA private key.
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -34,6 +34,7 @@ func createTempCertificateFiles(certPath, keyPath string) error {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		DNSNames:              domains,
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
@@ -78,7 +79,7 @@ func TestCertificateManager(t *testing.T) {
 	certPath := filepath.Join(tempDir, "test_cert.pem")
 	keyPath := filepath.Join(tempDir, "test_key.pem")
 
-	err := createTempCertificateFiles(certPath, keyPath)
+	err := createTempCertificateFiles(certPath, keyPath, []string{"example.com"})
 	require.NoError(t, err)
 
 	certManager := certificateManager{
@@ -93,6 +94,15 @@ func TestCertificateManager(t *testing.T) {
 	cert, err := certManager.GetCertificate(nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, cert)
+
+	err = certManager.ValidForDomain("example.com")
+	assert.NoError(t, err)
+
+	err = certManager.ValidForDomain("")
+	assert.ErrorIs(t, err, errCertificateNotValid)
+
+	err = certManager.ValidForDomain("something.com")
+	assert.ErrorIs(t, err, errCertificateNotValid)
 
 	errE = certManager.Start()
 	require.NoError(t, errE)

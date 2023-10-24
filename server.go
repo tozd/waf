@@ -128,15 +128,9 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := manager.ValidForDomain(site.Domain)
+				err = manager.ValidForDomain(site.Domain)
 				if err != nil {
-					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
-				}
-				if !ok {
-					err := errors.New("certificate is not valid for domain")
-					errors.Details(err)["certFile"] = site.CertFile
-					errors.Details(err)["domain"] = site.Domain
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", site.CertFile)
 				}
 			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
@@ -159,15 +153,9 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := manager.ValidForDomain(site.Domain)
+				err = manager.ValidForDomain(site.Domain)
 				if err != nil {
-					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
-				}
-				if !ok {
-					err := errors.New("certificate is not valid for domain")
-					errors.Details(err)["certFile"] = s.TLS.CertFile
-					errors.Details(err)["domain"] = site.Domain
-					return sites, err
+					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
 				}
 			} else {
 				err := errors.New("missing file or Let's Encrypt's certificate configuration")
