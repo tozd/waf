@@ -13,9 +13,9 @@ import (
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
-	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/net/idna"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -39,8 +39,8 @@ type Server[SiteT hasSite] struct {
 	} `embed:"" prefix:"tls." yaml:"tls"`
 	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." placeholder:"NAME" short:"T" yaml:"title"`
 
-	fileGetCertificate        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	server   *http.Server
+	managers []*certificateManager
 }
 
 func validForDomain(manager *certificateManager, domain string) (bool, errors.E) {
@@ -70,6 +70,53 @@ func validForDomain(manager *certificateManager, domain string) (bool, errors.E)
 }
 
 func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
+	// TODO: How to shutdown ACME manager?
+	//       See: https://github.com/golang/go/issues/63706
+
+	// TODO: How to shutdown websocket connections?
+
+	// TODO: Add limits on max idle time and min speed for writing the whole response.
+	//       If a limit is reached, context should be canceled.
+	//       See: https://github.com/golang/go/issues/16100
+	//       See: https://github.com/golang/go/issues/21389
+	//       See: https://github.com/golang/go/issues/59602
+	server := &http.Server{
+		Addr:                         listenAddr,
+		Handler:                      nil,
+		DisableGeneralOptionsHandler: false,
+		TLSConfig: &tls.Config{ //nolint:exhaustruct
+			CipherSuites: []uint16{
+				tls.TLS_AES_128_GCM_SHA256,
+				tls.TLS_AES_256_GCM_SHA384,
+				tls.TLS_CHACHA20_POLY1305_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			},
+			MinVersion:       tls.VersionTLS12,
+			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+		},
+		ReadTimeout:       0,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      0,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    0,
+		TLSNextProto:      nil,
+		ConnState:         nil,
+		ErrorLog:          log.New(s.Logger, "", 0),
+		BaseContext:       nil,
+		ConnContext:       s.connContext,
+	}
+
+	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	var nextProtos []string
+
 	letsEncryptDomainsList := []string{}
 
 	if len(sites) > 0 { //nolint:nestif
@@ -89,7 +136,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			}
 
 			if site.CertFile != "" && site.KeyFile != "" {
-				manager := certificateManager{
+				manager := &certificateManager{
 					CertFile:    site.CertFile,
 					KeyFile:     site.KeyFile,
 					Logger:      s.Logger,
@@ -99,15 +146,15 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 					done:        nil,
 				}
 
-				err := manager.Start()
+				err := manager.Configure()
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
 				}
-				defer manager.Stop()
+				s.managers = append(s.managers, manager)
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := validForDomain(&manager, site.Domain)
+				ok, err := validForDomain(manager, site.Domain)
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
 				}
@@ -120,7 +167,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
 			} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
-				manager := certificateManager{
+				manager := &certificateManager{
 					CertFile:    s.TLS.CertFile,
 					KeyFile:     s.TLS.KeyFile,
 					Logger:      s.Logger,
@@ -130,15 +177,15 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 					done:        nil,
 				}
 
-				err := manager.Start()
+				err := manager.Configure()
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
 				}
-				defer manager.Stop()
+				s.managers = append(s.managers, manager)
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := validForDomain(&manager, site.Domain)
+				ok, err := validForDomain(manager, site.Domain)
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
 				}
@@ -156,7 +203,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 		}
 
 		if len(fileGetCertificateFunctions) > 0 {
-			s.fileGetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			fileGetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				// Note that this conversion is necessary because some server names in the handshakes
 				// started by some clients (such as cURL) are not converted to Punycode, which will
 				// prevent us from obtaining certificates for them. In addition, we should also treat
@@ -195,7 +242,7 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			s.TLS.Domain: st,
 		}
 	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
-		manager := certificateManager{
+		manager := &certificateManager{
 			CertFile:    s.TLS.CertFile,
 			KeyFile:     s.TLS.KeyFile,
 			Logger:      s.Logger,
@@ -205,13 +252,13 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			done:        nil,
 		}
 
-		errE := manager.Start()
+		errE := manager.Configure()
 		if errE != nil {
 			return sites, errors.WithDetails(errE, "certFile", s.TLS.CertFile)
 		}
-		defer manager.Stop()
+		s.managers = append(s.managers, manager)
 
-		s.fileGetCertificate = manager.GetCertificate
+		fileGetCertificate = manager.GetCertificate
 
 		// We have to determine domain names this certificate is valid for.
 		certificate, err := manager.GetCertificate(nil)
@@ -275,8 +322,32 @@ func (s *Server[SiteT]) Configure(sites map[string]SiteT) (map[string]SiteT, err
 			ExternalAccountBinding: nil,
 		}
 
-		s.letsEncryptGetCertificate = manager.GetCertificate
+		letsEncryptGetCertificate = manager.GetCertificate
+		nextProtos = manager.TLSConfig().NextProtos
 	}
+
+	if fileGetCertificate != nil && letsEncryptGetCertificate != nil {
+		server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			c, err := fileGetCertificate(hello)
+			if err != nil {
+				return c, err
+			} else if c != nil {
+				return c, nil
+			}
+
+			return letsEncryptGetCertificate(hello)
+		}
+		server.TLSConfig.NextProtos = nextProtos
+	} else if fileGetCertificate != nil {
+		server.TLSConfig.GetCertificate = fileGetCertificate
+	} else if letsEncryptGetCertificate != nil {
+		server.TLSConfig.GetCertificate = letsEncryptGetCertificate
+		server.TLSConfig.NextProtos = nextProtos
+	} else {
+		panic(errors.New("not possible"))
+	}
+
+	s.server = server
 
 	return sites, nil
 }
@@ -289,70 +360,56 @@ func (s *Server[SiteT]) InDevelopment() string {
 	return development
 }
 
-func (s *Server[SiteT]) Run(handler http.Handler) errors.E {
-	// TODO: Implement graceful shutdown.
-	// TODO: Add limits on max idle time and min speed for writing the whole response.
-	//       If a limit is reached, context should be canceled.
-	//       See: https://github.com/golang/go/issues/16100
-	//       See: https://github.com/golang/go/issues/21389
-	//       See: https://github.com/golang/go/issues/59602
-	server := &http.Server{
-		Addr:                         listenAddr,
-		Handler:                      handler,
-		DisableGeneralOptionsHandler: false,
-		TLSConfig: &tls.Config{ //nolint:exhaustruct
-			CipherSuites: []uint16{
-				tls.TLS_AES_128_GCM_SHA256,
-				tls.TLS_AES_256_GCM_SHA384,
-				tls.TLS_CHACHA20_POLY1305_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-			},
-			MinVersion:       tls.VersionTLS12,
-			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-		},
-		ReadTimeout:       0,
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      0,
-		IdleTimeout:       idleTimeout,
-		MaxHeaderBytes:    0,
-		TLSNextProto:      nil,
-		ConnState:         nil,
-		ErrorLog:          log.New(s.Logger, "", 0),
-		BaseContext:       nil,
-		ConnContext:       s.connContext,
+func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E {
+	if s.server == nil {
+		return errors.New("server not configured")
 	}
+	if s.server.Handler != nil {
+		return errors.New("run already called")
+	}
+	s.server.Handler = handler
 
-	if s.fileGetCertificate != nil && s.letsEncryptGetCertificate != nil {
-		server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			c, err := s.fileGetCertificate(hello)
-			if err != nil {
-				return c, err
-			} else if c != nil {
-				return c, nil
-			}
-
-			return s.letsEncryptGetCertificate(hello)
+	for _, manager := range s.managers {
+		err := manager.Start()
+		if err != nil {
+			return err
 		}
-		server.TLSConfig.NextProtos = []string{"h2", "http/1.1", acme.ALPNProto}
-	} else if s.fileGetCertificate != nil {
-		server.TLSConfig.GetCertificate = s.fileGetCertificate
-	} else if s.letsEncryptGetCertificate != nil {
-		server.TLSConfig.GetCertificate = s.letsEncryptGetCertificate
-		server.TLSConfig.NextProtos = []string{"h2", "http/1.1", acme.ALPNProto}
-	} else {
-		panic(errors.New("server not configured"))
+		// We use defer here and not s.server.RegisterOnShutdown so that
+		// manager is stopped also on errors and not only at clean shutdown.
+		defer manager.Stop()
 	}
 
-	s.Logger.Info().Msgf("starting on %s", listenAddr)
+	g, errCtx := errgroup.WithContext(ctx)
 
-	return errors.WithStack(server.ListenAndServeTLS("", ""))
+	g.Go(func() error {
+		s.Logger.Info().Msgf("server starting on %s", listenAddr)
+
+		err := s.server.ListenAndServeTLS("", "")
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return errors.WithStack(err)
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		<-errCtx.Done()
+
+		// Parent context was not canceled (is nil) or the error is different,
+		// which both means the server's goroutine exited with an error.
+		// We do not have to do anything.
+		if ctx.Err() != errCtx.Err() { //nolint:errorlint,goerr113
+			return nil
+		}
+
+		s.Logger.Info().Msg("server stopping")
+
+		// We wait indefinitely for the server to shut down cleanly.
+		// The whole process will be killed anyway if we wait too long.
+		return errors.WithStack(s.server.Shutdown(context.Background())) //nolint:contextcheck
+	})
+
+	return errors.WithStack(g.Wait())
 }
 
 func (s *Server[SiteT]) connContext(ctx context.Context, _ net.Conn) context.Context {

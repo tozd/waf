@@ -23,20 +23,23 @@ type certificateManager struct {
 	certificate *tls.Certificate
 	mu          sync.RWMutex
 	ticker      *time.Ticker
-	done        chan bool
+	done        chan struct{}
+}
+
+func (c *certificateManager) Configure() errors.E {
+	return c.reloadCertificate()
 }
 
 func (c *certificateManager) Start() errors.E {
-	err := c.reloadCertificate()
-	if err != nil {
-		return err
+	if c.certificate == nil {
+		return errors.New("manager not configured")
 	}
 	c.ticker = time.NewTicker(certificateReloadInterval)
-	c.done = make(chan bool)
-	go func() {
+	c.done = make(chan struct{})
+	go func(d chan struct{}) {
 		for {
 			select {
-			case <-c.done:
+			case <-d:
 				return
 			case <-c.ticker.C:
 				err := c.reloadCertificate()
@@ -45,7 +48,7 @@ func (c *certificateManager) Start() errors.E {
 				}
 			}
 		}
-	}()
+	}(c.done) // We make a copy of c.done so that we can nil c.done in Close in this goroutine.
 	return nil
 }
 
@@ -65,7 +68,10 @@ func (c *certificateManager) reloadCertificate() errors.E {
 
 func (c *certificateManager) Stop() {
 	c.ticker.Stop()
-	c.done <- true
+	if c.done != nil {
+		close(c.done)
+		c.done = nil
+	}
 }
 
 func (c *certificateManager) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {

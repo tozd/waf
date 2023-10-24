@@ -87,11 +87,18 @@ func TestCertificateManager(t *testing.T) {
 		Logger:   zerolog.Nop(),
 	}
 
-	errE := certManager.Start()
+	errE := certManager.Configure()
+	require.NoError(t, errE)
+
+	cert, err := certManager.GetCertificate(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, cert)
+
+	errE = certManager.Start()
 	require.NoError(t, errE)
 	t.Cleanup(certManager.Stop)
 
-	cert, err := certManager.GetCertificate(nil)
+	cert, err = certManager.GetCertificate(nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, cert)
 
