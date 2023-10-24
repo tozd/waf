@@ -26,7 +26,7 @@ type certificateManager struct {
 	done        chan struct{}
 }
 
-func (c *certificateManager) Configure() errors.E {
+func (c *certificateManager) Init() errors.E {
 	return c.reloadCertificate()
 }
 
