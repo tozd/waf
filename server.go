@@ -43,32 +43,6 @@ type Server[SiteT hasSite] struct {
 	managers []*certificateManager
 }
 
-func validForDomain(manager *certificateManager, domain string) (bool, errors.E) {
-	certificate, err := manager.GetCertificate(nil)
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-	// certificate.Leaf is nil, so we have to parse leaf ourselves.
-	// See: https://github.com/golang/go/issues/35504
-	leaf, err := x509.ParseCertificate(certificate.Certificate[0])
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
-	found := false
-	if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
-		found = leaf.Subject.CommonName == domain
-	}
-	for _, san := range leaf.DNSNames {
-		if san == domain {
-			found = true
-			break
-		}
-	}
-
-	return found, nil
-}
-
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown ACME manager?
 	//       See: https://github.com/golang/go/issues/63706
@@ -154,7 +128,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := validForDomain(manager, site.Domain)
+				ok, err := manager.ValidForDomain(site.Domain)
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", site.CertFile, "domain", site.Domain)
 				}
@@ -185,7 +159,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				fileGetCertificateFunctions[site.Domain] = manager.GetCertificate
 
-				ok, err := validForDomain(manager, site.Domain)
+				ok, err := manager.ValidForDomain(site.Domain)
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
 				}

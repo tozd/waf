@@ -2,6 +2,7 @@ package waf
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"sync"
 	"time"
 
@@ -78,4 +79,30 @@ func (c *certificateManager) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certif
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.certificate, nil
+}
+
+func (c *certificateManager) ValidForDomain(domain string) (bool, errors.E) {
+	certificate, err := c.GetCertificate(nil)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	// certificate.Leaf is nil, so we have to parse leaf ourselves.
+	// See: https://github.com/golang/go/issues/35504
+	leaf, err := x509.ParseCertificate(certificate.Certificate[0])
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	found := false
+	if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
+		found = leaf.Subject.CommonName == domain
+	}
+	for _, san := range leaf.DNSNames {
+		if san == domain {
+			found = true
+			break
+		}
+	}
+
+	return found, nil
 }
