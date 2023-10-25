@@ -190,8 +190,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
 		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
 
-		st := *new(SiteT)
-		site := st.GetSite()
+		st, site := newSiteT[SiteT]()
 		*site = Site{
 			Domain:               s.TLS.Domain,
 			Title:                s.Title,
@@ -236,8 +235,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 		sites = map[string]SiteT{}
 		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
-			st := *new(SiteT)
-			site := st.GetSite()
+			st, site := newSiteT[SiteT]()
 			*site = Site{
 				Domain:               leaf.Subject.CommonName,
 				Title:                s.Title,
@@ -249,8 +247,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 			sites[leaf.Subject.CommonName] = st
 		}
 		for _, san := range leaf.DNSNames {
-			st := *new(SiteT)
-			site := st.GetSite()
+			st, site := newSiteT[SiteT]()
 			*site = Site{
 				Domain:               san,
 				Title:                s.Title,

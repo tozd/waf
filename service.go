@@ -61,6 +61,19 @@ type hasSite interface {
 	GetSite() *Site
 }
 
+// We use a helper to create SiteT and a pointer to its internal Site
+// to make it work with current Go type system limitations. Because we
+// do not use this in critical paths, use of reflect seems reasonable.
+//
+// See: https://go.dev/play/p/j0GRRI96WMM
+// See: https://github.com/golang/go/issues/63708
+func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
+	typ := reflect.TypeOf((*SiteT)(nil)).Elem().Elem()
+	st := reflect.New(typ).Interface().(SiteT) //nolint:forcetypeassert,errcheck
+	site := st.GetSite()
+	return st, site
+}
+
 type Service[SiteT hasSite] struct {
 	Logger zerolog.Logger
 
