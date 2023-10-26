@@ -298,7 +298,7 @@ func TestWebsocketHandler(t *testing.T) {
 	h3 := hlog.NewHandler(zerolog.New(pipeW))(h2)
 	ts = httptest.NewServer(h3)
 	defer ts.Close()
-	resp, err := http.Get(ts.URL) //nolint:noctx
+	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
 	if assert.NoError(t, err) {
 		defer resp.Body.Close()
 	}
