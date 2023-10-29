@@ -1,12 +1,12 @@
 package waf
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -182,10 +182,15 @@ func TestServer(t *testing.T) {
 	})
 	assert.ErrorContains(t, errE, "certificate is not valid for domain")
 
-	out := &bytes.Buffer{}
+	pipeR, pipeW, err := os.Pipe()
+	t.Cleanup(func() {
+		// We might double close but we do not care.
+		pipeR.Close()
+		pipeW.Close()
+	})
 
 	server = &Server[*Site]{
-		Logger: zerolog.New(out),
+		Logger: zerolog.New(pipeW),
 		TLS: TLS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
@@ -220,11 +225,16 @@ func TestServer(t *testing.T) {
 	err = g.Wait()
 	assert.NoError(t, err)
 
+	pipeW.Close()
+	out, err := io.ReadAll(pipeR)
+	pipeR.Close()
+	assert.NoError(t, err)
+
 	assert.Equal(
 		t,
 		`{"level":"info","message":"server starting on :8080"}`+"\n"+
 			`{"level":"info","message":"server stopping"}`+"\n",
-		out.String(),
+		string(out),
 	)
 }
 
