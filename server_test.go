@@ -1,17 +1,22 @@
 package waf
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/tozd/identifier"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestServer(t *testing.T) {
@@ -177,8 +182,10 @@ func TestServer(t *testing.T) {
 	})
 	assert.ErrorContains(t, errE, "certificate is not valid for domain")
 
+	out := &bytes.Buffer{}
+
 	server = &Server[*Site]{
-		Logger: zerolog.Nop(),
+		Logger: zerolog.New(out),
 		TLS: TLS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
@@ -193,6 +200,32 @@ func TestServer(t *testing.T) {
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	g := errgroup.Group{}
+
+	g.Go(func() error {
+		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("test"))
+			w.WriteHeader(http.StatusOK)
+		}))
+	})
+
+	time.Sleep(time.Second)
+
+	cancel()
+
+	err = g.Wait()
+	assert.NoError(t, err)
+
+	assert.Equal(
+		t,
+		`{"level":"info","message":"server starting on :8080"}`+"\n"+
+			`{"level":"info","message":"server stopping"}`+"\n",
+		out.String(),
+	)
 }
 
 func TestServerConnection(t *testing.T) {
@@ -202,7 +235,7 @@ func TestServerConnection(t *testing.T) {
 	certPath := filepath.Join(tempDir, "test_cert.pem")
 	keyPath := filepath.Join(tempDir, "test_key.pem")
 
-	err := createTempCertificateFiles(certPath, keyPath, []string{"example.com", "localhost"})
+	err := createTempCertificateFiles(certPath, keyPath, []string{"localhost"})
 	require.NoError(t, err)
 
 	server := &Server[*Site]{
@@ -216,8 +249,7 @@ func TestServerConnection(t *testing.T) {
 	sites, errE := server.Init(nil)
 	assert.NoError(t, errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "example"},
+		"localhost": {Domain: "localhost", Title: "example"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -233,10 +265,20 @@ func TestServerConnection(t *testing.T) {
 		_, _ = w.Write([]byte("test"))
 		w.WriteHeader(http.StatusOK)
 	})
+	ts.TLS = server.server.TLSConfig.Clone()
+	// We have to call GetCertificate ourselves.
+	// See: https://github.com/golang/go/issues/63812
+	cert, err := ts.TLS.GetCertificate(nil)
+	require.NoError(t, err)
+	// By setting Certificates, we force testing server and testing client to use our certificate.
+	ts.TLS.Certificates = []tls.Certificate{*cert}
 
+	// This does not start server.server's managers, but that is OK for this test.
 	ts.StartTLS()
 
-	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
+	// Our certificate is for localhost domain and not 127.0.0.1 IP.
+	url := strings.ReplaceAll(ts.URL, "127.0.0.1", "localhost")
+	resp, err := ts.Client().Get(url) //nolint:noctx
 	if assert.NoError(t, err) {
 		defer resp.Body.Close()
 		out, err := io.ReadAll(resp.Body)
