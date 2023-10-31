@@ -378,7 +378,7 @@ func TestServerACME(t *testing.T) {
 	transport.ForceAttemptHTTP2 = true
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if addr == "site.test:443" {
-			addr = listenAddr.Load().(string) //nolint:errcheck
+			addr = listenAddr.Load().(string) //nolint:errcheck,forcetypeassert
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}
