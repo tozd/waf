@@ -30,7 +30,8 @@ test:
     - docker build -t pebbleimage -f testdata/pebble.dockerfile testdata
     - |
       docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 "$(nslookup build | awk '/^Address: / { print $2 }' | head -n 1)"
-    - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver pebble:8053
+    - |
+      docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver "$(nslookup pebble | awk '/^Address: / { print $2 }' | head -n 1):8053"
     - export PEBBLE_HOST=pebble
 
   script:
