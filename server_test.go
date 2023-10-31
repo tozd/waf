@@ -373,6 +373,7 @@ func TestServerACME(t *testing.T) {
 	time.Sleep(time.Second)
 
 	require.NotEmpty(t, listenAddr.Load())
+	t.Logf("listenAddr: %s", listenAddr.Load())
 
 	transport := cleanhttp.DefaultTransport()
 	transport.ForceAttemptHTTP2 = true
