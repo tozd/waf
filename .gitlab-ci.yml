@@ -17,6 +17,9 @@ test:
   services:
     - docker:23-dind
 
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+
   before_script:
     - apk --update add docker-cli-buildx make bash gcc musl-dev
     - (cd /go; go install gotest.tools/gotestsum@v1.10.1)
