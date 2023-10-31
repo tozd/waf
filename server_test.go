@@ -62,7 +62,7 @@ func TestServer(t *testing.T) {
 		Title:   "example",
 	}
 	sites, errE := server.Init(nil)
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "example"},
@@ -81,7 +81,7 @@ func TestServer(t *testing.T) {
 		Title:       "example",
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "example"},
@@ -100,7 +100,7 @@ func TestServer(t *testing.T) {
 		Title:       "example",
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "example"},
@@ -115,7 +115,7 @@ func TestServer(t *testing.T) {
 		"example.com": {Domain: "example.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
 		"localhost":   {Domain: "localhost", Title: "localhost", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
 		"localhost":   {Domain: "localhost", Title: "localhost", CertFile: certPath, KeyFile: keyPath},
@@ -164,7 +164,7 @@ func TestServer(t *testing.T) {
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "localhost"},
 	})
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "localhost"},
@@ -188,6 +188,7 @@ func TestServer(t *testing.T) {
 		pipeR.Close()
 		pipeW.Close()
 	})
+	require.NoError(t, err)
 
 	server = &Server[*Site]{
 		Logger: zerolog.New(pipeW),
@@ -198,7 +199,7 @@ func TestServer(t *testing.T) {
 		Title: "example",
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", Title: "example"},
 		"localhost":   {Domain: "localhost", Title: "example"},
@@ -223,7 +224,7 @@ func TestServer(t *testing.T) {
 	cancel()
 
 	err = g.Wait()
-	assert.NoError(t, err)
+	assert.NoError(t, err, "% -+#.1v", errE)
 
 	pipeW.Close()
 	out, err := io.ReadAll(pipeR)
@@ -257,7 +258,7 @@ func TestServerConnection(t *testing.T) {
 		Title: "example",
 	}
 	sites, errE := server.Init(nil)
-	assert.NoError(t, errE)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"localhost": {Domain: "localhost", Title: "example"},
 	}, sites)
