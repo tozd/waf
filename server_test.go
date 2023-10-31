@@ -337,7 +337,7 @@ func TestServerACME(t *testing.T) {
 	assert.Equal(t, "", server.InDevelopment())
 
 	// Pebble uses this port by default for the TLS-ALPN-01 challenge.
-	server.server.Addr = ":5001"
+	server.server.Addr = "172.18.0.3:5001"
 	// We extract the address on which the server listens.
 	var listenAddr atomic.Value
 	server.server.BaseContext = func(l net.Listener) context.Context {
