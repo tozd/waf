@@ -28,7 +28,7 @@ test:
     - docker info
     - echo "$CI_JOB_TOKEN" | docker login --username gitlab-ci-token --password-stdin "$CI_REGISTRY"
     - docker build -t pebbleimage -f testdata/pebble.dockerfile testdata
-    - nslookup build
+    - cat /etc/hosts
     - |
       export BUILD_IP="$(nslookup build | awk '/^Address: / { print $2 }' | head -n 1)"
     - docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 "$BUILD_IP"
