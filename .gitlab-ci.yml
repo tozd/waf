@@ -32,6 +32,8 @@ test:
     - docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 "$BUILD_IP"
     - ping -c 4 pebble
     - nslookup pebble
+    - cat /etc/resolv.conf
+    - cat /etc/hosts
     - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver "pebble:8053"
     - export PEBBLE_HOST=pebble
 
