@@ -37,6 +37,10 @@ test:
   script:
     - make test-ci
 
+  after_script:
+    - docker logs pebble
+    - docker logs pebble-challtestsrv
+
   artifacts:
     when: always
     reports:
