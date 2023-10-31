@@ -336,8 +336,8 @@ func TestServerACME(t *testing.T) {
 
 	assert.Equal(t, "", server.InDevelopment())
 
-	// TLS-ALPN-01 challenge uses HTTPS port.
-	server.server.Addr = ":443"
+	// Pebble uses this port by default for the TLS-ALPN-01 challenge.
+	server.server.Addr = ":5001"
 	// We extract the address on which the server listens.
 	var listenAddr atomic.Value
 	server.server.BaseContext = func(l net.Listener) context.Context {
