@@ -15,10 +15,11 @@ test:
   image: golang:$IMAGE_TAG
 
   services:
-    - docker:23-dind
+    - name: docker:23-dind
+      alias: pebble
 
   variables:
-    DOCKER_HOST: tcp://docker:2375
+    DOCKER_HOST: tcp://pebble:2375
 
   before_script:
     - apk --update add docker-cli-buildx make bash gcc musl-dev
@@ -28,8 +29,8 @@ test:
     - echo "$CI_JOB_TOKEN" | docker login --username gitlab-ci-token --password-stdin "$CI_REGISTRY"
     - docker build -t pebbleimage -f testdata/pebble.dockerfile testdata
     - docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 build
-    - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver docker:8053
-    - export PEBBLE_HOST=docker
+    - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver pebble:8053
+    - export PEBBLE_HOST=pebble
 
   script:
     - make test-ci
