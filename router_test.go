@@ -95,12 +95,12 @@ func TestParsePath(t *testing.T) {
 		t.Run(tt.inputPath, func(t *testing.T) {
 			t.Parallel()
 
-			segments, err := parsePath(tt.inputPath)
+			segments, errE := parsePath(tt.inputPath)
 			assert.Equal(t, tt.expectedResult, segments)
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, err, tt.expectedError)
+				assert.ErrorContains(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, errE, "% -+#.1v", errE)
 			}
 		})
 	}
@@ -146,14 +146,14 @@ func TestCompileRegexp(t *testing.T) {
 		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
 			t.Parallel()
 
-			re, paramMapFunc, err := compileRegexp(tt.inputSegments)
+			re, paramMapFunc, errE := compileRegexp(tt.inputSegments)
 
 			if tt.expectedError != "" {
 				assert.Nil(t, re)
 				assert.Nil(t, paramMapFunc)
-				assert.ErrorContains(t, err, tt.expectedError)
+				assert.ErrorContains(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, errE, "% -+#.1v", errE)
 				if assert.NotNil(t, re) {
 					assert.Equal(t, tt.expectedRegexp, re.String())
 				}
@@ -361,15 +361,15 @@ func TestRouterHandle(t *testing.T) {
 
 			r := &Router{}
 
-			var err errors.E
+			var errE errors.E
 			for _, route := range tt.routes {
-				err = r.Handle(route.routeName, route.method, route.path, route.api, func(http.ResponseWriter, *http.Request, Params) {})
+				errE = r.Handle(route.routeName, route.method, route.path, route.api, func(http.ResponseWriter, *http.Request, Params) {})
 			}
 
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, err, tt.expectedError)
+				assert.ErrorContains(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, errE, "% -+#.1v", errE)
 				for _, route := range tt.routes {
 					assert.NotNil(t, r.routes[route.routeName])
 				}
@@ -546,15 +546,15 @@ func TestRouterPath(t *testing.T) {
 				EncodeQuery: tt.encodeQuery,
 			}
 
-			err := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
-			require.NoError(t, err)
+			errE := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
+			require.NoError(t, errE, "% -+#.1v", errE)
 
-			path, err := r.path("PathName", tt.params, tt.qs, tt.inputAPI)
+			path, errE := r.path("PathName", tt.params, tt.qs, tt.inputAPI)
 
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, err, tt.expectedError)
+				assert.ErrorContains(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, errE, "% -+#.1v", errE)
 				assert.Equal(t, tt.expectedPath, path)
 			}
 		})
@@ -566,11 +566,11 @@ func TestRouterPathMissing(t *testing.T) {
 
 	r := &Router{}
 
-	err := r.Handle("PathName", http.MethodGet, "/", false, func(http.ResponseWriter, *http.Request, Params) {})
-	require.NoError(t, err)
+	errE := r.Handle("PathName", http.MethodGet, "/", false, func(http.ResponseWriter, *http.Request, Params) {})
+	require.NoError(t, errE, "% -+#.1v", errE)
 
-	_, err = r.path("PathNameMissing", nil, nil, false)
-	assert.ErrorContains(t, err, "route does not exist")
+	_, errE = r.path("PathNameMissing", nil, nil, false)
+	assert.ErrorContains(t, errE, "route does not exist")
 }
 
 func TestRouterServeHTTP(t *testing.T) {
@@ -720,8 +720,8 @@ func TestRouterServeHTTP(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 				},
 			}
-			err := r.Handle("PathName", tt.method, tt.path, tt.api, tt.handler)
-			require.NoError(t, err)
+			errE := r.Handle("PathName", tt.method, tt.path, tt.api, tt.handler)
+			require.NoError(t, errE, "% -+#.1v", errE)
 
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, tt.request)

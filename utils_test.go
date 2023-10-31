@@ -46,8 +46,8 @@ func TestParsePostForm(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/example?"+queryString, strings.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	err := parsePostForm(req)
-	assert.NoError(t, err)
+	errE := parsePostForm(req)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Nil(t, req.Form)
 
 	require.NotNil(t, req.PostForm)
@@ -64,8 +64,8 @@ func TestGetQueryForm(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/example?"+queryString, strings.NewReader(postBody))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	queryForm, err := getQueryForm(req)
-	assert.NoError(t, err)
+	queryForm, errE := getQueryForm(req)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 
 	assert.Len(t, queryForm, 2)
 	assert.Equal(t, "value1", queryForm.Get("key1"))
@@ -74,8 +74,8 @@ func TestGetQueryForm(t *testing.T) {
 	assert.Nil(t, req.Form)
 	assert.Nil(t, req.PostForm)
 
-	err = parsePostForm(req)
-	assert.NoError(t, err)
+	errE = parsePostForm(req)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Nil(t, req.Form)
 
 	require.NotNil(t, req.PostForm)
@@ -83,8 +83,8 @@ func TestGetQueryForm(t *testing.T) {
 	assert.Equal(t, "value3", req.PostForm.Get("key3"))
 	assert.Equal(t, "value4", req.PostForm.Get("key4"))
 
-	queryForm, err = getQueryForm(req)
-	assert.NoError(t, err)
+	queryForm, errE = getQueryForm(req)
+	assert.NoError(t, errE, "% -+#.1v", errE)
 
 	assert.Len(t, queryForm, 2)
 	assert.Equal(t, "value1", queryForm.Get("key1"))
