@@ -5,16 +5,28 @@ variables:
   FF_ENABLE_BASH_EXIT_CODE_CHECK: "true"
   # We always want to run with the Go version installed in a Docker image.
   GOTOOLCHAIN: local
+  DOCKER_DRIVER: overlay2
+  DOCKER_BUILDKIT: "1"
+  FF_NETWORK_PER_BUILD: 1
 
 test:
   stage: test
 
   image: golang:$IMAGE_TAG
 
+  services:
+    - docker:23-dind
+
   before_script:
-    - apk --update add make bash gcc musl-dev
+    - apk --update add docker-cli-buildx make bash gcc musl-dev
     - (cd /go; go install gotest.tools/gotestsum@v1.10.1)
     - (cd /go; go install github.com/boumenot/gocover-cobertura@v1.2.0)
+    - docker info
+    - echo "$CI_JOB_TOKEN" | docker login --username gitlab-ci-token --password-stdin "$CI_REGISTRY"
+    - docker build -t pebbleimage -f testdata/pebble.dockerfile testdata
+    - docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 build
+    - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 pebbleimage pebble -dnsserver docker:8053
+    - export PEBBLE_HOST=docker
 
   script:
     - make test-ci

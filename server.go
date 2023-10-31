@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/net/idna"
 	"golang.org/x/sync/errgroup"
@@ -31,6 +32,10 @@ type TLS struct {
 	Domain   string `group:"Let's Encrypt:"       help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING"                                                 short:"D"          yaml:"domain"`
 	Email    string `group:"Let's Encrypt:"       help:"Contact e-mail to use with Let's Encrypt."                                             short:"E"                                                            yaml:"email"`
 	Cache    string `default:"${defaultTLSCache}" group:"Let's Encrypt:"                                                                       help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." placeholder:"PATH" short:"C"     type:"path"         yaml:"cache"`
+
+	// Used primarily for testing.
+	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
+	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
 }
 
 //nolint:lll
@@ -273,12 +278,23 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	}
 
 	if len(letsEncryptDomainsList) > 0 {
+		directory := autocert.DefaultACMEDirectory
+		if s.TLS.ACMEDirectory != "" {
+			directory = s.TLS.ACMEDirectory
+		}
+		client, err := acmeClient(s.TLS.ACMEDirectoryRootCAs)
+		if err != nil {
+			return sites, err
+		}
 		manager := autocert.Manager{
-			Prompt:                 autocert.AcceptTOS,
-			Cache:                  autocert.DirCache(s.TLS.Cache),
-			HostPolicy:             autocert.HostWhitelist(letsEncryptDomainsList...),
-			RenewBefore:            0,
-			Client:                 nil,
+			Prompt:      autocert.AcceptTOS,
+			Cache:       autocert.DirCache(s.TLS.Cache),
+			HostPolicy:  autocert.HostWhitelist(letsEncryptDomainsList...),
+			RenewBefore: 0,
+			Client: &acme.Client{ //nolint:exhaustruct
+				DirectoryURL: directory,
+				HTTPClient:   client,
+			},
 			Email:                  s.TLS.Email,
 			ForceRSA:               false,
 			ExtraExtensions:        nil,

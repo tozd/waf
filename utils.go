@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -15,6 +19,7 @@ import (
 	"unicode"
 
 	"github.com/andybalholm/brotli"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
@@ -232,4 +237,57 @@ func copyValues(dst, src url.Values) {
 	for k, vs := range src {
 		dst[k] = append(dst[k], vs...)
 	}
+}
+
+func parseCertPool(certs []byte) (*x509.CertPool, errors.E) {
+	var blocks []byte
+	for {
+		var block *pem.Block
+		block, certs = pem.Decode(certs)
+		if block == nil {
+			return nil, errors.New("PEM not parsed")
+		}
+		blocks = append(blocks, block.Bytes...)
+		if len(certs) == 0 {
+			break
+		}
+	}
+	certificates, err := x509.ParseCertificates(blocks)
+	if err != nil {
+		return nil, errors.WithMessage(err, "unable to parse certificates")
+	}
+	certpool := x509.NewCertPool()
+	for _, certificate := range certificates {
+		certpool.AddCert(certificate)
+	}
+	return certpool, nil
+}
+
+func parseCertPoolFrom(certsPath string) (*x509.CertPool, errors.E) {
+	certs, err := os.ReadFile(certsPath)
+	if err != nil {
+		errE := errors.WithMessage(err, "unable to read file")
+		errors.Details(err)["certsPath"] = certsPath
+		return nil, errE
+	}
+	certpool, errE := parseCertPool(certs)
+	if errE != nil {
+		errors.Details(err)["certsPath"] = certsPath
+		return nil, errE
+	}
+	return certpool, nil
+}
+
+func acmeClient(certsPath string) (*http.Client, errors.E) {
+	client := cleanhttp.DefaultPooledClient()
+	if certsPath != "" {
+		certpool, err := parseCertPoolFrom(certsPath)
+		if err != nil {
+			return nil, err
+		}
+		client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{ //nolint:exhaustruct,gosec,forcetypeassert
+			RootCAs: certpool,
+		}
+	}
+	return client, nil
 }

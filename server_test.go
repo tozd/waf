@@ -3,15 +3,19 @@ package waf
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -207,6 +211,9 @@ func TestServer(t *testing.T) {
 
 	assert.Equal(t, "", server.InDevelopment())
 
+	// We bind the server to any localhost port.
+	server.server.Addr = "localhost:0"
+
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
@@ -231,6 +238,7 @@ func TestServer(t *testing.T) {
 	pipeR.Close()
 	assert.NoError(t, err)
 
+	// Server does not really start on :8080, but that is OK.
 	assert.Equal(
 		t,
 		`{"level":"info","message":"server starting on :8080"}`+"\n"+
@@ -250,7 +258,7 @@ func TestServerConnection(t *testing.T) {
 	require.NoError(t, err)
 
 	server := &Server[*Site]{
-		Logger: zerolog.Nop(),
+		Logger: zerolog.New(zerolog.NewTestWriter(t)),
 		TLS: TLS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
@@ -298,4 +306,102 @@ func TestServerConnection(t *testing.T) {
 		assert.Equal(t, 2, resp.ProtoMajor)
 		assert.Equal(t, `test`, string(out))
 	}
+}
+
+func TestServerACME(t *testing.T) {
+	t.Parallel()
+
+	if os.Getenv("PEBBLE_HOST") == "" {
+		t.Skip("PEBBLE_HOST is not available")
+	}
+
+	tempDir := t.TempDir()
+
+	server := &Server[*Site]{
+		Logger: zerolog.New(zerolog.NewTestWriter(t)),
+		TLS: TLS{
+			Domain:               "site.test",
+			Email:                "user@example.com",
+			Cache:                tempDir,
+			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
+			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
+		},
+		Title: "example",
+	}
+	sites, errE := server.Init(nil)
+	assert.NoError(t, errE, "% -+#.1v", errE)
+	assert.Equal(t, map[string]*Site{
+		"site.test": {Domain: "site.test", Title: "example"},
+	}, sites)
+
+	assert.Equal(t, "", server.InDevelopment())
+
+	// TLS-ALPN-01 challenge uses HTTPS port.
+	server.server.Addr = ":443"
+	// We extract the address on which the server listens.
+	var listenAddr atomic.Value
+	server.server.BaseContext = func(l net.Listener) context.Context {
+		listenAddr.Store(l.Addr().String())
+		return context.Background()
+	}
+
+	acmeClient, errE := acmeClient("testdata/pebble.minica.pem")
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	resp, err := acmeClient.Get(fmt.Sprintf("https://%s/roots/0", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "15000"))) //nolint:noctx
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	acmeRootCAsData, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	acmeRootCAs, errE := parseCertPool(acmeRootCAsData)
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	g := errgroup.Group{}
+
+	g.Go(func() error {
+		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("test"))
+			w.WriteHeader(http.StatusOK)
+		}))
+	})
+
+	time.Sleep(time.Second)
+
+	require.NotEmpty(t, listenAddr.Load())
+
+	transport := cleanhttp.DefaultTransport()
+	transport.ForceAttemptHTTP2 = true
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr == "site.test:443" {
+			addr = listenAddr.Load().(string) //nolint:errcheck
+		}
+		return (&net.Dialer{}).DialContext(ctx, network, addr)
+	}
+	transport.TLSClientConfig = &tls.Config{ //nolint:gosec
+		RootCAs: acmeRootCAs,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	resp, err = client.Get("https://site.test") //nolint:noctx
+	if assert.NoError(t, err) {
+		defer resp.Body.Close()
+		out, err := io.ReadAll(resp.Body) //nolint:govet
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 2, resp.ProtoMajor)
+		assert.Equal(t, `test`, string(out))
+	}
+
+	cancel()
+
+	err = g.Wait()
+	assert.NoError(t, err, "% -+#.1v", err)
 }
