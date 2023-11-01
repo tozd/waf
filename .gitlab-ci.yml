@@ -20,7 +20,7 @@ test:
       command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", "172.18.0.1"]
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
-      command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "172.18.0.2:8053"]
+      command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
 
   variables:
     DOCKER_HOST: tcp://pebble:2375
