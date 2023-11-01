@@ -15,33 +15,28 @@ test:
   image: golang:$IMAGE_TAG
 
   services:
-    - name: docker:23-dind
+    - name: letsencrypt/pebble-challtestsrv:v2.3.1
+      alias: pebble-challtestsrv
+      command: ["pebble-challtestsrv", '-defaultIPv6 ""', "-defaultIPv4 build"]
+    - name: letsencrypt/pebble:v2.3.1
       alias: pebble
+      command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
 
   variables:
     DOCKER_HOST: tcp://pebble:2375
 
   before_script:
-    - apk --update add docker-cli-buildx make bash gcc musl-dev
+    - apk --update add make bash gcc musl-dev
     - (cd /go; go install gotest.tools/gotestsum@v1.10.1)
     - (cd /go; go install github.com/boumenot/gocover-cobertura@v1.2.0)
-    - docker info
-    - echo "$CI_JOB_TOKEN" | docker login --username gitlab-ci-token --password-stdin "$CI_REGISTRY"
-    - export BUILD_IP="$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')"
-    - docker run -d --rm --name pebble-challtestsrv -p 8053:8053/udp -p 8055:8055 letsencrypt/pebble-challtestsrv:v2.3.1 pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 "$BUILD_IP"
-    - export PEBBLE_IP="$(getent ahostsv4 pebble | awk '{print $1}' | head -1)"
-    - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 letsencrypt/pebble:v2.3.1 pebble -config /test/config/pebble-config.json -dnsserver "$PEBBLE_IP:8053"
     - export PEBBLE_HOST=pebble
-    - nslookup -port=8053 site.test "$PEBBLE_IP"
-    - docker exec -t pebble ping -c 4 "$BUILD_IP"
+    - nslookup -port=8053 site.test pebble-challtestsrv
 
   script:
     - make test-ci
 
   after_script:
-    - wget -O - --post-data '{"host":"site.test"}' http://pebble:8055/dns-request-history
-    - docker logs pebble
-    - docker logs pebble-challtestsrv
+    - wget -O - --post-data '{"host":"site.test"}' http://pebble-challtestsrv:8055/dns-request-history
 
   artifacts:
     when: always
