@@ -36,6 +36,7 @@ test:
     - (cd /go; go install github.com/boumenot/gocover-cobertura@v1.2.0)
     - export PEBBLE_HOST=pebble
     - nslookup -port=8053 site.test pebble-challtestsrv
+    - ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'
 
   script:
     - make test-ci
