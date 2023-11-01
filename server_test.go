@@ -376,6 +376,12 @@ func TestServerACME(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
+	getCertificate := server.server.TLSConfig.GetCertificate
+	server.server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		t.Logf("clientHelloInfo: %+v", hello)
+		return getCertificate(hello)
+	}
+
 	acmeRootCAs, errE := parseCertPool(acmeRootCAsData)
 	require.NoError(t, errE, "% -+#.1v", errE)
 
