@@ -33,6 +33,7 @@ test:
     - docker run -d --rm --name pebble -p 15000:15000 -p 14000:14000 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 -e PEBBLE_AUTHZREUSE=100 letsencrypt/pebble:v2.3.1 pebble -config /test/config/pebble-config.json -dnsserver "$PEBBLE_IP:8053"
     - export PEBBLE_HOST=pebble
     - nslookup -port=8053 site.test "$PEBBLE_IP"
+    - docker exec -t pebble ping -c 4 "$BUILD_IP"
 
   script:
     - make test-ci
