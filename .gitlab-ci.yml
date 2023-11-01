@@ -24,6 +24,11 @@ test:
 
   variables:
     DOCKER_HOST: tcp://pebble:2375
+    # Currently, environment variables for services have to be defined here.
+    # See: https://gitlab.com/gitlab-org/gitlab/-/issues/23671
+    PEBBLE_VA_NOSLEEP: 1
+    PEBBLE_WFE_NONCEREJECT: 0
+    PEBBLE_AUTHZREUSE: 100
 
   before_script:
     - apk --update add make bash gcc musl-dev
