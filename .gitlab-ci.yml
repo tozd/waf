@@ -18,10 +18,7 @@ test:
     - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
       command:
-        - "ash"
-        - "-c"
-        - |
-          IP="$(getent ahostsv4 build | awk '{print $1}' | head -1)"; exec pebble-challtestsrv -defaultIPv6 "" -defaultIPv4 "$IP"
+        - "getent ahostsv4 build | awk '{print $1}' | head -1"
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
