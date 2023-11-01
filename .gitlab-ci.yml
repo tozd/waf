@@ -17,7 +17,7 @@ test:
   services:
     - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
-      command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", "172.18.0.1"]
+      command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", "172.18.0.4"]
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
