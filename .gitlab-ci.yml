@@ -8,7 +8,6 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_BUILDKIT: "1"
   FF_NETWORK_PER_BUILD: 1
-  CI_DEBUG_SERVICES: "true"
 
 test:
   stage: test
@@ -18,10 +17,6 @@ test:
   services:
     - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
-      command:
-        - "ash"
-        - "-c"
-        - "echo foo; sleep 25; getent ahostsv4 build"
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
@@ -40,6 +35,7 @@ test:
     - export PEBBLE_HOST=pebble
     - nslookup -port=8053 site.test pebble-challtestsrv
     - ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'
+    - getent ahostsv4 build
 
   script:
     - make test-ci
