@@ -17,6 +17,7 @@ test:
   services:
     - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
+      command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", ""]
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
@@ -27,15 +28,17 @@ test:
 
   variables:
     DOCKER_HOST: tcp://pebble:2375
+    PEBBLE_HOST: pebble
 
   before_script:
     - apk --update add make bash gcc musl-dev
     - (cd /go; go install gotest.tools/gotestsum@v1.10.1)
     - (cd /go; go install github.com/boumenot/gocover-cobertura@v1.2.0)
-    - export PEBBLE_HOST=pebble
-    - nslookup -port=8053 site.test pebble-challtestsrv
+    - BUILD_IP="$(getent ahostsv4 build | awk '{print $1}' | head -1)"
+    - echo "$BUILD_IP"
     - ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'
-    - getent ahostsv4 build
+    - wget -O - --post-data '{"host":"site.test", "addresses":["'"$BUILD_IP"'"]}' http://pebble-challtestsrv:8055/add-a
+    - nslookup -port=8053 site.test pebble-challtestsrv
 
   script:
     - make test-ci
