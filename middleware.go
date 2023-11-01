@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/felixge/httpsnoop"
 	servertiming "github.com/mitchellh/go-server-timing"
@@ -319,4 +320,31 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 			next.ServeHTTP(w, req)
 		})
 	}
+}
+
+// validatePath checks that path does not contain non-printable characters.
+// It also checks that the path is canonical. If not, it redirects to that
+// canonical URL.
+func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Check URL path for non-printable characters.
+		// Copied from https://github.com/hashicorp/go-cleanhttp/blob/master/handlers.go.
+		idx := strings.IndexFunc(req.URL.Path, func(c rune) bool {
+			return !unicode.IsPrint(c)
+		})
+		if idx != -1 {
+			s.BadRequest(w, req)
+			return
+		}
+
+		// Check canonical path.
+		path := cleanPath(req.URL.Path)
+		if path != req.URL.Path {
+			req.URL.Path = path
+			s.TemporaryRedirect(w, req, req.URL.String())
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
 }

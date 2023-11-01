@@ -207,10 +207,13 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(hostHandler("host"))
 	c = c.Append(etagHandler("etag"))
 	c = c.Append(responseHeaderHandler("encoding", "Content-Encoding"))
-	// parseForm should be last because it can fail or redirect and we want
-	// other fields to be logged. It also logs query string and redirects to
-	// canonical query strings.
+	// parseForm should be towards the end because it can fail or redirect
+	// and we want other fields to be logged. It also logs query string and
+	// redirects to canonical query strings.
 	c = c.Append(s.parseForm("query", "rawQuery"))
+	// validatePath should be towards the end because it can fail or redirect
+	// and we want other fields to be logged. It redirects to canonical path.
+	c = c.Append(s.validatePath)
 
 	return c.Then(s.router), nil
 }

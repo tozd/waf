@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"reflect"
 	"runtime"
 	"strings"
@@ -290,4 +291,27 @@ func acmeClient(certsPath string) (*http.Client, errors.E) {
 		}
 	}
 	return client, nil
+}
+
+// cleanPath returns the canonical path for p, eliminating . and .. elements.
+// Copied from net/http/server.go.
+func cleanPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if p[0] != '/' {
+		p = "/" + p
+	}
+	np := path.Clean(p)
+	// path.Clean removes trailing slash except for root;
+	// put the trailing slash back if necessary.
+	if p[len(p)-1] == '/' && np != "/" {
+		// Fast path for common case of p being the string we want.
+		if len(p) == len(np)+1 && strings.HasPrefix(p, np) {
+			np = p
+		} else {
+			np += "/"
+		}
+	}
+	return np
 }

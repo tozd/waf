@@ -389,7 +389,6 @@ func TestParseForm(t *testing.T) {
 func TestParseFormRedirect(t *testing.T) {
 	t.Parallel()
 
-	out := &bytes.Buffer{}
 	w := httptest.NewRecorder()
 	s := Service[*Site]{
 		router: new(Router),
@@ -399,7 +398,7 @@ func TestParseFormRedirect(t *testing.T) {
 	h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	h = hlog.NewHandler(zerolog.New(out))(h)
+	h = hlog.NewHandler(zerolog.New(zerolog.NewTestWriter(t)))(h)
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
@@ -407,4 +406,51 @@ func TestParseFormRedirect(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 	assert.Equal(t, "/example?key1=value1&key2=value2", res.Header.Get("Location"))
+}
+
+func TestValidatePath(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{
+		router: new(Router),
+	}
+	h := s.validatePath(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	h = hlog.NewHandler(zerolog.New(zerolog.NewTestWriter(t)))(h)
+
+	tests := []struct {
+		In  string
+		Out string
+	}{
+		{"/foo/../bar", "/bar"},
+		{"/foo/../bar/", "/bar/"},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, tt.In, nil)
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close()
+			})
+			assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+			assert.Equal(t, tt.Out, res.Header.Get("Location"))
+		})
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/foo%0Abar", nil)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 }
