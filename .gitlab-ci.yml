@@ -18,9 +18,9 @@ test:
     - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
       command:
-        - "getent"
-        - "ahostsv4"
-        - "test"
+        - "ash"
+        - "-c"
+        - "sleep 25; getent ahostsv4 build"
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
