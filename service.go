@@ -169,6 +169,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 				metrics.Dur(metric.Name, metric.Duration)
 			}
 		}
+		// Full duration is added to the response as a trailer in accessHandler,
+		// but it is not added to timing.Metrics. So we add it here to the log.
 		metrics.Dur("t", duration)
 		l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
 		if s.Revision != "" || s.BuildTimestamp != "" || s.Version != "" {
