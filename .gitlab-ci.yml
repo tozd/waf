@@ -38,7 +38,7 @@ test:
     - make test-ci
 
   after_script:
-    - curl -d '{"host":"site.test"}' http://pebble:8055/dns-request-history
+    - wget -O - --post-data '{"host":"site.test"}' http://pebble:8055/dns-request-history
     - docker logs pebble
     - docker logs pebble-challtestsrv
 
