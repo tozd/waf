@@ -257,18 +257,27 @@ func TestServerConnection(t *testing.T) {
 	err := createTempCertificateFiles(certPath, keyPath, []string{"localhost"})
 	require.NoError(t, err)
 
+	cert2Path := filepath.Join(tempDir, "test_cert2.pem")
+	key2Path := filepath.Join(tempDir, "test_key2.pem")
+
+	err = createTempCertificateFiles(cert2Path, key2Path, []string{"example.com"})
+	require.NoError(t, err)
+
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
 		TLS: TLS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
-		Title: "example",
 	}
-	sites, errE := server.Init(nil)
+	sites, errE := server.Init(map[string]*Site{
+		"example.com": {Domain: "example.com", Title: "example", CertFile: cert2Path, KeyFile: key2Path},
+		"localhost":   {Domain: "localhost", Title: "localhost"},
+	})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"localhost": {Domain: "localhost", Title: "example"},
+		"example.com": {Domain: "example.com", Title: "example", CertFile: cert2Path, KeyFile: key2Path},
+		"localhost":   {Domain: "localhost", Title: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -287,10 +296,22 @@ func TestServerConnection(t *testing.T) {
 	ts.TLS = server.server.TLSConfig.Clone()
 	// We have to call GetCertificate ourselves.
 	// See: https://github.com/golang/go/issues/63812
-	cert, err := ts.TLS.GetCertificate(nil)
-	require.NoError(t, err)
-	// By setting Certificates, we force testing server and testing client to use our certificate.
-	ts.TLS.Certificates = []tls.Certificate{*cert}
+	cert, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
+		ServerName: "localhost",
+	})
+	require.NoError(t, err, "% -+#.1v", err)
+	cert2, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
+		ServerName: "example.com",
+	})
+	require.NoError(t, err, "% -+#.1v", err)
+	// By setting Certificates, we force testing server and testing client to use our certificates.
+	ts.TLS.Certificates = []tls.Certificate{*cert, *cert2}
+
+	c, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
+		ServerName: "EXAMPLE.com",
+	})
+	assert.NoError(t, err, "% -+#.1v", err)
+	assert.NotNil(t, c)
 
 	// This does not start server.server's managers, but that is OK for this test.
 	ts.StartTLS()
