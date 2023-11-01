@@ -413,7 +413,6 @@ func TestServerACME(t *testing.T) {
 	transport.TLSClientConfig = &tls.Config{ //nolint:gosec
 		RootCAs: acmeRootCAs,
 	}
-	transport.TLSHandshakeTimeout = 60 * time.Second
 
 	client := &http.Client{
 		Transport: transport,
