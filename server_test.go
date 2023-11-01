@@ -231,7 +231,7 @@ func TestServer(t *testing.T) {
 	cancel()
 
 	err = g.Wait()
-	assert.NoError(t, err, "% -+#.1v", errE)
+	assert.NoError(t, err, "% -+#.1v", err)
 
 	pipeW.Close()
 	out, err := io.ReadAll(pipeR)
