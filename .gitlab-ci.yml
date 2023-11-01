@@ -20,7 +20,7 @@ test:
       command:
         - "getent"
         - "ahostsv4"
-        - "build"
+        - "test"
     - name: letsencrypt/pebble:v2.3.1
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
