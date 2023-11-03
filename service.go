@@ -327,43 +327,49 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 
 		for _, compression := range allCompressions {
 			site.compressedFiles[compression] = make(map[string][]byte)
+		}
 
-			err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					return errors.WithStack(err)
-				}
-				if d.IsDir() {
-					return nil
-				}
+		err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if d.IsDir() {
+				return nil
+			}
 
-				data, err := s.Files.ReadFile(path)
-				if err != nil {
-					errE := errors.WithStack(err)
+			path = strings.TrimPrefix(path, ".")
+
+			data, err := s.Files.ReadFile(path)
+			if err != nil {
+				errE := errors.WithStack(err)
+				errors.Details(errE)["path"] = path
+				return errE
+			}
+
+			path = "/" + path
+
+			var errE errors.E
+			if strings.HasSuffix(path, ".html") {
+				data, errE = s.render(path, data, siteT)
+				if errE != nil {
 					errors.Details(errE)["path"] = path
 					return errE
 				}
-				path = strings.TrimPrefix(path, ".")
+			}
 
-				var errE errors.E
-				if strings.HasSuffix(path, ".html") {
-					data, errE = s.render(path, data, siteT)
-					if errE != nil {
-						errors.Details(errE)["path"] = path
-						return errE
-					}
-				}
-
-				data, errE = compress(compression, data)
+			for _, compression := range allCompressions {
+				d, errE := compress(compression, data)
 				if errE != nil {
 					return errE
 				}
 
-				site.compressedFiles[compression][path] = data
-				return nil
-			})
-			if err != nil {
-				return errors.WithStack(err)
+				site.compressedFiles[compression][path] = d
 			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.WithStack(err)
 		}
 
 		// Map cannot be modified directly, so we modify the copy
@@ -385,22 +391,22 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			site.compressedFiles = make(map[string]map[string][]byte)
 		}
 
+		data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
+		if errE != nil {
+			return errE
+		}
+
 		for _, compression := range allCompressions {
 			if _, ok := site.compressedFiles[compression]; !ok {
 				site.compressedFiles[compression] = make(map[string][]byte)
 			}
 
-			data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
+			d, errE := compress(compression, data)
 			if errE != nil {
 				return errE
 			}
 
-			data, errE = compress(compression, data)
-			if errE != nil {
-				return errE
-			}
-
-			site.compressedFiles[compression][contextPath] = data
+			site.compressedFiles[compression][contextPath] = d
 		}
 
 		// Map cannot be modified directly, so we modify the copy
