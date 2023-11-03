@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
@@ -39,7 +38,7 @@ func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
+	logger := canonicalLogger(req.Context())
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
 	})
@@ -60,7 +59,7 @@ func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
+	logger := canonicalLogger(req.Context())
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Err(err)
 	})
@@ -73,7 +72,7 @@ func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Re
 }
 
 func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := hlog.FromRequest(req)
+	logger := canonicalLogger(req.Context())
 
 	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
 	if errors.Is(err, context.Canceled) {

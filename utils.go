@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -22,7 +23,6 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -49,6 +49,26 @@ var connectionIDContextKey = &contextKey{"connection-id"} //nolint:gochecknoglob
 
 // requestIDContextKey provides a random ID for each HTTP request.
 var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
+
+var disabledLogger *zerolog.Logger //nolint:gochecknoglobals
+
+func init() { //nolint:gochecknoinits
+	l := zerolog.Nop()
+	disabledLogger = &l
+}
+
+// canonicalLoggerContextKey provides a canonical log line logger for each HTTP request.
+var canonicalLoggerContextKey = &contextKey{"canonical-logger"} //nolint:gochecknoglobals
+
+// canonicalLogger is similar to zerolog.Ctx, but uses canonicalLoggerContextKey context key.
+func canonicalLogger(ctx context.Context) *zerolog.Logger {
+	if l, ok := ctx.Value(canonicalLoggerContextKey).(*zerolog.Logger); ok {
+		return l
+	} else if l = zerolog.DefaultContextLogger; l != nil {
+		return l
+	}
+	return disabledLogger
+}
 
 func getHost(hostPort string) string {
 	if hostPort == "" {
@@ -165,7 +185,7 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 
 	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		logger := hlog.FromRequest(req)
+		logger := canonicalLogger(req.Context())
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str(zerolog.MessageFieldName, name)
 		})
@@ -179,7 +199,7 @@ func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request))
 	}
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := hlog.FromRequest(req)
+		logger := canonicalLogger(req.Context())
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Str(zerolog.MessageFieldName, name)
 		})

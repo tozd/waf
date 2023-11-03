@@ -2,6 +2,7 @@ package waf
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -28,6 +29,7 @@ import (
 	"github.com/rs/zerolog/hlog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/go/x"
+	z "gitlab.com/tozd/go/zerolog"
 )
 
 const contextPath = "/index.json"
@@ -75,7 +77,8 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 }
 
 type Service[SiteT hasSite] struct {
-	Logger zerolog.Logger
+	Logger      zerolog.Logger
+	WithContext func(context.Context) (context.Context, func(), func())
 
 	Files  fs.ReadFileFS
 	Routes []Route
@@ -149,7 +152,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 
 	c := alice.New()
 
+	// We first create a canonical log line logger as context logger.
 	c = c.Append(hlog.NewHandler(s.Logger))
+	// Then we set the canonical log line logger under its own context key as well.
+	c = c.Append(setCanonicalLogger)
 	// It has to be before accessHandler so that it can access the timing context.
 	c = c.Append(func(next http.Handler) http.Handler {
 		return servertiming.Middleware(next, nil)
@@ -214,6 +220,15 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	// validatePath should be towards the end because it can fail or redirect
 	// and we want other fields to be logged. It redirects to canonical path.
 	c = c.Append(s.validatePath)
+
+	// We replace the canonical log line logger with a new context logger, but with associated request ID.
+	// The canonical log line logger is still available under its own context key.
+	if s.WithContext != nil {
+		c = c.Append(z.NewHandler(s.WithContext))
+	} else {
+		c = c.Append(hlog.NewHandler(s.Logger))
+	}
+	c = c.Append(requestIDHandler("request", ""))
 
 	return c.Then(s.router), nil
 }
@@ -578,8 +593,8 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 
 	etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
 
-	logger := hlog.FromRequest(req)
 	if len(metadata) > 0 {
+		logger := canonicalLogger(ctx)
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return logValues(c, "metadata", metadata)
 		})
@@ -707,7 +722,7 @@ func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
-	logger := hlog.FromRequest(req)
+	logger := canonicalLogger(req.Context())
 	var e error
 	switch ee := err.(type) {
 	case error:

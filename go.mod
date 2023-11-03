@@ -10,15 +10,17 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/justinas/alice v1.2.0
 	github.com/mitchellh/go-server-timing v1.0.1
-	github.com/rs/zerolog v1.31.1-0.20231014103838-6ed7439d9c6c
+	github.com/rs/zerolog v1.31.1-0.20231021022052-c4046fe2cb46
 	github.com/stretchr/testify v1.8.4
 	gitlab.com/tozd/go/errors v0.8.0
-	gitlab.com/tozd/go/x v0.0.0-20231018212754-db1da04ceaa8
+	gitlab.com/tozd/go/x v0.0.0-20231020213422-f3cd46ddd778
 	gitlab.com/tozd/identifier v0.1.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.3.0
 )
+
+require github.com/alecthomas/kong v0.8.1 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
@@ -44,6 +46,7 @@ require (
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/whilp/git-urls v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
+	gitlab.com/tozd/go/zerolog v0.4.0
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

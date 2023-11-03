@@ -143,5 +143,6 @@ issues:
       linters:
         - exhaustruct
         - goconst
+        - lll
         - testpackage
         - wrapcheck

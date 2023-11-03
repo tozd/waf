@@ -348,3 +348,14 @@ func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
 		next.ServeHTTP(w, req)
 	})
 }
+
+// setCanonicalLogger sets context logger under canonical logger context key as well.
+func setCanonicalLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		l := zerolog.Ctx(ctx)
+		ctx = context.WithValue(ctx, canonicalLoggerContextKey, l)
+		req = req.WithContext(ctx)
+		next.ServeHTTP(w, req)
+	})
+}
