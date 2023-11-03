@@ -453,4 +453,13 @@ func TestValidatePath(t *testing.T) {
 		res.Body.Close()
 	})
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest(http.MethodGet, "/foo/", nil)
+	h.ServeHTTP(w, r)
+	res = w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
