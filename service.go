@@ -489,7 +489,7 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 
 		// We can use any compression to obtain all static paths, so we use compressionIdentity.
 		for path := range site.compressedFiles[compressionIdentity] {
-			if (s.SkipStaticFile != nil && s.SkipStaticFile(path)) || path == contextPath {
+			if s.SkipStaticFile != nil && s.SkipStaticFile(path) {
 				continue
 			}
 
