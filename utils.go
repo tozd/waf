@@ -173,7 +173,21 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 }
 
-func autoName(f http.HandlerFunc) string {
+func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	if name == "" {
+		return h
+	}
+
+	return func(w http.ResponseWriter, req *http.Request) {
+		logger := hlog.FromRequest(req)
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str(zerolog.MessageFieldName, name)
+		})
+		h(w, req)
+	}
+}
+
+func autoName(f func(http.ResponseWriter, *http.Request)) string {
 	fn := runtime.FuncForPC(reflect.ValueOf(f).Pointer())
 	if fn == nil {
 		return ""

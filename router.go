@@ -113,7 +113,7 @@ type Handler func(http.ResponseWriter, *http.Request, Params)
 // TODO: Implement RedirectFixedPath = true.
 
 type Router struct {
-	NotFound         Handler
+	NotFound         func(http.ResponseWriter, *http.Request)
 	MethodNotAllowed Handler
 	Panic            func(w http.ResponseWriter, req *http.Request, err interface{})
 	EncodeQuery      func(qs url.Values) string
@@ -307,7 +307,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if r.NotFound != nil {
-		r.NotFound(w, req, nil)
+		r.NotFound(w, req)
 	} else {
 		Error(w, req, http.StatusNotFound)
 	}

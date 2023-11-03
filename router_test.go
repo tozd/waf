@@ -561,7 +561,7 @@ func TestRouterPath(t *testing.T) {
 	}
 }
 
-func TestRouterPathMissing(t *testing.T) {
+func TestRouterMissing(t *testing.T) {
 	t.Parallel()
 
 	r := &Router{}
@@ -571,6 +571,56 @@ func TestRouterPathMissing(t *testing.T) {
 
 	_, errE = r.path("PathNameMissing", nil, nil, false)
 	assert.ErrorContains(t, errE, "route does not exist")
+
+	errE = r.Handle("HandlerMissing", http.MethodGet, "/missing", false, nil)
+	assert.ErrorContains(t, errE, "handler cannot be nil")
+}
+
+func TestRouterErrorHandlers(t *testing.T) {
+	t.Parallel()
+
+	r := &Router{
+		NotFound: func(w http.ResponseWriter, req *http.Request) {
+			w.WriteHeader(480)
+		},
+		MethodNotAllowed: func(w http.ResponseWriter, req *http.Request, params Params) {
+			w.WriteHeader(490)
+		},
+	}
+
+	errE := r.Handle("PathName", http.MethodGet, "/", false, func(w http.ResponseWriter, _ *http.Request, _ Params) {
+		w.WriteHeader(http.StatusOK)
+	})
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	errE = r.Handle("PathName", http.MethodGet, "/", true, func(w http.ResponseWriter, _ *http.Request, _ Params) {
+		w.WriteHeader(http.StatusOK)
+	})
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/foobar", nil))
+	assert.Equal(t, 480, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/foobar", nil))
+	assert.Equal(t, 480, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/", nil))
+	assert.Equal(t, 490, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/", nil))
+	assert.Equal(t, 490, w.Code)
 }
 
 func TestRouterServeHTTP(t *testing.T) {

@@ -25,7 +25,7 @@ func RequestID(req *http.Request) (identifier.Identifier, bool) {
 	return id, ok
 }
 
-func ToHandler(f http.HandlerFunc) Handler {
+func ToHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 	return func(w http.ResponseWriter, req *http.Request, _ Params) {
 		f(w, req)
 	}

@@ -82,13 +82,16 @@ func TestCertificateManager(t *testing.T) {
 	err := createTempCertificateFiles(certPath, keyPath, []string{"example.com"})
 	require.NoError(t, err)
 
+	errE := (&certificateManager{}).Start()
+	assert.ErrorContains(t, errE, "manager not configured")
+
 	certManager := certificateManager{
 		CertFile: certPath,
 		KeyFile:  keyPath,
 		Logger:   zerolog.Nop(),
 	}
 
-	errE := certManager.Init()
+	errE = certManager.Init()
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	cert, err := certManager.GetCertificate(nil)

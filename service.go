@@ -123,7 +123,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerName(autoName(s.Proxy), ToHandler(s.Proxy))
+		s.router.NotFound = logHandlerFuncName(autoName(s.Proxy), s.Proxy)
 		s.router.MethodNotAllowed = logHandlerName(autoName(s.Proxy), ToHandler(s.Proxy))
 	} else {
 		errE := s.renderAndCompressFiles()
@@ -142,7 +142,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerName(autoName(s.NotFound), ToHandler(s.NotFound))
+		s.router.NotFound = logHandlerFuncName(autoName(s.NotFound), s.NotFound)
 		s.router.MethodNotAllowed = logHandlerName(autoName(s.MethodNotAllowed), ToHandler(s.MethodNotAllowed))
 	}
 	s.router.Panic = s.handlePanic
