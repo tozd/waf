@@ -17,7 +17,7 @@ func (s *Service[SiteT]) getSiteContext(site SiteT) siteContext[SiteT] {
 		Build: nil,
 	}
 
-	if c.Build.Version != "" || s.BuildTimestamp != "" || s.Revision != "" {
+	if s.Version != "" || s.BuildTimestamp != "" || s.Revision != "" {
 		c.Build = &buildContext{
 			Version:        s.Version,
 			BuildTimestamp: s.BuildTimestamp,
