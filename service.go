@@ -126,8 +126,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerFuncName(autoName(s.Proxy), s.Proxy)
-		s.router.MethodNotAllowed = logHandlerName(autoName(s.Proxy), ToHandler(s.Proxy))
+		s.router.NotFound = logHandlerFuncName("Proxy", s.Proxy)
+		s.router.MethodNotAllowed = logHandlerName("Proxy", ToHandler(s.Proxy))
 	} else {
 		errE := s.renderAndCompressFiles()
 		if errE != nil {
@@ -145,8 +145,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerFuncName(autoName(s.NotFound), s.NotFound)
-		s.router.MethodNotAllowed = logHandlerName(autoName(s.MethodNotAllowed), ToHandler(s.MethodNotAllowed))
+		s.router.NotFound = logHandlerFuncName("NotFound", s.NotFound)
+		s.router.MethodNotAllowed = logHandlerName("MethodNotAllowed", ToHandler(s.MethodNotAllowed))
 	}
 	s.router.Panic = s.handlePanic
 
@@ -494,10 +494,8 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 }
 
 func (s *Service[SiteT]) serveStaticFiles() errors.E {
-	staticName := autoName(s.staticFile)
-	staticH := logHandlerName(staticName, ToHandler(s.staticFile))
-	immutableName := autoName(s.immutableFile)
-	immutableH := logHandlerName(staticName, ToHandler(s.immutableFile))
+	staticH := logHandlerName("StaticFile", ToHandler(s.staticFile))
+	immutableH := logHandlerName("ImmutableFile", ToHandler(s.immutableFile))
 
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
@@ -511,10 +509,10 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 			var n string
 			var h Handler
 			if s.IsImmutableFile != nil && s.IsImmutableFile(path) {
-				n = fmt.Sprintf("%s:%s", immutableName, path)
+				n = fmt.Sprintf("ImmutableFile:%s", path)
 				h = immutableH
 			} else {
-				n = fmt.Sprintf("%s:%s", staticName, path)
+				n = fmt.Sprintf("StaticFile:%s", path)
 				h = staticH
 			}
 

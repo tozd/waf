@@ -14,11 +14,8 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync/atomic"
-	"unicode"
 
 	"github.com/andybalholm/brotli"
 	"github.com/hashicorp/go-cleanhttp"
@@ -205,27 +202,6 @@ func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request))
 		})
 		h(w, req)
 	}
-}
-
-func autoName(f func(http.ResponseWriter, *http.Request)) string {
-	fn := runtime.FuncForPC(reflect.ValueOf(f).Pointer())
-	if fn == nil {
-		return ""
-	}
-	name := fn.Name()
-	i := strings.LastIndex(name, ".")
-	if i != -1 {
-		name = name[i+1:]
-	}
-	name = strings.TrimSuffix(name, "-fm")
-
-	// Make sure the first letter is upper case. We also have internal handler
-	// functions and we want uniform look in logs.
-	rs := []rune(name)
-	rs[0] = unicode.ToUpper(rs[0])
-	name = string(rs)
-
-	return name
 }
 
 // parsePostForm parses and sets only PostForm on http.Request.
