@@ -19,12 +19,12 @@ func Error(w http.ResponseWriter, _ *http.Request, code int) {
 	http.Error(w, body, code)
 }
 
-func RequestID(req *http.Request) (identifier.Identifier, bool) {
-	if req == nil {
-		return identifier.Identifier{}, false
-	}
-	id, ok := req.Context().Value(requestIDContextKey).(identifier.Identifier)
-	return id, ok
+func RequestID(ctx context.Context) identifier.Identifier {
+	return ctx.Value(requestIDContextKey).(identifier.Identifier) //nolint:forcetypeassert
+}
+
+func GetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
+	return ctx.Value(siteContextKey).(SiteT) //nolint:forcetypeassert
 }
 
 func ToHandler(f func(http.ResponseWriter, *http.Request)) Handler {

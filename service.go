@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	eddo "github.com/golang/gddo/httputil"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
 	servertiming "github.com/mitchellh/go-server-timing"
@@ -222,6 +221,9 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	// validatePath should be towards the end because it can fail or redirect
 	// and we want other fields to be logged. It redirects to canonical path.
 	c = c.Append(s.validatePath)
+	// validateSite should be towards the end because it can fail and we want
+	// other fields to be logged.
+	c = c.Append(s.validateSite)
 
 	// We replace the canonical log line logger with a new context logger, but with associated request ID.
 	// The canonical log line logger is still available under its own context key.
@@ -619,7 +621,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
 }
 
-func (s *Service[SiteT]) Site(req *http.Request) (SiteT, errors.E) { //nolint:ireturn
+func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ireturn
 	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
 		return site, nil
 	}
@@ -638,19 +640,13 @@ func (s *Service[SiteT]) APIPath(name string, params Params, qs url.Values) (str
 
 // TODO: Use Vite's manifest.json to send preload headers.
 func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
-	contentEncoding := eddo.NegotiateContentEncoding(req, allCompressions)
+	contentEncoding := NegotiateContentEncoding(req, nil)
 	if contentEncoding == "" {
 		s.NotAcceptable(w, req)
 		return
 	}
 
-	siteT, err := s.Site(req)
-	if err != nil {
-		s.NotFoundWithError(w, req, err)
-		return
-	}
-
-	site := siteT.GetSite()
+	site := GetSite[SiteT](req.Context()).GetSite()
 
 	data, ok := site.compressedFiles[contentEncoding][path]
 	if !ok {

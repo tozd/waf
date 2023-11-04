@@ -47,6 +47,9 @@ var connectionIDContextKey = &contextKey{"connection-id"} //nolint:gochecknoglob
 // requestIDContextKey provides a random ID for each HTTP request.
 var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
 
+// siteContextKey provides a site for the HTTP request.
+var siteContextKey = &contextKey{"site"} //nolint:gochecknoglobals
+
 var disabledLogger *zerolog.Logger //nolint:gochecknoglobals
 
 func init() { //nolint:gochecknoinits

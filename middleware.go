@@ -86,7 +86,7 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
-			id, ok := RequestID(req)
+			id, ok := ctx.Value(requestIDContextKey).(identifier.Identifier)
 			if !ok {
 				id = identifier.New()
 				ctx = context.WithValue(ctx, requestIDContextKey, id)
@@ -360,6 +360,23 @@ func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
 			s.TemporaryRedirect(w, req, req.URL.String())
 			return
 		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
+// validateSite checks that host matches a known site. If site is found, it is
+// set in context.
+func (s *Service[SiteT]) validateSite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		siteT, err := s.site(req)
+		if err != nil {
+			s.NotFoundWithError(w, req, err)
+			return
+		}
+
+		ctx := context.WithValue(req.Context(), siteContextKey, siteT)
+		req = req.WithContext(ctx)
 
 		next.ServeHTTP(w, req)
 	})

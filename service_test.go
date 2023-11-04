@@ -188,7 +188,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool) (*testService,
 
 	ts := httptest.NewUnstartedServer(handler)
 	ts.EnableHTTP2 = https2
-	ts.TLS = &tls.Config{
+	ts.TLS = &tls.Config{ //nolint:gosec
 		Certificates: []tls.Certificate{certificate},
 	}
 	ts.Config.ConnContext = (&Server[*testSite]{}).connContext
@@ -619,7 +619,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"other.example.com","message":"HomeGet","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"other.example.com","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
@@ -650,6 +650,25 @@ func TestService(t *testing.T) {
 				"Test-Foobar":            {"42"},
 				"Server-Timing":          {"j;dur=,c;dur="},
 				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://other.example.com/api/json", nil)
+			},
+			http.StatusNotFound,
+			"Not Found\n",
+			`{"level":"warn","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"other.example.com","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
