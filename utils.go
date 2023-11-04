@@ -342,11 +342,11 @@ func newByteCountReadCloser(body io.ReadCloser) *byteCountReadCloser {
 func (b *byteCountReadCloser) Read(p []byte) (int, error) {
 	n, err := b.rc.Read(p)
 	b.read += int64(n)
-	return n, err
+	return n, err //nolint:wrapcheck
 }
 
 func (b *byteCountReadCloser) Close() error {
-	return b.rc.Close()
+	return b.rc.Close() //nolint:wrapcheck
 }
 
 func (b *byteCountReadCloser) BytesRead() int64 {

@@ -144,5 +144,6 @@ issues:
         - exhaustruct
         - goconst
         - lll
+        - maintidx
         - testpackage
         - wrapcheck

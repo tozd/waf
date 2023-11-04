@@ -368,7 +368,7 @@ func TestParseForm(t *testing.T) {
 			"key3=value3;key4=value4",
 			url.Values{},
 			url.Values{},
-			`{"error":"error parsing POST form: invalid semicolon separator in query\nerror parsing query string: invalid semicolon separator in query","rawQuery":"key1=value1;key2=value2"}`, //nolint:lll
+			`{"error":"error parsing POST form: invalid semicolon separator in query\nerror parsing query string: invalid semicolon separator in query","rawQuery":"key1=value1;key2=value2"}`,
 		},
 	}
 
