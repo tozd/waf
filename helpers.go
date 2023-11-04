@@ -3,17 +3,20 @@ package waf
 import (
 	"context"
 	"net/http"
+	"strconv"
 
+	gddo "github.com/golang/gddo/httputil"
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
 
 func Error(w http.ResponseWriter, _ *http.Request, code int) {
-	http.Error(w,
-		http.StatusText(code),
-		code,
-	)
+	body := http.StatusText(code)
+	w.Header().Set("Cache-Control", "no-cache")
+	// http.Error append a newline so we have to add 1.
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)+1))
+	http.Error(w, body, code)
 }
 
 func RequestID(req *http.Request) (identifier.Identifier, bool) {
@@ -28,6 +31,13 @@ func ToHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 	return func(w http.ResponseWriter, req *http.Request, _ Params) {
 		f(w, req)
 	}
+}
+
+func NegotiateContentEncoding(req *http.Request, offers []string) string {
+	if offers == nil {
+		offers = allCompressions
+	}
+	return gddo.NegotiateContentEncoding(req, offers)
 }
 
 // NotFound is a HTTP request handler which returns a 404 error to the client.

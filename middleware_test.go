@@ -221,28 +221,37 @@ func TestAccessHandler(t *testing.T) {
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
-			t.Parallel()
+		for _, protocol := range []int{1, 2} {
+			protocol := protocol
 
-			out := &bytes.Buffer{}
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodGet, "/foo", bytes.NewBufferString("test"))
-			h := accessHandler(func(r *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
-				l := hlog.FromRequest(r)
-				l.Log().Int("code", code).Int64("responseBody", responseBody).Int64("requestBody", requestBody).Msg("")
-				assert.Positive(t, duration)
-			})(tt.handler)
-			h = setCanonicalLogger(h)
-			h = hlog.NewHandler(zerolog.New(out))(h)
-			h.ServeHTTP(w, r)
-			assert.Equal(t, tt.expected+"\n", out.String())
-			res := w.Result()
-			t.Cleanup(func() {
-				res.Body.Close()
+			t.Run(fmt.Sprintf("case=#%d/protocol=%d", k, protocol), func(t *testing.T) {
+				t.Parallel()
+
+				out := &bytes.Buffer{}
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest(http.MethodGet, "/foo", bytes.NewBufferString("test"))
+				r.ProtoMajor = protocol
+				h := accessHandler(func(r *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
+					l := hlog.FromRequest(r)
+					l.Log().Int("code", code).Int64("responseBody", responseBody).Int64("requestBody", requestBody).Msg("")
+					assert.Positive(t, duration)
+				})(tt.handler)
+				h = setCanonicalLogger(h)
+				h = hlog.NewHandler(zerolog.New(out))(h)
+				h.ServeHTTP(w, r)
+				assert.Equal(t, tt.expected+"\n", out.String())
+				res := w.Result()
+				t.Cleanup(func() {
+					res.Body.Close()
+				})
+				trailer := res.Trailer.Get(servertiming.HeaderKey)
+				if protocol > 1 {
+					assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
+				} else {
+					assert.Equal(t, "", trailer)
+				}
 			})
-			trailer := res.Trailer.Get(servertiming.HeaderKey)
-			assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
-		})
+		}
 	}
 }
 

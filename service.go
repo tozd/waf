@@ -175,7 +175,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 				metrics.Dur(metric.Name, metric.Duration)
 			}
 		}
-		// Full duration is added to the response as a trailer in accessHandler,
+		// Full duration is added to the response as a trailer in accessHandler for HTTP2,
 		// but it is not added to timing.Metrics. So we add it here to the log.
 		metrics.Dur("t", duration)
 		l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
@@ -214,6 +214,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(hostHandler("host"))
 	c = c.Append(etagHandler("etag"))
 	c = c.Append(responseHeaderHandler("encoding", "Content-Encoding"))
+	c = c.Append(addNosniffHeader)
 	// parseForm should be towards the end because it can fail or redirect
 	// and we want other fields to be logged. It also logs query string and
 	// redirects to canonical query strings.
@@ -612,7 +613,6 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 	}
 	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("Etag", etag)
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// See: https://github.com/golang/go/issues/50905
 	// See: https://github.com/golang/go/pull/50903
@@ -705,7 +705,6 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	}
 	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("Etag", etag)
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// See: https://github.com/golang/go/issues/50905
 	// See: https://github.com/golang/go/pull/50903

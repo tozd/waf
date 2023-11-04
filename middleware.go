@@ -159,10 +159,15 @@ func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) 
 // See: https://github.com/rs/zerolog/issues/417
 // Afterwards, it was extended with Server-Timing trailer and counting of bytes read from the body.
 // See: https://github.com/rs/zerolog/pull/562
+// Trailers are added only on HTTP2 so that we are not required to use chunked transport encoding
+// with HTTP1.1 to support trailers (which conflicts with us setting Content-Length response header).
 func accessHandler(f func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Set("Trailer", servertiming.HeaderKey)
+			// We use trailers only with http2.
+			if req.ProtoMajor > 1 {
+				w.Header().Set("Trailer", servertiming.HeaderKey)
+			}
 			// We initialize Metrics ourselves so that if Code is never set it is logged as zero.
 			// This allows one to detect calls which has been canceled early and websocket upgrades.
 			// See: https://github.com/felixge/httpsnoop/issues/17
@@ -174,9 +179,12 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			body := newByteCountReadCloser(req.Body)
 			req.Body = body
 			defer func() {
-				milliseconds := float64(m.Duration) / float64(time.Millisecond)
-				// This writes the trailer.
-				w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
+				// We use trailers only with http2.
+				if req.ProtoMajor > 1 {
+					milliseconds := float64(m.Duration) / float64(time.Millisecond)
+					// This writes the trailer.
+					w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
+				}
 				f(req, m.Code, m.Written, body.BytesRead(), m.Duration)
 			}()
 			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
@@ -359,6 +367,14 @@ func setCanonicalLogger(next http.Handler) http.Handler {
 		l := zerolog.Ctx(ctx)
 		ctx = context.WithValue(ctx, canonicalLoggerContextKey, l)
 		req = req.WithContext(ctx)
+		next.ServeHTTP(w, req)
+	})
+}
+
+// addNosniffHeader sets nosniff header on all responses.
+func addNosniffHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, req)
 	})
 }

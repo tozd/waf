@@ -79,9 +79,15 @@ func (s *testService) PanicAPIGet(_ http.ResponseWriter, _ *http.Request, _ Para
 }
 
 func (s *testService) JSONAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
+	contentEncoding := NegotiateContentEncoding(req, nil)
+	if contentEncoding == "" {
+		s.NotAcceptable(w, req)
+		return
+	}
+
 	metadata := http.Header{}
 	metadata.Set("foobar", "42")
-	s.WriteJSON(w, req, compressionIdentity, map[string]interface{}{"data": 123}, metadata)
+	s.WriteJSON(w, req, contentEncoding, map[string]interface{}{"data": 123}, metadata)
 }
 
 func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Params) {
@@ -109,7 +115,7 @@ func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request 
 	return req
 }
 
-func newService(t *testing.T, logger zerolog.Logger) (*testService, *httptest.Server) {
+func newService(t *testing.T, logger zerolog.Logger, https2 bool) (*testService, *httptest.Server) {
 	t.Helper()
 
 	service := &testService{
@@ -169,9 +175,10 @@ func newService(t *testing.T, logger zerolog.Logger) (*testService, *httptest.Se
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	ts := httptest.NewUnstartedServer(handler)
+	ts.EnableHTTP2 = https2
 	ts.Config.ConnContext = (&Server[*testSite]{}).connContext
 	t.Cleanup(ts.Close)
-	ts.Start()
+	ts.StartTLS()
 
 	var listenAddr atomic.Value
 	listenAddr.Store(ts.Listener.Addr().String())
@@ -179,7 +186,7 @@ func newService(t *testing.T, logger zerolog.Logger) (*testService, *httptest.Se
 	// We make a client version which maps example.com to the address ts is listening on.
 	client := ts.Client()
 	client.Transport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) { //nolint:forcetypeassert
-		if addr == "example.com:80" || addr == "other.example.com:80" {
+		if addr == "example.com:443" || addr == "other.example.com:443" {
 			addr = listenAddr.Load().(string) //nolint:forcetypeassert,errcheck
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
@@ -190,10 +197,38 @@ func newService(t *testing.T, logger zerolog.Logger) (*testService, *httptest.Se
 
 var logCleanupRegexp = regexp.MustCompile(`("connection":")[^"]+(")|("request":")[^"]+(")|("[tjc]":)[0-9.]+`)
 
-func logCleanup(t *testing.T, log string) string {
+func logCleanup(t *testing.T, http2 bool, log string) string {
 	t.Helper()
 
+	if !http2 {
+		log = strings.ReplaceAll(log, `"proto":"1.1"`, `"proto":"2.0"`)
+		log = strings.ReplaceAll(log, `Go-http-client/1.1`, `Go-http-client/2.0`)
+	}
+
 	return logCleanupRegexp.ReplaceAllString(log, "$1$2$3$4$5")
+}
+
+var headerCleanupRegexp = regexp.MustCompile(`[0-9.]+`)
+
+func headerCleanup(t *testing.T, header http.Header) http.Header {
+	t.Helper()
+
+	for _, h := range []string{"Date", "Request-Id"} {
+		dates, ok := header[h]
+		if ok {
+			header[h] = make([]string, len(dates))
+		}
+	}
+
+	timing, ok := header["Server-Timing"]
+	if ok {
+		for i, t := range timing {
+			timing[i] = headerCleanupRegexp.ReplaceAllString(t, "")
+		}
+		header["Server-Timing"] = timing
+	}
+
+	return header
 }
 
 func TestServicePath(t *testing.T) {
@@ -201,7 +236,7 @@ func TestServicePath(t *testing.T) {
 
 	out := &bytes.Buffer{}
 
-	service, _ := newService(t, zerolog.New(out))
+	service, _ := newService(t, zerolog.New(out), false)
 
 	p, errE := service.Path("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
@@ -256,179 +291,408 @@ func TestService(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		Request        func() *http.Request
-		ExpectedStatus int
-		ExpectedBody   string
-		ExpectedLog    string
+		Request         func() *http.Request
+		ExpectedStatus  int
+		ExpectedBody    string
+		ExpectedLog     string
+		ExpectedHeader  http.Header
+		ExpectedTrailer http.Header
 	}{
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/", nil)
 			},
 			http.StatusOK,
 			`<!DOCTYPE html><html><head><title>test</title></head><body>test site</body></html>`,
-			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGet","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"82"},
+				"Content-Type":           {"text/html; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/data.txt", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/data.txt", nil)
 			},
 			http.StatusOK,
 			`test data`,
-			`{"level":"info","method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"9"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/assets/image.png", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/assets/image.png", nil)
 			},
 			http.StatusOK,
 			`test image`,
-			`{"level":"info","method":"GET","path":"/assets/image.png","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"ImmutableFile","etag":"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
-		},
-		{
-			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/missing", nil)
+			`{"level":"info","method":"GET","path":"/assets/image.png","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"ImmutableFile","etag":"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"public,max-age=31536000,immutable,stale-while-revalidate=86400"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"image/png"},
+				"Date":                   {""},
+				"Etag":                   {`"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
 			},
-			http.StatusOK,
-			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/missing","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"NotFound","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/api/", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/missing", nil)
+			},
+			http.StatusNotFound,
+			"Not Found\n",
+			`{"level":"warn","method":"GET","path":"/missing","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"NotFound","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/api/", nil)
 			},
 			http.StatusOK,
 			`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`,
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":1000,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":1000,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"161"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk"`},
+				"Request-Id":             {""},
+				"Server-Timing":          {"test;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/NotFound", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/NotFound", nil)
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/NotFoundWithError", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/NotFoundWithError", nil)
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/MethodNotAllowed", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/MethodNotAllowed", nil)
 			},
 			http.StatusMethodNotAllowed,
 			"Method Not Allowed\n",
-			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/NotAcceptable", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/NotAcceptable", nil)
 			},
 			http.StatusNotAcceptable,
 			"Not Acceptable\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotAcceptable","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":406,"responseBody":15,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotAcceptable","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":406,"responseBody":15,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"15"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/InternalServerError", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/InternalServerError", nil)
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"22"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/InternalServerErrorWithError", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/InternalServerErrorWithError", nil)
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"22"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/Canceled", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/Canceled", nil)
 			},
 			http.StatusRequestTimeout,
 			"Request Timeout\n",
-			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"16"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/DeadlineExceeded", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/DeadlineExceeded", nil)
 			},
 			http.StatusRequestTimeout,
 			"Request Timeout\n",
-			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"16"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/helper/something", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/helper/something", nil)
 			}, http.StatusBadRequest,
 			"Bad Request\n",
-			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"12"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/api/panic", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/api/panic", nil)
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"PanicAPIGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicAPIGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"22"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://other.example.com/", nil)
+				return newRequest(t, http.MethodGet, "https://other.example.com/", nil)
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"other.example.com","message":"HomeGet","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"other.example.com","message":"HomeGet","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"10"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "http://example.com/api/json", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/api/json", nil)
 			},
 			http.StatusOK,
 			`{"data":123}`,
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"JSONAPIGet","metadata":{"Foobar":["42"]},"etag":"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","metadata":{"Foobar":["42"]},"etag":"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"12"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA"`},
+				"Request-Id":             {""},
+				"Test-Foobar":            {"42"},
+				"Server-Timing":          {"j;dur=,c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 		{
 			func() *http.Request {
-				req := newRequest(t, http.MethodPost, "http://example.com/api/json?foo=1", bytes.NewBufferString("data=abcde"))
+				req := newRequest(t, http.MethodPost, "https://example.com/api/json?foo=1", bytes.NewBufferString("data=abcde"))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				return req
 			},
 			http.StatusAccepted,
 			`data=abcde&foo=1`,
-			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Content-Length":         {"16"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
 		},
 	}
 
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
-			t.Parallel()
+		for _, http2 := range []bool{false, true} {
+			http2 := http2
 
-			log := &bytes.Buffer{}
+			t.Run(fmt.Sprintf("case=%d/http2=%t", k, http2), func(t *testing.T) {
+				t.Parallel()
 
-			_, ts := newService(t, zerolog.New(log).Level(zerolog.InfoLevel))
+				log := &bytes.Buffer{}
 
-			resp, err := ts.Client().Do(tt.Request())
-			if assert.NoError(t, err) {
-				defer resp.Body.Close()
-				out, err := io.ReadAll(resp.Body)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
-				assert.Equal(t, tt.ExpectedBody, string(out))
-				assert.Equal(t, tt.ExpectedLog, logCleanup(t, log.String()))
-			}
-		})
+				_, ts := newService(t, zerolog.New(log).Level(zerolog.InfoLevel), http2)
+
+				resp, err := ts.Client().Do(tt.Request())
+				if assert.NoError(t, err) {
+					defer resp.Body.Close()
+					out, err := io.ReadAll(resp.Body)
+					assert.NoError(t, err)
+					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
+					assert.Equal(t, tt.ExpectedBody, string(out))
+					assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, log.String()))
+					assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header))
+					if http2 {
+						assert.Equal(t, 2, resp.ProtoMajor)
+						assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))
+					} else {
+						assert.Equal(t, 1, resp.ProtoMajor)
+						assert.Equal(t, http.Header(nil), resp.Trailer)
+					}
+				}
+			})
+		}
 	}
 }
 
