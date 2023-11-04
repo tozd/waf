@@ -276,6 +276,7 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 			postErr := parsePostForm(req)
 			if len(req.PostForm) > 0 {
 				// We parsed PostForm so we know we consumed the body and we can close it.
+				// This can make errors visible sooner if a handler attempts to read it again.
 				req.Body.Close()
 			}
 			queryForm, queryErr := getQueryForm(req)
