@@ -3,12 +3,14 @@ package waf
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -174,8 +176,21 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool) (*testService,
 	handler, errE := service.RouteWith(service, router)
 	require.NoError(t, errE, "% -+#.1v", errE)
 
+	tempDir := t.TempDir()
+	certPath := filepath.Join(tempDir, "test_cert.pem")
+	keyPath := filepath.Join(tempDir, "test_key.pem")
+
+	err := createTempCertificateFiles(certPath, keyPath, []string{"example.com", "other.example.com"})
+	require.NoError(t, err)
+
+	certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
+	require.NoError(t, err)
+
 	ts := httptest.NewUnstartedServer(handler)
 	ts.EnableHTTP2 = https2
+	ts.TLS = &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+	}
 	ts.Config.ConnContext = (&Server[*testSite]{}).connContext
 	t.Cleanup(ts.Close)
 	ts.StartTLS()
