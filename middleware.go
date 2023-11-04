@@ -274,6 +274,10 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 			//       reading the whole body when parsing form. If a limit is reached, context
 			//       should be canceled.
 			postErr := parsePostForm(req)
+			if len(req.PostForm) > 0 {
+				// We parsed PostForm so we know we consumed the body and we can close it.
+				req.Body.Close()
+			}
 			queryForm, queryErr := getQueryForm(req)
 			if queryErr != nil {
 				if len(req.URL.RawQuery) > 0 {
