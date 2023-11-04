@@ -157,8 +157,9 @@ func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) 
 
 // accessHandler is similar to hlog.accessHandler, but it uses github.com/felixge/httpsnoop.
 // See: https://github.com/rs/zerolog/issues/417
-// Afterwards, it was extended with Server-Timing trailer.
-func accessHandler(f func(req *http.Request, code int, size int64, duration time.Duration)) func(next http.Handler) http.Handler {
+// Afterwards, it was extended with Server-Timing trailer and counting of bytes read from the body.
+// See: https://github.com/rs/zerolog/pull/562
+func accessHandler(f func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Trailer", servertiming.HeaderKey)
@@ -170,11 +171,13 @@ func accessHandler(f func(req *http.Request, code int, size int64, duration time
 				Duration: 0,
 				Written:  0,
 			}
+			body := newByteCountReadCloser(req.Body)
+			req.Body = body
 			defer func() {
 				milliseconds := float64(m.Duration) / float64(time.Millisecond)
 				// This writes the trailer.
 				w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
-				f(req, m.Code, m.Written, m.Duration)
+				f(req, m.Code, m.Written, body.BytesRead(), m.Duration)
 			}()
 			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
 				next.ServeHTTP(ww, req)

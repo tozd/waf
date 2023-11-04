@@ -160,7 +160,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(func(next http.Handler) http.Handler {
 		return servertiming.Middleware(next, nil)
 	})
-	c = c.Append(accessHandler(func(req *http.Request, code int, size int64, duration time.Duration) {
+	c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
 		level := zerolog.InfoLevel
 		if code >= http.StatusBadRequest {
 			level = zerolog.WarnLevel
@@ -196,7 +196,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if code != 0 {
 			l = l.Int("code", code)
 		}
-		l.Int64("size", size).
+		l.Int64("responseBody", responseBody).
+			Int64("requestBody", requestBody).
 			Dict("metrics", metrics).
 			Send()
 	}))

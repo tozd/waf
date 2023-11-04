@@ -198,20 +198,23 @@ func TestAccessHandler(t *testing.T) {
 	}{
 		{
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.ReadAll(r.Body)
 				w.WriteHeader(http.StatusOK)
 			}),
-			`{"code":200,"size":0}`,
+			`{"code":200,"responseBody":0,"requestBody":4}`,
 		},
 		{
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.ReadAll(r.Body)
 			}),
-			`{"code":0,"size":0}`,
+			`{"code":0,"responseBody":0,"requestBody":4}`,
 		},
 		{
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.ReadAll(r.Body)
 				Error(w, r, http.StatusNotFound)
 			}),
-			`{"code":404,"size":10}`,
+			`{"code":404,"responseBody":10,"requestBody":4}`,
 		},
 	}
 
@@ -223,10 +226,10 @@ func TestAccessHandler(t *testing.T) {
 
 			out := &bytes.Buffer{}
 			w := httptest.NewRecorder()
-			r := &http.Request{}
-			h := accessHandler(func(r *http.Request, code int, size int64, duration time.Duration) {
+			r := httptest.NewRequest(http.MethodGet, "/foo", bytes.NewBufferString("test"))
+			h := accessHandler(func(r *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
 				l := hlog.FromRequest(r)
-				l.Log().Int("code", code).Int64("size", size).Msg("")
+				l.Log().Int("code", code).Int64("responseBody", responseBody).Int64("requestBody", requestBody).Msg("")
 				assert.Positive(t, duration)
 			})(tt.handler)
 			h = setCanonicalLogger(h)

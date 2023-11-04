@@ -267,7 +267,31 @@ func TestService(t *testing.T) {
 			},
 			http.StatusOK,
 			`<!DOCTYPE html><html><head><title>test</title></head><body>test site</body></html>`,
-			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGet","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"size":82,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGet","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "http://example.com/data.txt", nil)
+			},
+			http.StatusOK,
+			`test data`,
+			`{"level":"info","method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "http://example.com/assets/image.png", nil)
+			},
+			http.StatusOK,
+			`test image`,
+			`{"level":"info","method":"GET","path":"/assets/image.png","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"ImmutableFile","etag":"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "http://example.com/missing", nil)
+			},
+			http.StatusOK,
+			"Not Found\n",
+			`{"level":"warn","method":"GET","path":"/missing","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"NotFound","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -276,7 +300,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`,
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"size":161,"metrics":{"test":1000,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":1000,"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -284,7 +308,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"size":10,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -292,7 +316,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"size":10,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -300,7 +324,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusMethodNotAllowed,
 			"Method Not Allowed\n",
-			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"size":19,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -308,7 +332,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusNotAcceptable,
 			"Not Acceptable\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotAcceptable","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":406,"size":15,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotAcceptable","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":406,"responseBody":15,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -316,7 +340,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"size":22,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -324,7 +348,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"size":22,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -332,7 +356,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusRequestTimeout,
 			"Request Timeout\n",
-			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"size":16,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -340,14 +364,14 @@ func TestService(t *testing.T) {
 			},
 			http.StatusRequestTimeout,
 			"Request Timeout\n",
-			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"size":16,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
 				return newRequest(t, http.MethodGet, "http://example.com/helper/something", nil)
 			}, http.StatusBadRequest,
 			"Bad Request\n",
-			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"size":12,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -355,7 +379,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"PanicAPIGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"size":22,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"PanicAPIGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -363,7 +387,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusNotFound,
 			"Not Found\n",
-			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"other.example.com","message":"HomeGet","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"size":10,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"other.example.com","message":"HomeGet","error":"site not found for host","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -371,7 +395,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusOK,
 			`{"data":123}`,
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"JSONAPIGet","metadata":{"Foobar":["42"]},"etag":"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"size":12,"metrics":{"j":,"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","message":"JSONAPIGet","metadata":{"Foobar":["42"]},"etag":"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
 		},
 		{
 			func() *http.Request {
@@ -381,7 +405,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusAccepted,
 			`data=abcde&foo=1`,
-			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"size":16,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/1.1","connection":"","request":"","proto":"1.1","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
 		},
 	}
 

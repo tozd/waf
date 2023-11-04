@@ -325,3 +325,30 @@ func cleanPath(p string) string {
 	}
 	return np
 }
+
+// Copied from https://github.com/rs/zerolog/pull/562.
+type byteCountReadCloser struct {
+	rc   io.ReadCloser
+	read int64
+}
+
+func newByteCountReadCloser(body io.ReadCloser) *byteCountReadCloser {
+	return &byteCountReadCloser{
+		rc:   body,
+		read: 0,
+	}
+}
+
+func (b *byteCountReadCloser) Read(p []byte) (int, error) {
+	n, err := b.rc.Read(p)
+	b.read += int64(n)
+	return n, err
+}
+
+func (b *byteCountReadCloser) Close() error {
+	return b.rc.Close()
+}
+
+func (b *byteCountReadCloser) BytesRead() int64 {
+	return b.read
+}
