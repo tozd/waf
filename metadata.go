@@ -63,7 +63,7 @@ func encodeMetadataUnsignedInteger(v uint64, b *bytes.Buffer) errors.E {
 	return nil
 }
 
-func encodeMetadataFloat(v float64, b *bytes.Buffer) errors.E {
+func encodeMetadataDecimal(v float64, b *bytes.Buffer) errors.E {
 	rounded := math.RoundToEven(v/0.001) * 0.001 //nolint:gomnd
 	if rounded < -999_999_999_999 || rounded > 999_999_999_999 {
 		errE := errors.New("decimal out of range")
@@ -104,9 +104,9 @@ func encodeMetadataItem(value interface{}, b *bytes.Buffer) errors.E {
 	case uint64:
 		return encodeMetadataUnsignedInteger(v, b)
 	case float32:
-		return encodeMetadataFloat(float64(v), b)
+		return encodeMetadataDecimal(float64(v), b)
 	case float64:
-		return encodeMetadataFloat(v, b)
+		return encodeMetadataDecimal(v, b)
 	case bool:
 		b.WriteString("?")
 		if v {
@@ -116,8 +116,13 @@ func encodeMetadataItem(value interface{}, b *bytes.Buffer) errors.E {
 		}
 	case []byte:
 		b.WriteString(":")
-		b.Grow(base64.StdEncoding.EncodedLen(len(v)))
-		base64.StdEncoding.Encode(v, b.AvailableBuffer())
+		// TODO: Use AppendEncoded in Go 1.22.
+		//       See: https://github.com/golang/go/issues/53693
+		l := base64.StdEncoding.EncodedLen(len(v))
+		b.Grow(l)
+		s := b.AvailableBuffer()[:l]
+		base64.StdEncoding.Encode(s, v)
+		b.Write(s)
 		b.WriteString(":")
 	case string:
 		b.WriteString(`"`)
@@ -149,7 +154,14 @@ func encodeMetadataItem(value interface{}, b *bytes.Buffer) errors.E {
 func encodeMetadataInnerList(value interface{}, b *bytes.Buffer) errors.E {
 	b.WriteString(`(`)
 	v := reflect.ValueOf(value)
+	first := true
 	for i := 0; i < v.Len(); i++ {
+		if first {
+			first = false
+		} else {
+			b.WriteString(" ")
+		}
+
 		errE := encodeMetadataItem(v.Index(i).Interface(), b)
 		if errE != nil {
 			return errE
@@ -159,6 +171,8 @@ func encodeMetadataInnerList(value interface{}, b *bytes.Buffer) errors.E {
 	return nil
 }
 
+// encodeMetadata encodes data as SFV for HTTP.
+// See: https://www.ietf.org/archive/id/draft-ietf-httpbis-sfbis-03.html
 func encodeMetadata(metadata map[string]interface{}, b *bytes.Buffer) errors.E {
 	keys := make([]string, 0, len(metadata))
 	for key := range metadata {
