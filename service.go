@@ -39,6 +39,12 @@ type Route struct {
 	Get  bool   `json:"get,omitempty"`
 }
 
+type file struct {
+	Data      []byte
+	Etag      string
+	MediaType string
+}
+
 type Site struct {
 	Domain string `json:"domain" yaml:"domain"`
 	Title  string `json:"title"  yaml:"title"`
@@ -47,10 +53,9 @@ type Site struct {
 	CertFile string `json:"-" yaml:"cert,omitempty"`
 	KeyFile  string `json:"-" yaml:"key,omitempty"`
 
-	// Maps between content types, paths, and content/etags.
+	// Maps between content types, paths, and data/etag/media type.
 	// They are per site because they can include rendered per-site content.
-	compressedFiles      map[string]map[string][]byte
-	compressedFilesEtags map[string]map[string]string
+	files map[string]map[string]file
 }
 
 func (s *Site) GetSite() *Site {
@@ -335,14 +340,14 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 	for domain, siteT := range s.Sites {
 		site := siteT.GetSite()
 
-		if site.compressedFiles != nil {
+		if site.files != nil {
 			return errors.New("renderAndCompressFiles called more than once")
 		}
 
-		site.compressedFiles = make(map[string]map[string][]byte)
+		site.files = make(map[string]map[string]file)
 
 		for _, compression := range allCompressions {
-			site.compressedFiles[compression] = make(map[string][]byte)
+			site.files[compression] = make(map[string]file)
 		}
 
 		err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
@@ -373,13 +378,24 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				}
 			}
 
+			mediaType := mime.TypeByExtension(filepath.Ext(path))
+			if mediaType == "" {
+				errE := errors.New("unable to determine content type for file")
+				errors.Details(errE)["path"] = path
+				return errE
+			}
+
 			for _, compression := range allCompressions {
 				d, errE := compress(compression, data)
 				if errE != nil {
 					return errE
 				}
 
-				site.compressedFiles[compression][path] = d
+				site.files[compression][path] = file{
+					Data:      d,
+					Etag:      "",
+					MediaType: mediaType,
+				}
 			}
 
 			return nil
@@ -400,11 +416,11 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 	for domain, siteT := range s.Sites {
 		site := siteT.GetSite()
 
-		// In development, this method could be called first and compressedFiles are not yet
+		// In development, this method could be called first and files are not yet
 		// initialized (as requests for other files are proxied), while in production
-		// compressedFiles has already been initialized and populated by built static files.
-		if site.compressedFiles == nil {
-			site.compressedFiles = make(map[string]map[string][]byte)
+		// files has already been initialized and populated by built static files.
+		if site.files == nil {
+			site.files = make(map[string]map[string]file)
 		}
 
 		data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
@@ -413,8 +429,8 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 		}
 
 		for _, compression := range allCompressions {
-			if _, ok := site.compressedFiles[compression]; !ok {
-				site.compressedFiles[compression] = make(map[string][]byte)
+			if _, ok := site.files[compression]; !ok {
+				site.files[compression] = make(map[string]file)
 			}
 
 			d, errE := compress(compression, data)
@@ -422,7 +438,11 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 				return errE
 			}
 
-			site.compressedFiles[compression][contextPath] = d
+			site.files[compression][contextPath] = file{
+				Data:      d,
+				Etag:      "",
+				MediaType: "application/json",
+			}
 		}
 
 		// Map cannot be modified directly, so we modify the copy
@@ -437,20 +457,19 @@ func (s *Service[SiteT]) computeEtags() errors.E {
 	for domain, siteT := range s.Sites {
 		site := siteT.GetSite()
 
-		if site.compressedFilesEtags != nil {
-			return errors.New("computeEtags called more than once")
-		}
+		for compression, files := range site.files {
+			for path, file := range files {
+				if file.Etag != "" {
+					errE := errors.New("etag already computed")
+					errors.Details(errE)["compression"] = compression
+					errors.Details(errE)["path"] = path
+					return errE
+				}
 
-		site.compressedFilesEtags = make(map[string]map[string]string)
-
-		for compression, files := range site.compressedFiles {
-			site.compressedFilesEtags[compression] = make(map[string]string)
-
-			for path, data := range files {
 				hash := sha256.New()
-				_, _ = hash.Write(data)
-				etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
-				site.compressedFilesEtags[compression][path] = etag
+				_, _ = hash.Write(file.Data)
+				file.Etag = `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
+				site.files[compression][path] = file
 			}
 		}
 
@@ -502,7 +521,7 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 		site := siteT.GetSite()
 
 		// We can use any compression to obtain all static paths, so we use compressionIdentity.
-		for path := range site.compressedFiles[compressionIdentity] {
+		for path := range site.files[compressionIdentity] {
 			if s.SkipStaticFile != nil && s.SkipStaticFile(path) {
 				continue
 			}
@@ -657,20 +676,20 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 
 	site := GetSite[SiteT](req.Context()).GetSite()
 
-	data, ok := site.compressedFiles[contentEncoding][path]
+	file, ok := site.files[contentEncoding][path]
 	if !ok {
-		err := errors.New("no data for compression and path")
+		err := errors.New("no file for compression and path")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
-	if len(data) <= minCompressionSize {
+	if len(file.Data) <= minCompressionSize {
 		contentEncoding = compressionIdentity
-		data, ok = site.compressedFiles[contentEncoding][path]
+		file, ok = site.files[contentEncoding][path]
 		if !ok {
-			err := errors.New("no data for compression and path")
+			err := errors.New("no file for compression and path")
 			errors.Details(err)["compression"] = contentEncoding
 			errors.Details(err)["path"] = path
 			s.InternalServerErrorWithError(w, req, err)
@@ -678,30 +697,29 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	etag, ok := site.compressedFilesEtags[contentEncoding][path]
-	if !ok {
-		err := errors.New("no etag for compression and path")
+	if file.Etag == "" {
+		err := errors.New("no etag for file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
-	contentType := mime.TypeByExtension(filepath.Ext(path))
-	if contentType == "" {
-		err := errors.New("unable to determine content type for file")
+	if file.MediaType == "" {
+		err := errors.New("no content type for file")
+		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", file.MediaType)
 	if contentEncoding != compressionIdentity {
 		w.Header().Set("Content-Encoding", contentEncoding)
 	} else {
 		// TODO: Always set Content-Length.
 		//       See: https://github.com/golang/go/pull/50904
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		w.Header().Set("Content-Length", strconv.Itoa(len(file.Data)))
 	}
 	if immutable {
 		w.Header().Set("Cache-Control", "public,max-age=31536000,immutable,stale-while-revalidate=86400")
@@ -709,11 +727,11 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 	w.Header().Add("Vary", "Accept-Encoding")
-	w.Header().Set("Etag", etag)
+	w.Header().Set("Etag", file.Etag)
 
 	// See: https://github.com/golang/go/issues/50905
 	// See: https://github.com/golang/go/pull/50903
-	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(data))
+	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(file.Data))
 }
 
 func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
