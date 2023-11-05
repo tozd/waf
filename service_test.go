@@ -636,7 +636,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusOK,
 			`{"data":123}`,
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","metadata":{"foobar":42},"etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},

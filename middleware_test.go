@@ -254,34 +254,56 @@ func TestAccessHandler(t *testing.T) {
 	}
 }
 
-func TestRemoveMetadataHeaders(t *testing.T) {
+func TestLogMetadata(t *testing.T) {
 	t.Parallel()
 
+	out := &bytes.Buffer{}
 	w := httptest.NewRecorder()
 	r := &http.Request{}
-	h := removeMetadataHeader("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := logMetadata("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("test-metadata", "foobar=1234")
+		logMetadata := r.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
+		logMetadata["foobar"] = 1234
 		w.WriteHeader(http.StatusOK)
 	}))
-	h.ServeHTTP(w, r)
+	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
+		l := hlog.FromRequest(r)
+		l.Log().Msg("")
+	})
+	h3 := setCanonicalLogger(h2)
+	h3 = hlog.NewHandler(zerolog.New(out))(h3)
+	h3.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
 	assert.Equal(t, "foobar=1234", res.Header.Get("test-metadata"))
+	assert.Equal(t, `{"metadata":{"foobar":1234}}`+"\n", out.String())
 
+	out.Reset()
 	w = httptest.NewRecorder()
 	r = &http.Request{}
-	h = removeMetadataHeader("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h = logMetadata("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("test-metadata", "foobar=1234")
+		logMetadata := r.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
+		logMetadata["foobar"] = 1234
 		w.WriteHeader(http.StatusNotModified)
 	}))
-	h.ServeHTTP(w, r)
+	h2 = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
+		l := hlog.FromRequest(r)
+		l.Log().Msg("")
+	})
+	h3 = setCanonicalLogger(h2)
+	h3 = hlog.NewHandler(zerolog.New(out))(h3)
+	h3.ServeHTTP(w, r)
 	res = w.Result()
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
 	assert.Equal(t, "", res.Header.Get("test-metadata"))
+	assert.Equal(t, "{}\n", out.String())
 }
 
 func TestWebsocketHandler(t *testing.T) {

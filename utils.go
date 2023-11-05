@@ -50,6 +50,9 @@ var requestIDContextKey = &contextKey{"request-id"} //nolint:gochecknoglobals
 // siteContextKey provides a site for the HTTP request.
 var siteContextKey = &contextKey{"site"} //nolint:gochecknoglobals
 
+// metadataContextKey accumulates metadata for the HTTP response.
+var metadataContextKey = &contextKey{"metadata"} //nolint:gochecknoglobals
+
 var disabledLogger *zerolog.Logger //nolint:gochecknoglobals
 
 func init() { //nolint:gochecknoinits

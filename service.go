@@ -202,7 +202,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			Dict("metrics", metrics).
 			Send()
 	}))
-	c = c.Append(removeMetadataHeader(s.MetadataHeaderPrefix))
+	c = c.Append(logMetadata(s.MetadataHeaderPrefix))
 	c = c.Append(websocketHandler("ws"))
 	c = c.Append(hlog.MethodHandler("method"))
 	c = c.Append(urlHandler("path"))
@@ -575,11 +575,12 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	}
 	w.Header().Add(s.MetadataHeaderPrefix+metadataHeader, b.String())
 
-	logger := canonicalLogger(req.Context())
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		// TODO: How to merge multiple calls to AddMetadata into one "metadata" field in the log?
-		return c.Interface("metadata", metadata)
-	})
+	logMetadata := req.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
+	for key, value := range metadata {
+		// We overwrite any existing key. This is the same behavior RFC 8941 specifies
+		// for duplicate keys in its dictionaries. The last one wins.
+		logMetadata[key] = value
+	}
 
 	return b.Bytes(), nil
 }

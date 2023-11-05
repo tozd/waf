@@ -194,18 +194,32 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 	}
 }
 
-// removeMetadataHeader removes metadata header in a response
-// if the response is 304 Not Modified because clients will then use the cached
+// logMetadata logs metadata added to the response based on metadata accumulated in the context.
+//
+// It removes metadata from the response and does not log metadata if the
+// response is 304 Not Modified because clients will then use the cached
 // version of the response (and metadata header there). This works because metadata
 // header is included in the Etag, so 304 Not Modified means that metadata header
 // has not changed either.
-func removeMetadataHeader(metadataHeaderPrefix string) func(next http.Handler) http.Handler {
+func logMetadata(metadataHeaderPrefix string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			metadata := map[string]interface{}{}
+			req = req.WithContext(context.WithValue(req.Context(), metadataContextKey, metadata))
+			logMetadata := true
+			defer func() {
+				if logMetadata && len(metadata) > 0 {
+					logger := canonicalLogger(req.Context())
+					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+						return c.Interface("metadata", metadata)
+					})
+				}
+			}()
 			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 				WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 					return func(code int) {
 						if code == http.StatusNotModified {
+							logMetadata = false
 							w.Header().Del(metadataHeaderPrefix + metadataHeader)
 						}
 						next(code)
