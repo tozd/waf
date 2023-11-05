@@ -729,6 +729,3 @@ func TestService(t *testing.T) {
 		}
 	}
 }
-
-func TestReverseProxy(t *testing.T) {
-}
