@@ -87,9 +87,7 @@ func (s *testService) JSONAPIGet(w http.ResponseWriter, req *http.Request, _ Par
 		return
 	}
 
-	metadata := http.Header{}
-	metadata.Set("foobar", "42")
-	s.WriteJSON(w, req, contentEncoding, map[string]interface{}{"data": 123}, metadata)
+	s.WriteJSON(w, req, contentEncoding, map[string]interface{}{"data": 123}, map[string]interface{}{"foobar": 42})
 }
 
 func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Params) {
@@ -162,7 +160,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool) (*testService,
 			Version:              "vTEST",
 			Revision:             "abcde",
 			BuildTimestamp:       "2023-11-03T00:51:07Z",
-			MetadataHeaderPrefix: "test-",
+			MetadataHeaderPrefix: "Test-",
 			IsImmutableFile: func(path string) bool {
 				return strings.HasPrefix(path, "/assets/")
 			},
@@ -638,16 +636,16 @@ func TestService(t *testing.T) {
 			},
 			http.StatusOK,
 			`{"data":123}`,
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","metadata":{"Foobar":["42"]},"etag":"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","metadata":{"foobar":42},"etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
 				"Content-Type":           {"application/json"},
 				"Date":                   {""},
-				"Etag":                   {`"KcFDb3C8-dK_3QADiV0TXFENFQxhaHDKRUNF8Gqc3dA"`},
+				"Etag":                   {`"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE"`},
 				"Request-Id":             {""},
-				"Test-Foobar":            {"42"},
+				"Test-Metadata":          {"foobar=42"},
 				"Server-Timing":          {"j;dur=,c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},

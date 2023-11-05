@@ -259,8 +259,8 @@ func TestRemoveMetadataHeaders(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := &http.Request{}
-	h := removeMetadataHeaders("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("test-foobar", "1234")
+	h := removeMetadataHeader("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("test-metadata", "foobar=1234")
 		w.WriteHeader(http.StatusOK)
 	}))
 	h.ServeHTTP(w, r)
@@ -268,12 +268,12 @@ func TestRemoveMetadataHeaders(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Equal(t, "1234", res.Header.Get("test-foobar"))
+	assert.Equal(t, "foobar=1234", res.Header.Get("test-metadata"))
 
 	w = httptest.NewRecorder()
 	r = &http.Request{}
-	h = removeMetadataHeaders("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("test-foobar", "1234")
+	h = removeMetadataHeader("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("test-metadata", "foobar=1234")
 		w.WriteHeader(http.StatusNotModified)
 	}))
 	h.ServeHTTP(w, r)
@@ -281,7 +281,7 @@ func TestRemoveMetadataHeaders(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Equal(t, "", res.Header.Get("test-foobar"))
+	assert.Equal(t, "", res.Header.Get("test-metadata"))
 }
 
 func TestWebsocketHandler(t *testing.T) {

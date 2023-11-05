@@ -194,24 +194,19 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 	}
 }
 
-// removeMetadataHeaders removes metadata headers in a response
+// removeMetadataHeader removes metadata header in a response
 // if the response is 304 Not Modified because clients will then use the cached
-// version of the response (and metadata headers there). This works because metadata
-// headers are included in the Etag, so 304 Not Modified means that metadata headers
-// have not changed either.
-func removeMetadataHeaders(metadataHeaderPrefix string) func(next http.Handler) http.Handler {
+// version of the response (and metadata header there). This works because metadata
+// header is included in the Etag, so 304 Not Modified means that metadata header
+// has not changed either.
+func removeMetadataHeader(metadataHeaderPrefix string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 				WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 					return func(code int) {
 						if code == http.StatusNotModified {
-							headers := w.Header()
-							for header := range headers {
-								if strings.HasPrefix(strings.ToLower(header), metadataHeaderPrefix) {
-									headers.Del(header)
-								}
-							}
+							w.Header().Del(metadataHeaderPrefix + metadataHeader)
 						}
 						next(code)
 					}

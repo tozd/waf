@@ -13,7 +13,6 @@ import (
 	"mime"
 	"net/http"
 	"net/http/httputil"
-	"net/textproto"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -88,8 +87,6 @@ type Service[SiteT hasSite] struct {
 	BuildTimestamp string
 	Revision       string
 
-	// It should be kept all lower case so that it is easier to
-	// compare against in the case insensitive manner.
 	MetadataHeaderPrefix string
 
 	Development string
@@ -200,7 +197,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			Dict("metrics", metrics).
 			Send()
 	}))
-	c = c.Append(removeMetadataHeaders(s.MetadataHeaderPrefix))
+	c = c.Append(removeMetadataHeader(s.MetadataHeaderPrefix))
 	c = c.Append(websocketHandler("ws"))
 	c = c.Append(hlog.MethodHandler("method"))
 	c = c.Append(urlHandler("path"))
@@ -547,7 +544,28 @@ func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, e
 	return out.Bytes(), nil
 }
 
-func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata http.Header) {
+func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, metadata map[string]interface{}) ([]byte, errors.E) {
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+
+	b := &bytes.Buffer{}
+	err := encodeMetadata(metadata, b)
+	if err != nil {
+		return nil, err
+	}
+	w.Header().Add(s.MetadataHeaderPrefix+metadataHeader, b.String())
+
+	logger := canonicalLogger(req.Context())
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		// TODO: How to merge multiple calls to AddMetadata into one "metadata" field in the log?
+		return c.Interface("metadata", metadata)
+	})
+
+	return b.Bytes(), nil
+}
+
+func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata map[string]interface{}) {
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
 
@@ -582,25 +600,16 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, con
 
 	m.Stop()
 
+	md, errE := s.AddMetadata(w, req, metadata)
+	if errE != nil {
+		s.InternalServerErrorWithError(w, req, errE)
+		return
+	}
+
 	hash := sha256.New()
 	_, _ = hash.Write(encoded)
-
-	for key, value := range metadata {
-		w.Header()[textproto.CanonicalMIMEHeaderKey(s.MetadataHeaderPrefix+key)] = value
-		_, _ = hash.Write([]byte(key))
-		for _, v := range value {
-			_, _ = hash.Write([]byte(v))
-		}
-	}
-
+	_, _ = hash.Write(md)
 	etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
-
-	if len(metadata) > 0 {
-		logger := canonicalLogger(ctx)
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return logValues(c, "metadata", metadata)
-		})
-	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if contentEncoding != compressionIdentity {
