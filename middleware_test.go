@@ -560,3 +560,39 @@ func TestValidateSite(t *testing.T) {
 		})
 	}
 }
+
+func TestSetCanonicalLogger(t *testing.T) {
+	t.Parallel()
+
+	out1 := &bytes.Buffer{}
+	out2 := &bytes.Buffer{}
+	r := &http.Request{}
+	h := setCanonicalLogger(hlog.NewHandler(zerolog.New(out2))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		l := hlog.FromRequest(r)
+		l.Log().Msg("test1")
+		l = canonicalLogger(r.Context())
+		l.Log().Msg("test2")
+	})))
+	h = hlog.NewHandler(zerolog.New(out1))(h)
+	h.ServeHTTP(nil, r)
+	assert.Equal(t, `{"message":"test2"}`+"\n", out1.String())
+	assert.Equal(t, `{"message":"test1"}`+"\n", out2.String())
+}
+
+func TestAddNosniffHeader(t *testing.T) {
+	t.Parallel()
+
+	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+}
