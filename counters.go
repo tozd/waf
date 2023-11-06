@@ -14,6 +14,17 @@ type counterConn struct {
 	written *int64
 }
 
+// TODO: Do we have to test conn for *net.TCPConn and *tls.Conn concrete types and then wrap them instead?
+func newCounterConn(c net.Conn) net.Conn {
+	var read int64
+	var written int64
+	return &counterConn{
+		Conn:    c,
+		read:    &read,
+		written: &written,
+	}
+}
+
 func (c *counterConn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
 	atomic.AddInt64(c.read, int64(n))
@@ -32,6 +43,14 @@ func (c *counterConn) Write(b []byte) (int, error) {
 		return n, io.EOF
 	}
 	return n, errors.WithStack(err)
+}
+
+func (c *counterConn) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
+}
+
+func (c *counterConn) BytesWritten() int64 {
+	return atomic.LoadInt64(c.written)
 }
 
 // Based on https://github.com/rs/zerolog/pull/562.

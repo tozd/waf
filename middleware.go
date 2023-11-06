@@ -234,16 +234,14 @@ func logMetadata(metadataHeaderPrefix string) func(next http.Handler) http.Handl
 func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			var websocket bool
-			var read int64
-			var written int64
+			var nc net.Conn
 			defer func() {
-				if websocket {
+				if nc != nil {
 					logger := hlog.FromRequest(req)
 					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 						data := zerolog.Dict()
-						data.Int64("fromClient", read)
-						data.Int64("toClient", written)
+						data.Int64("fromClient", nc.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
+						data.Int64("toClient", nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
 						return c.Dict(fieldKey, data)
 					})
 				}
@@ -255,13 +253,8 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 						if err != nil {
 							return conn, bufrw, err
 						}
-						websocket = true
-						// TODO: Do we have to test conn for *net.TCPConn and *tls.Conn concrete types and then wrap them instead?
-						return &counterConn{
-							Conn:    conn,
-							read:    &read,
-							written: &written,
-						}, bufrw, err
+						nc = newCounterConn(conn)
+						return nc, bufrw, err
 					}
 				},
 			}), req)
