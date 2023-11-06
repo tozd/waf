@@ -185,7 +185,7 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 					// This writes the trailer.
 					w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
 				}
-				f(req, m.Code, m.Written, body.BytesRead(), m.Duration)
+				f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration)
 			}()
 			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
 				next.ServeHTTP(ww, req)

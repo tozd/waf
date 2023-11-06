@@ -338,7 +338,13 @@ type byteCountReadCloser struct {
 	read int64
 }
 
-func newByteCountReadCloser(body io.ReadCloser) *byteCountReadCloser {
+func newByteCountReadCloser(body io.ReadCloser) io.ReadCloser {
+	if _, ok := body.(io.WriterTo); ok {
+		return &byteCountReadCloserWriterTo{
+			rc:   body,
+			read: 0,
+		}
+	}
 	return &byteCountReadCloser{
 		rc:   body,
 		read: 0,
@@ -356,5 +362,30 @@ func (b *byteCountReadCloser) Close() error {
 }
 
 func (b *byteCountReadCloser) BytesRead() int64 {
+	return b.read
+}
+
+type byteCountReadCloserWriterTo struct {
+	rc   io.ReadCloser
+	read int64
+}
+
+func (b *byteCountReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
+	n, err := b.rc.(io.WriterTo).WriteTo(w)
+	b.read += int64(n)
+	return n, err //nolint:wrapcheck
+}
+
+func (b *byteCountReadCloserWriterTo) Read(p []byte) (int, error) {
+	n, err := b.rc.Read(p)
+	b.read += int64(n)
+	return n, err //nolint:wrapcheck
+}
+
+func (b *byteCountReadCloserWriterTo) Close() error {
+	return b.rc.Close() //nolint:wrapcheck
+}
+
+func (b *byteCountReadCloserWriterTo) BytesRead() int64 {
 	return b.read
 }
