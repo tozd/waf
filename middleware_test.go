@@ -413,6 +413,10 @@ func TestParseForm(t *testing.T) {
 			}))
 			h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				h.ServeHTTP(w, r)
+				_, err := r.Body.Read(nil)
+				// Here we test for io.EOF and not http.ErrBodyReadAfterClose which would be
+				// if the body was made by the http.Server.
+				assert.ErrorIs(t, err, io.EOF)
 				assert.Equal(t, tt.postValues, r.PostForm)
 				assert.Equal(t, tt.formValues, r.Form)
 				l := hlog.FromRequest(r)

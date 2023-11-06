@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -388,4 +389,24 @@ func (b *byteCountReadCloserWriterTo) Close() error {
 
 func (b *byteCountReadCloserWriterTo) BytesRead() int64 {
 	return b.read
+}
+
+// This is the condition when req.ParseForm consumes the body.
+//
+// It is equal to the check req.ParseForm does internally.
+func postFormParsed(req *http.Request) bool {
+	if req.Body == nil {
+		return false
+	}
+
+	if !(req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") {
+		return false
+	}
+
+	ct := req.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	ct, _, _ = mime.ParseMediaType(ct)
+	return ct == "application/x-www-form-urlencoded"
 }

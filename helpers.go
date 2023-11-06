@@ -137,6 +137,15 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 }
 
 func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
+	if s.Development == "" {
+		s.InternalServerErrorWithError(w, req, errors.New("Proxy called while not in development"))
+		return
+	}
+
+	logger := canonicalLogger(req.Context())
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str("proxied", s.Development)
+	})
 	s.reverseProxy.ServeHTTP(w, req)
 }
 

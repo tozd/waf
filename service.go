@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"mime"
@@ -496,6 +497,21 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 	singleHostDirector := httputil.NewSingleHostReverseProxy(target).Director
 	director := func(req *http.Request) {
 		singleHostDirector(req)
+
+		// We pass request ID through.
+		req.Header.Set("Request-Id", MustRequestID(req.Context()).String())
+
+		// We potentially parse PostForm in parseForm middleware. In that case
+		// the body is consumed and closed. We have to reconstruct it here.
+		if postFormParsed(req) {
+			encoded := req.PostForm.Encode()
+			req.Body = io.NopCloser(strings.NewReader(encoded))
+			if req.Header.Get("Content-Length") != "" {
+				// Our reconstruction might have a different length.
+				req.Header.Set("Content-Length", strconv.Itoa(len(encoded)))
+			}
+		}
+
 		// TODO: Map origin and other headers.
 	}
 
