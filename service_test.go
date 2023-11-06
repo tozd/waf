@@ -609,7 +609,7 @@ func TestService(t *testing.T) {
 			},
 			http.StatusInternalServerError,
 			"Internal Server Error\n",
-			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicAPIGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicAPIGet","panic":true,"error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},

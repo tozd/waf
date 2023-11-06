@@ -754,7 +754,7 @@ func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, e
 	}
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		if e != nil {
-			return c.Err(e)
+			return c.Bool("panic", true).Err(e)
 		}
 		return c.Interface("panic", err)
 	})
