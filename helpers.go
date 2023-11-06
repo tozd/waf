@@ -19,12 +19,38 @@ func Error(w http.ResponseWriter, _ *http.Request, code int) {
 	http.Error(w, body, code)
 }
 
-func RequestID(ctx context.Context) identifier.Identifier {
-	return ctx.Value(requestIDContextKey).(identifier.Identifier) //nolint:forcetypeassert
+func RequestID(ctx context.Context) (identifier.Identifier, bool) {
+	v := ctx.Value(requestIDContextKey)
+	if v == nil {
+		return identifier.Identifier{}, false
+	}
+	i, ok := v.(identifier.Identifier)
+	return i, ok
 }
 
-func GetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
-	return ctx.Value(siteContextKey).(SiteT) //nolint:forcetypeassert
+func MustRequestID(ctx context.Context) identifier.Identifier {
+	i, ok := RequestID(ctx)
+	if !ok {
+		panic(errors.New("request ID not found in context"))
+	}
+	return i
+}
+
+func GetSite[SiteT hasSite](ctx context.Context) (SiteT, bool) { //nolint:ireturn
+	v := ctx.Value(siteContextKey)
+	if v == nil {
+		return *new(SiteT), false
+	}
+	s, ok := v.(SiteT)
+	return s, ok
+}
+
+func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
+	s, ok := GetSite[SiteT](ctx)
+	if !ok {
+		panic(errors.New("site not found in context"))
+	}
+	return s
 }
 
 func ToHandler(f func(http.ResponseWriter, *http.Request)) Handler {

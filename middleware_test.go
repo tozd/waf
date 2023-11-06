@@ -113,7 +113,7 @@ func TestRequestIDHandler(t *testing.T) {
 	out := &bytes.Buffer{}
 	r := &http.Request{}
 	h := requestIDHandler("request", "Request-Id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := RequestID(r.Context())
+		id := MustRequestID(r.Context())
 		assert.Equal(t, id.String(), w.Header().Get("Request-Id"))
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")

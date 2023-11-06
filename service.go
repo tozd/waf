@@ -675,7 +675,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	site := GetSite[SiteT](req.Context()).GetSite()
+	site := MustGetSite[SiteT](req.Context()).GetSite()
 
 	file, ok := site.files[contentEncoding][path]
 	if !ok {
