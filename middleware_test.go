@@ -514,3 +514,49 @@ func TestValidatePath(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
+
+func TestValidateSite(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{
+		Sites: map[string]*Site{
+			"localhost": {
+				Domain: "localhost",
+			},
+		},
+	}
+	h := s.validateSite(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, ok := GetSite[*Site](r.Context())
+		if ok {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+
+	tests := []struct {
+		Site           string
+		ExpectedStatus int
+	}{
+		{"localhost", http.StatusOK},
+		{"example.com", http.StatusNotFound},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r.Host = tt.Site
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close()
+			})
+			assert.Equal(t, tt.ExpectedStatus, res.StatusCode)
+		})
+	}
+}
