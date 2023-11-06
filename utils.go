@@ -373,7 +373,7 @@ type byteCountReadCloserWriterTo struct {
 
 func (b *byteCountReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
 	n, err := b.rc.(io.WriterTo).WriteTo(w)
-	b.read += int64(n)
+	b.read += n
 	return n, err //nolint:wrapcheck
 }
 

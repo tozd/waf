@@ -823,10 +823,6 @@ func TestReverseProxy(t *testing.T) {
 		_, _ = w.Write([]byte("data: "))
 		_, _ = w.Write([]byte(r.Form.Encode()))
 		_, _ = w.Write([]byte("\n"))
-		_, err = r.Body.Read(nil)
-		if err == nil {
-
-		}
 	}))
 	t.Cleanup(proxy.Close)
 
