@@ -176,7 +176,7 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 				Duration: 0,
 				Written:  0,
 			}
-			body := newByteCountReadCloser(req.Body)
+			body := newCounterReadCloser(req.Body)
 			req.Body = body
 			defer func() {
 				// We use trailers only with http2.
@@ -257,7 +257,7 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 						}
 						websocket = true
 						// TODO: Do we have to test conn for *net.TCPConn and *tls.Conn concrete types and then wrap them instead?
-						return &metricsConn{
+						return &counterConn{
 							Conn:    conn,
 							read:    &read,
 							written: &written,

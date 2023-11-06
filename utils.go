@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -16,7 +15,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync/atomic"
 
 	"github.com/andybalholm/brotli"
 	"github.com/hashicorp/go-cleanhttp"
@@ -155,32 +153,6 @@ func logValues(c zerolog.Context, field string, values map[string][]string) zero
 	}
 
 	return c.Object(field, valuesLogObjectMarshaler(values))
-}
-
-type metricsConn struct {
-	net.Conn
-	read    *int64
-	written *int64
-}
-
-func (c *metricsConn) Read(b []byte) (int, error) {
-	n, err := c.Conn.Read(b)
-	atomic.AddInt64(c.read, int64(n))
-	if err == io.EOF { //nolint:errorlint
-		// See: https://github.com/golang/go/issues/39155
-		return n, io.EOF
-	}
-	return n, errors.WithStack(err)
-}
-
-func (c *metricsConn) Write(b []byte) (int, error) {
-	n, err := c.Conn.Write(b)
-	atomic.AddInt64(c.written, int64(n))
-	if err == io.EOF { //nolint:errorlint
-		// See: https://github.com/golang/go/issues/39155
-		return n, io.EOF
-	}
-	return n, errors.WithStack(err)
 }
 
 func logHandlerName(name string, h Handler) Handler {
@@ -331,77 +303,6 @@ func cleanPath(p string) string {
 		}
 	}
 	return np
-}
-
-// Copied from https://github.com/rs/zerolog/pull/562.
-type byteCountReadCloser struct {
-	rc   io.ReadCloser
-	read *int64
-}
-
-func newByteCountReadCloser(body io.ReadCloser) io.ReadCloser {
-	var read int64
-	if _, ok := body.(io.WriterTo); ok {
-		return &byteCountReadCloserWriterTo{
-			rc:   body,
-			read: &read,
-		}
-	}
-	return &byteCountReadCloser{
-		rc:   body,
-		read: &read,
-	}
-}
-
-func (b *byteCountReadCloser) Read(p []byte) (int, error) {
-	n, err := b.rc.Read(p)
-	atomic.AddInt64(b.read, int64(n))
-	if err == io.EOF { //nolint:errorlint
-		// See: https://github.com/golang/go/issues/39155
-		return n, io.EOF
-	}
-	return n, errors.WithStack(err)
-}
-
-func (b *byteCountReadCloser) Close() error {
-	return b.rc.Close() //nolint:wrapcheck
-}
-
-func (b *byteCountReadCloser) BytesRead() int64 {
-	return atomic.LoadInt64(b.read)
-}
-
-type byteCountReadCloserWriterTo struct {
-	rc   io.ReadCloser
-	read *int64
-}
-
-func (b *byteCountReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
-	n, err := b.rc.(io.WriterTo).WriteTo(w)
-	atomic.AddInt64(b.read, n)
-	if err == io.EOF { //nolint:errorlint
-		// See: https://github.com/golang/go/issues/39155
-		return n, io.EOF
-	}
-	return n, errors.WithStack(err)
-}
-
-func (b *byteCountReadCloserWriterTo) Read(p []byte) (int, error) {
-	n, err := b.rc.Read(p)
-	atomic.AddInt64(b.read, int64(n))
-	if err == io.EOF { //nolint:errorlint
-		// See: https://github.com/golang/go/issues/39155
-		return n, io.EOF
-	}
-	return n, errors.WithStack(err)
-}
-
-func (b *byteCountReadCloserWriterTo) Close() error {
-	return b.rc.Close() //nolint:wrapcheck
-}
-
-func (b *byteCountReadCloserWriterTo) BytesRead() int64 {
-	return atomic.LoadInt64(b.read)
 }
 
 // This is the condition when req.ParseForm consumes the body.
