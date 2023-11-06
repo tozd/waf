@@ -61,7 +61,7 @@ func (s *testService) HelperGet(w http.ResponseWriter, req *http.Request, p Para
 	case "NotFoundWithError":
 		s.NotFoundWithError(w, req, errors.New("test"))
 	case "MethodNotAllowed":
-		s.MethodNotAllowed(w, req)
+		s.MethodNotAllowed(w, req, []string{http.MethodDelete, http.MethodGet})
 	case "NotAcceptable":
 		s.NotAcceptable(w, req)
 	case "InternalServerError":
@@ -348,6 +348,26 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
+				return newRequest(t, http.MethodPost, "https://example.com/", nil)
+			},
+			http.StatusMethodNotAllowed,
+			"Method Not Allowed\n",
+			`{"level":"warn","method":"POST","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"MethodNotAllowed","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Allow":                  {"GET, HEAD"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
 				req := newRequest(t, http.MethodGet, "https://example.com/data.txt", nil)
 				req.Header.Set("Referer", "https://example.com/")
 				return req
@@ -364,6 +384,26 @@ func TestService(t *testing.T) {
 				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
 				"Request-Id":             {""},
 				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodPost, "https://example.com/data.txt", nil)
+			},
+			http.StatusMethodNotAllowed,
+			"Method Not Allowed\n",
+			`{"level":"warn","method":"POST","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"MethodNotAllowed","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Allow":                  {"GET, HEAD"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
@@ -481,6 +521,7 @@ func TestService(t *testing.T) {
 			"Method Not Allowed\n",
 			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Allow":                  {"DELETE, GET"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -697,6 +738,28 @@ func TestService(t *testing.T) {
 			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Content-Length":         {"16"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodPatch, "https://example.com/api/json?foo=1", bytes.NewBufferString("data=abcde"))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				return req
+			},
+			http.StatusMethodNotAllowed,
+			"Method Not Allowed\n",
+			`{"level":"warn","method":"PATCH","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"MethodNotAllowed","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":10,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Allow":                  {"GET, HEAD, POST"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
 				"Request-Id":             {""},
@@ -986,6 +1049,7 @@ func TestReverseProxy(t *testing.T) {
 					t.Cleanup(func() { resp.Body.Close() })
 					out, err := io.ReadAll(resp.Body)
 					assert.NoError(t, err)
+					// Wait a bit for log pipe to be written to.
 					time.Sleep(100 * time.Millisecond)
 					pipeW.Close()
 					log, err := io.ReadAll(pipeR)

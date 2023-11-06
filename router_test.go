@@ -583,7 +583,7 @@ func TestRouterErrorHandlers(t *testing.T) {
 		NotFound: func(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(480)
 		},
-		MethodNotAllowed: func(w http.ResponseWriter, req *http.Request, params Params) {
+		MethodNotAllowed: func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
 			w.WriteHeader(490)
 		},
 	}

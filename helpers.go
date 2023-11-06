@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	gddo "github.com/golang/gddo/httputil"
 	"github.com/rs/zerolog"
@@ -53,12 +54,6 @@ func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
 	return s
 }
 
-func ToHandler(f func(http.ResponseWriter, *http.Request)) Handler {
-	return func(w http.ResponseWriter, req *http.Request, _ Params) {
-		f(w, req)
-	}
-}
-
 func NegotiateContentEncoding(req *http.Request, offers []string) string {
 	if offers == nil {
 		offers = allCompressions
@@ -82,7 +77,8 @@ func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Requ
 	s.NotFound(w, req)
 }
 
-func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request) {
+func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request, allow []string) {
+	w.Header().Add("Allow", strings.Join(allow, ", "))
 	Error(w, req, http.StatusMethodNotAllowed)
 }
 

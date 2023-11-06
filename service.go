@@ -128,8 +128,11 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerFuncName("Proxy", s.Proxy)
-		s.router.MethodNotAllowed = logHandlerName("Proxy", ToHandler(s.Proxy))
+		p := logHandlerFuncName("Proxy", s.Proxy)
+		s.router.NotFound = p
+		s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, _ []string) {
+			p(w, req)
+		}
 	} else {
 		errE := s.renderAndCompressFiles()
 		if errE != nil {
@@ -148,7 +151,13 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			return nil, errE
 		}
 		s.router.NotFound = logHandlerFuncName("NotFound", s.NotFound)
-		s.router.MethodNotAllowed = logHandlerName("MethodNotAllowed", ToHandler(s.MethodNotAllowed))
+		s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
+			logger := canonicalLogger(req.Context())
+			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+				return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
+			})
+			s.MethodNotAllowed(w, req, allow)
+		}
 	}
 	s.router.Panic = s.handlePanic
 
@@ -530,8 +539,8 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 }
 
 func (s *Service[SiteT]) serveStaticFiles() errors.E {
-	staticH := logHandlerName("StaticFile", ToHandler(s.staticFile))
-	immutableH := logHandlerName("ImmutableFile", ToHandler(s.immutableFile))
+	staticH := logHandlerName("StaticFile", toHandler(s.staticFile))
+	immutableH := logHandlerName("ImmutableFile", toHandler(s.immutableFile))
 
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()

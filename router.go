@@ -110,12 +110,18 @@ type Params map[string]string
 
 type Handler func(http.ResponseWriter, *http.Request, Params)
 
+func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
+	return func(w http.ResponseWriter, req *http.Request, _ Params) {
+		f(w, req)
+	}
+}
+
 // TODO: Implement RedirectTrailingSlash = true
 // TODO: Implement RedirectFixedPath = true.
 
 type Router struct {
 	NotFound         func(http.ResponseWriter, *http.Request)
-	MethodNotAllowed Handler
+	MethodNotAllowed func(http.ResponseWriter, *http.Request, Params, []string)
 	Panic            func(w http.ResponseWriter, req *http.Request, err interface{})
 	EncodeQuery      func(qs url.Values) string
 
@@ -277,11 +283,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					allow = append(allow, method)
 				}
 				sort.Strings(allow)
-				w.Header().Add("Allow", strings.Join(allow, ", "))
 
 				if r.MethodNotAllowed != nil {
-					r.MethodNotAllowed(w, req, params)
+					r.MethodNotAllowed(w, req, params, allow)
 				} else {
+					w.Header().Add("Allow", strings.Join(allow, ", "))
 					Error(w, req, http.StatusMethodNotAllowed)
 				}
 				return
@@ -292,11 +298,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				break
 			}
 			if req.Method != http.MethodGet && req.Method != http.MethodHead {
-				w.Header().Add("Allow", "GET, HEAD")
-
+				allow := []string{"GET", "HEAD"}
 				if r.MethodNotAllowed != nil {
-					r.MethodNotAllowed(w, req, params)
+					r.MethodNotAllowed(w, req, params, allow)
 				} else {
+					w.Header().Add("Allow", strings.Join(allow, ", "))
 					Error(w, req, http.StatusMethodNotAllowed)
 				}
 				return
