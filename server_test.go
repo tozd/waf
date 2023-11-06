@@ -320,7 +320,7 @@ func TestServerConnection(t *testing.T) {
 	url := strings.ReplaceAll(ts.URL, "127.0.0.1", "localhost")
 	resp, err := ts.Client().Get(url) //nolint:noctx
 	if assert.NoError(t, err) {
-		defer resp.Body.Close()
+		t.Cleanup(func() { resp.Body.Close() })
 		out, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -371,7 +371,7 @@ func TestServerACME(t *testing.T) {
 
 	resp, err := acmeClient.Get(fmt.Sprintf("https://%s/roots/0", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "15000"))) //nolint:noctx
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	t.Cleanup(func() { resp.Body.Close() })
 	acmeRootCAsData, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -420,7 +420,7 @@ func TestServerACME(t *testing.T) {
 
 	resp, err = client.Get("https://site.test") //nolint:noctx
 	if assert.NoError(t, err) {
-		defer resp.Body.Close()
+		t.Cleanup(func() { resp.Body.Close() })
 		out, err := io.ReadAll(resp.Body) //nolint:govet
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)

@@ -721,7 +721,7 @@ func TestService(t *testing.T) {
 
 				resp, err := ts.Client().Do(tt.Request())
 				if assert.NoError(t, err) {
-					defer resp.Body.Close()
+					t.Cleanup(func() { resp.Body.Close() })
 					out, err := io.ReadAll(resp.Body)
 					assert.NoError(t, err)
 					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
