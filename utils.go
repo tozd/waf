@@ -336,26 +336,31 @@ func cleanPath(p string) string {
 // Copied from https://github.com/rs/zerolog/pull/562.
 type byteCountReadCloser struct {
 	rc   io.ReadCloser
-	read int64
+	read *int64
 }
 
 func newByteCountReadCloser(body io.ReadCloser) io.ReadCloser {
+	var read int64
 	if _, ok := body.(io.WriterTo); ok {
 		return &byteCountReadCloserWriterTo{
 			rc:   body,
-			read: 0,
+			read: &read,
 		}
 	}
 	return &byteCountReadCloser{
 		rc:   body,
-		read: 0,
+		read: &read,
 	}
 }
 
 func (b *byteCountReadCloser) Read(p []byte) (int, error) {
 	n, err := b.rc.Read(p)
-	b.read += int64(n)
-	return n, err //nolint:wrapcheck
+	atomic.AddInt64(b.read, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
 }
 
 func (b *byteCountReadCloser) Close() error {
@@ -363,24 +368,32 @@ func (b *byteCountReadCloser) Close() error {
 }
 
 func (b *byteCountReadCloser) BytesRead() int64 {
-	return b.read
+	return atomic.LoadInt64(b.read)
 }
 
 type byteCountReadCloserWriterTo struct {
 	rc   io.ReadCloser
-	read int64
+	read *int64
 }
 
 func (b *byteCountReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
 	n, err := b.rc.(io.WriterTo).WriteTo(w)
-	b.read += n
-	return n, err //nolint:wrapcheck
+	atomic.AddInt64(b.read, n)
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
 }
 
 func (b *byteCountReadCloserWriterTo) Read(p []byte) (int, error) {
 	n, err := b.rc.Read(p)
-	b.read += int64(n)
-	return n, err //nolint:wrapcheck
+	atomic.AddInt64(b.read, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
 }
 
 func (b *byteCountReadCloserWriterTo) Close() error {
@@ -388,7 +401,7 @@ func (b *byteCountReadCloserWriterTo) Close() error {
 }
 
 func (b *byteCountReadCloserWriterTo) BytesRead() int64 {
-	return b.read
+	return atomic.LoadInt64(b.read)
 }
 
 // This is the condition when req.ParseForm consumes the body.
