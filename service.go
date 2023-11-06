@@ -105,7 +105,7 @@ type Service[SiteT hasSite] struct {
 
 func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Handler, errors.E) {
 	if s.router != nil {
-		panic(errors.New("RouteWith called more than once"))
+		return nil, errors.New("RouteWith called more than once")
 	}
 	s.router = router
 

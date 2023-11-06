@@ -244,6 +244,17 @@ func headerCleanup(t *testing.T, header http.Header) http.Header {
 	return header
 }
 
+func TestRouteWith(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{}
+	router := &Router{}
+	_, errE := s.RouteWith(s, router)
+	require.NoError(t, errE, "% -+#.1v", errE)
+	_, errE = s.RouteWith(s, router)
+	require.ErrorContains(t, errE, "RouteWith called more than once")
+}
+
 func TestServicePath(t *testing.T) {
 	t.Parallel()
 
