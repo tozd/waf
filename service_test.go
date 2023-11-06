@@ -72,6 +72,8 @@ func (s *testService) HelperGet(w http.ResponseWriter, req *http.Request, p Para
 		s.InternalServerErrorWithError(w, req, errors.WithStack(context.Canceled))
 	case "DeadlineExceeded":
 		s.InternalServerErrorWithError(w, req, errors.WithStack(context.DeadlineExceeded))
+	case "Proxy":
+		s.Proxy(w, req)
 	default:
 		s.BadRequest(w, req)
 	}
@@ -619,6 +621,25 @@ func TestService(t *testing.T) {
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"16"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/helper/Proxy", nil)
+			},
+			http.StatusInternalServerError,
+			"Internal Server Error\n",
+			`{"level":"error","method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"Proxy called while not in development","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"22"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
 				"Request-Id":             {""},
