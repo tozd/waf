@@ -54,9 +54,9 @@ func newCounterReadCloser(body io.ReadCloser) io.ReadCloser {
 	}
 }
 
-func (b *counterReadCloser) Read(p []byte) (int, error) {
-	n, err := b.rc.Read(p)
-	atomic.AddInt64(b.read, int64(n))
+func (c *counterReadCloser) Read(p []byte) (int, error) {
+	n, err := c.rc.Read(p)
+	atomic.AddInt64(c.read, int64(n))
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
@@ -64,12 +64,12 @@ func (b *counterReadCloser) Read(p []byte) (int, error) {
 	return n, errors.WithStack(err)
 }
 
-func (b *counterReadCloser) Close() error {
-	return b.rc.Close() //nolint:wrapcheck
+func (c *counterReadCloser) Close() error {
+	return c.rc.Close() //nolint:wrapcheck
 }
 
-func (b *counterReadCloser) BytesRead() int64 {
-	return atomic.LoadInt64(b.read)
+func (c *counterReadCloser) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
 }
 
 type counterReadCloserWriterTo struct {
@@ -77,9 +77,9 @@ type counterReadCloserWriterTo struct {
 	read *int64
 }
 
-func (b *counterReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
-	n, err := b.rc.(io.WriterTo).WriteTo(w)
-	atomic.AddInt64(b.read, n)
+func (c *counterReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
+	n, err := c.rc.(io.WriterTo).WriteTo(w)
+	atomic.AddInt64(c.read, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
@@ -87,9 +87,9 @@ func (b *counterReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
 	return n, errors.WithStack(err)
 }
 
-func (b *counterReadCloserWriterTo) Read(p []byte) (int, error) {
-	n, err := b.rc.Read(p)
-	atomic.AddInt64(b.read, int64(n))
+func (c *counterReadCloserWriterTo) Read(p []byte) (int, error) {
+	n, err := c.rc.Read(p)
+	atomic.AddInt64(c.read, int64(n))
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
@@ -97,10 +97,10 @@ func (b *counterReadCloserWriterTo) Read(p []byte) (int, error) {
 	return n, errors.WithStack(err)
 }
 
-func (b *counterReadCloserWriterTo) Close() error {
-	return b.rc.Close() //nolint:wrapcheck
+func (c *counterReadCloserWriterTo) Close() error {
+	return c.rc.Close() //nolint:wrapcheck
 }
 
-func (b *counterReadCloserWriterTo) BytesRead() int64 {
-	return atomic.LoadInt64(b.read)
+func (c *counterReadCloserWriterTo) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
 }
