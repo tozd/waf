@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -275,6 +276,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				for method := range matcher.Route.APIHandlers {
 					allow = append(allow, method)
 				}
+				sort.Strings(allow)
 				w.Header().Add("Allow", strings.Join(allow, ", "))
 
 				if r.MethodNotAllowed != nil {
