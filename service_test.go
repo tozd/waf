@@ -1061,14 +1061,18 @@ func TestReverseProxy(t *testing.T) {
 
 				_, ts := newService(t, zerolog.New(pipeW).Level(zerolog.InfoLevel), http2, proxy.URL)
 
+				// Close pipeW after serving.
+				h := ts.Config.Handler
+				ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					h.ServeHTTP(w, r)
+					pipeW.Close()
+				})
+
 				resp, err := ts.Client().Do(tt.Request())
 				if assert.NoError(t, err) {
 					t.Cleanup(func() { resp.Body.Close() })
 					out, err := io.ReadAll(resp.Body)
 					assert.NoError(t, err)
-					// Wait a bit for log pipe to be written to.
-					time.Sleep(100 * time.Millisecond)
-					pipeW.Close()
 					log, err := io.ReadAll(pipeR)
 					pipeR.Close()
 					assert.NoError(t, err)
