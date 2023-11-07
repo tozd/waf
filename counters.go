@@ -12,6 +12,27 @@ import (
 func newCounterConn(c net.Conn) net.Conn {
 	var read int64
 	var written int64
+	_, isWriterTo := c.(io.WriterTo)
+	_, isReaderFrom := c.(io.ReaderFrom)
+	if isWriterTo && isReaderFrom {
+		return &counterConnWriterToReaderFrom{
+			Conn:    c,
+			read:    &read,
+			written: &written,
+		}
+	} else if isWriterTo {
+		return &counterConnWriterTo{
+			Conn:    c,
+			read:    &read,
+			written: &written,
+		}
+	} else if isReaderFrom {
+		return &counterConnReaderFrom{
+			Conn:    c,
+			read:    &read,
+			written: &written,
+		}
+	}
 	return &counterConn{
 		Conn:    c,
 		read:    &read,
@@ -50,6 +71,148 @@ func (c *counterConn) BytesRead() int64 {
 }
 
 func (c *counterConn) BytesWritten() int64 {
+	return atomic.LoadInt64(c.written)
+}
+
+type counterConnWriterToReaderFrom struct {
+	net.Conn
+	read    *int64
+	written *int64
+}
+
+func (c *counterConnWriterToReaderFrom) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	atomic.AddInt64(c.read, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterToReaderFrom) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	atomic.AddInt64(c.written, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterToReaderFrom) WriteTo(w io.Writer) (int64, error) {
+	n, err := c.Conn.(io.WriterTo).WriteTo(w)
+	atomic.AddInt64(c.read, n)
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterToReaderFrom) ReadFrom(r io.Reader) (int64, error) {
+	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
+	atomic.AddInt64(c.read, n)
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterToReaderFrom) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
+}
+
+func (c *counterConnWriterToReaderFrom) BytesWritten() int64 {
+	return atomic.LoadInt64(c.written)
+}
+
+type counterConnWriterTo struct {
+	net.Conn
+	read    *int64
+	written *int64
+}
+
+func (c *counterConnWriterTo) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	atomic.AddInt64(c.read, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterTo) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	atomic.AddInt64(c.written, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterTo) WriteTo(w io.Writer) (int64, error) {
+	n, err := c.Conn.(io.WriterTo).WriteTo(w)
+	atomic.AddInt64(c.read, n)
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnWriterTo) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
+}
+
+func (c *counterConnWriterTo) BytesWritten() int64 {
+	return atomic.LoadInt64(c.written)
+}
+
+type counterConnReaderFrom struct {
+	net.Conn
+	read    *int64
+	written *int64
+}
+
+func (c *counterConnReaderFrom) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	atomic.AddInt64(c.read, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnReaderFrom) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	atomic.AddInt64(c.written, int64(n))
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnReaderFrom) ReadFrom(r io.Reader) (int64, error) {
+	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
+	atomic.AddInt64(c.read, n)
+	if err == io.EOF { //nolint:errorlint
+		// See: https://github.com/golang/go/issues/39155
+		return n, io.EOF
+	}
+	return n, errors.WithStack(err)
+}
+
+func (c *counterConnReaderFrom) BytesRead() int64 {
+	return atomic.LoadInt64(c.read)
+}
+
+func (c *counterConnReaderFrom) BytesWritten() int64 {
 	return atomic.LoadInt64(c.written)
 }
 
