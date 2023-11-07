@@ -246,7 +246,7 @@ func (c *counterReadCloser) Read(p []byte) (int, error) {
 }
 
 func (c *counterReadCloser) Close() error {
-	return c.rc.Close() //nolint:wrapcheck
+	return errors.WithStack(c.rc.Close())
 }
 
 func (c *counterReadCloser) BytesRead() int64 {
@@ -279,7 +279,7 @@ func (c *counterReadCloserWriterTo) Read(p []byte) (int, error) {
 }
 
 func (c *counterReadCloserWriterTo) Close() error {
-	return c.rc.Close() //nolint:wrapcheck
+	return errors.WithStack(c.rc.Close())
 }
 
 func (c *counterReadCloserWriterTo) BytesRead() int64 {
