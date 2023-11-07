@@ -112,7 +112,7 @@ func (c *counterConnWriterToReaderFrom) WriteTo(w io.Writer) (int64, error) {
 
 func (c *counterConnWriterToReaderFrom) ReadFrom(r io.Reader) (int64, error) {
 	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
-	atomic.AddInt64(c.read, n)
+	atomic.AddInt64(c.written, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
@@ -200,7 +200,7 @@ func (c *counterConnReaderFrom) Write(b []byte) (int, error) {
 
 func (c *counterConnReaderFrom) ReadFrom(r io.Reader) (int64, error) {
 	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
-	atomic.AddInt64(c.read, n)
+	atomic.AddInt64(c.written, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
