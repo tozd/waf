@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/tozd/identifier"
+	"nhooyr.io/websocket"
 )
 
 func TestConnectionIDHandler(t *testing.T) {
@@ -306,7 +307,7 @@ func TestLogMetadata(t *testing.T) {
 	assert.Equal(t, "{}\n", out.String())
 }
 
-func TestWebsocketHandler(t *testing.T) {
+func TestWebsocketHandlerHijack(t *testing.T) {
 	t.Parallel()
 
 	response := []byte("HTTP/1.1 232 Test\r\nConnection: Closed\r\nContent-Length: 0\r\n\r\n")
@@ -350,7 +351,78 @@ func TestWebsocketHandler(t *testing.T) {
 	pipeR.Close()
 	assert.NoError(t, err)
 	assert.Equal(t, 232, resp.StatusCode)
-	assert.Equal(t, `{"ws":{"fromClient":0,"toClient":`+strconv.Itoa(len(response))+`}}`+"\n", string(out))
+	assert.Equal(t, `{"wsFromClient":0,"wsToClient":`+strconv.Itoa(len(response))+`}`+"\n", string(out))
+}
+
+func TestWebsocketHandler(t *testing.T) {
+	t.Parallel()
+
+	pipeR, pipeW, err := os.Pipe()
+	t.Cleanup(func() {
+		// We might double close but we do not care.
+		pipeR.Close()
+		pipeW.Close()
+	})
+	require.NoError(t, err)
+	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if !assert.NoError(t, err) {
+			return
+		}
+		defer func() { _ = c.CloseNow() }()
+
+		ctx, cancel := context.WithCancel(r.Context())
+		t.Cleanup(cancel)
+
+		typ, d, err := c.Read(ctx)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		assert.Equal(t, websocket.MessageText, typ)
+		assert.Equal(t, []byte("hi"), d)
+
+		err = c.Write(ctx, typ, d)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		c.Close(websocket.StatusNormalClosure, "")
+	}))
+	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
+		l := hlog.FromRequest(r)
+		l.Log().Msg("")
+		pipeW.Close()
+	})
+	h3 := setCanonicalLogger(h2)
+	h3 = hlog.NewHandler(zerolog.New(pipeW))(h3)
+
+	ts := httptest.NewServer(h3)
+	t.Cleanup(ts.Close)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	c, _, err := websocket.Dial(ctx, strings.ReplaceAll(ts.URL, "http", "ws"), nil) //nolint:bodyclose
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = c.CloseNow() })
+
+	err = c.Write(ctx, websocket.MessageText, []byte("hi"))
+	require.NoError(t, err)
+
+	typ, d, err := c.Read(ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, websocket.MessageText, typ)
+	assert.Equal(t, []byte("hi"), d)
+
+	c.Close(websocket.StatusNormalClosure, "")
+
+	out, err := io.ReadAll(pipeR)
+	pipeR.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, `{"wsFromClient":16,"wsToClient":8}`+"\n", string(out))
 }
 
 func TestParseForm(t *testing.T) {

@@ -2,8 +2,10 @@ package waf
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -231,18 +233,24 @@ func logMetadata(metadataHeaderPrefix string) func(next http.Handler) http.Handl
 }
 
 // websocketHandler records metrics about a websocket.
-func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
+func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handler {
+	fromClient := "fromClient"
+	toClient := "toClient"
+	if fieldKeyPrefix != "" {
+		fromClient = fieldKeyPrefix + "FromClient"
+		toClient = fieldKeyPrefix + "ToClient"
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var nc net.Conn
+			buffered := 0
 			defer func() {
 				if nc != nil {
 					logger := hlog.FromRequest(req)
 					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-						data := zerolog.Dict()
-						data.Int64("fromClient", nc.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
-						data.Int64("toClient", nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
-						return c.Dict(fieldKey, data)
+						c = c.Int64(fromClient, nc.(interface{ BytesRead() int64 }).BytesRead())                     //nolint:forcetypeassert
+						c = c.Int64(toClient, int64(buffered)+nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+						return c
 					})
 				}
 			}()
@@ -253,7 +261,25 @@ func websocketHandler(fieldKey string) func(next http.Handler) http.Handler {
 						if err != nil {
 							return conn, bufrw, err
 						}
+						// We first make sure anything pending to write is flushed
+						// (and we count bytes we flushed).
+						buffered = bufrw.Writer.Buffered()
+						err = bufrw.Writer.Flush()
+						if err != nil {
+							return conn, bufrw, err
+						}
+						// We wrap the connection so that we can count bytes read and written.
 						nc = newCounterConn(conn)
+						// And we set it as underlying writer so that writing to the buffer
+						// goes to our wrapped connection and not the original connection.
+						bufrw.Writer.Reset(nc)
+						// We read any buffered data pending reading.
+						b, _ := bufrw.Reader.Peek(bufrw.Reader.Buffered())
+						// We count bytes buffered.
+						buffered += len(b)
+						// And then we set the underlying reader with our wrapped connection
+						// with buffered data prefixed.
+						bufrw.Reader.Reset(io.MultiReader(bytes.NewReader(b), nc))
 						return nc, bufrw, err
 					}
 				},
