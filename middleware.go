@@ -259,14 +259,14 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 					return func() (net.Conn, *bufio.ReadWriter, error) {
 						conn, bufrw, err := next()
 						if err != nil {
-							return conn, bufrw, err
+							return conn, bufrw, errors.WithStack(err)
 						}
 						// We first make sure anything pending to write is flushed
 						// (and we count bytes we flushed).
 						buffered = bufrw.Writer.Buffered()
 						err = bufrw.Writer.Flush()
 						if err != nil {
-							return conn, bufrw, err
+							return conn, bufrw, errors.WithStack(err)
 						}
 						// We wrap the connection so that we can count bytes read and written.
 						nc = newCounterConn(conn)
@@ -280,7 +280,7 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 						// And then we set the underlying reader with our wrapped connection
 						// with buffered data prefixed.
 						bufrw.Reader.Reset(io.MultiReader(bytes.NewReader(b), nc))
-						return nc, bufrw, err
+						return nc, bufrw, nil
 					}
 				},
 			}), req)

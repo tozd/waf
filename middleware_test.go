@@ -365,7 +365,7 @@ func TestWebsocketHandler(t *testing.T) {
 	})
 	require.NoError(t, err)
 	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
+		c, err := websocket.Accept(w, r, nil) //nolint:govet
 		if !assert.NoError(t, err) {
 			return
 		}
