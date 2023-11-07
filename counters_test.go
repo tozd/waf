@@ -131,7 +131,35 @@ func (c *MockConnReaderFrom) ReadFrom(r io.Reader) (int64, error) {
 	return c.buffer.ReadFrom(r)
 }
 
-func TestCounters(t *testing.T) {
+type MockReadCloser struct {
+	buffer *bytes.Buffer
+}
+
+func (r *MockReadCloser) Read(p []byte) (int, error) {
+	return r.buffer.Read(p)
+}
+
+func (r *MockReadCloser) Close() error {
+	return nil
+}
+
+type MockReadCloserWriterTo struct {
+	buffer *bytes.Buffer
+}
+
+func (r *MockReadCloserWriterTo) Read(p []byte) (int, error) {
+	return r.buffer.Read(p)
+}
+
+func (r *MockReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
+	return r.buffer.WriteTo(w)
+}
+
+func (r *MockReadCloserWriterTo) Close() error {
+	return nil
+}
+
+func TestNetConnCounters(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -266,5 +294,63 @@ func TestCounters(t *testing.T) {
 
 		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
 		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+	})
+}
+
+func TestReadCloserCounters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("MockReadCloser", func(t *testing.T) {
+		t.Parallel()
+
+		mockBuffer := bytes.NewBufferString("test data")
+		mockReadCloser := &MockReadCloser{buffer: mockBuffer}
+		counter := newCounterReadCloser(mockReadCloser)
+		assert.IsType(t, &counterReadCloser{}, counter)
+
+		data := make([]byte, 1024)
+		n, err := counter.Read(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 9, n)
+		assert.Equal(t, []byte("test data"), data[:n])
+
+		err = counter.Close()
+		assert.NoError(t, err)
+
+		assert.Equal(t, int64(9), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
+	})
+
+	t.Run("MockReadCloserWriterTo", func(t *testing.T) {
+		t.Parallel()
+
+		mockBuffer := bytes.NewBufferString("test data")
+		mockReadCloser := &MockReadCloserWriterTo{buffer: mockBuffer}
+		counter := newCounterReadCloser(mockReadCloser)
+		assert.IsType(t, &counterReadCloserWriterTo{}, counter)
+
+		data := make([]byte, 1024)
+		buff := &bytes.Buffer{}
+		n, err := counter.(io.WriterTo).WriteTo(buff)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(9), n)
+		n2, err := buff.Read(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 9, n2)
+		assert.Equal(t, []byte("test data"), data[:n2])
+
+		mockBuffer.Reset()
+		n2, err = mockBuffer.WriteString("foobar")
+		assert.NoError(t, err)
+		assert.Equal(t, 6, n2)
+
+		n2, err = counter.Read(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 6, n2)
+		assert.Equal(t, []byte("foobar"), data[:n2])
+
+		err = counter.Close()
+		assert.NoError(t, err)
+
+		assert.Equal(t, int64(15), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
 	})
 }
