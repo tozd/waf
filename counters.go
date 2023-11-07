@@ -8,12 +8,6 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
-type counterConn struct {
-	net.Conn
-	read    *int64
-	written *int64
-}
-
 // TODO: Do we have to test conn for *net.TCPConn and *tls.Conn concrete types and then wrap them instead?
 func newCounterConn(c net.Conn) net.Conn {
 	var read int64
@@ -23,6 +17,12 @@ func newCounterConn(c net.Conn) net.Conn {
 		read:    &read,
 		written: &written,
 	}
+}
+
+type counterConn struct {
+	net.Conn
+	read    *int64
+	written *int64
 }
 
 func (c *counterConn) Read(b []byte) (int, error) {
@@ -53,12 +53,6 @@ func (c *counterConn) BytesWritten() int64 {
 	return atomic.LoadInt64(c.written)
 }
 
-// Based on https://github.com/rs/zerolog/pull/562.
-type counterReadCloser struct {
-	rc   io.ReadCloser
-	read *int64
-}
-
 func newCounterReadCloser(body io.ReadCloser) io.ReadCloser {
 	var read int64
 	if _, ok := body.(io.WriterTo); ok {
@@ -71,6 +65,11 @@ func newCounterReadCloser(body io.ReadCloser) io.ReadCloser {
 		rc:   body,
 		read: &read,
 	}
+}
+
+type counterReadCloser struct {
+	rc   io.ReadCloser
+	read *int64
 }
 
 func (c *counterReadCloser) Read(p []byte) (int, error) {
