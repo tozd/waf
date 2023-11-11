@@ -36,53 +36,6 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// httpVersionHandler is similar to hlog.ProtoHandler, but it does not store the "HTTP/"
-// prefix in the protocol name.
-func httpVersionHandler(fieldKey string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			proto := strings.TrimPrefix(req.Proto, "HTTP/")
-			logger := hlog.FromRequest(req)
-			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-				return c.Str(fieldKey, proto)
-			})
-			next.ServeHTTP(w, req)
-		})
-	}
-}
-
-// remoteAddrHandler is similar to hlog.RemoteAddrHandler, but logs only an IP, not a port.
-func remoteAddrHandler(fieldKey string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			ip := getHost(req.RemoteAddr)
-			if ip != "" {
-				logger := hlog.FromRequest(req)
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, ip)
-				})
-			}
-			next.ServeHTTP(w, req)
-		})
-	}
-}
-
-// hostHandler is similar to hlog.HostHandler, but it does not log the port.
-func hostHandler(fieldKey string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			host := getHost(req.Host)
-			if host != "" {
-				logger := hlog.FromRequest(req)
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(fieldKey, host)
-				})
-			}
-			next.ServeHTTP(w, req)
-		})
-	}
-}
-
 // requestIDHandler is similar to hlog.RequestIDHandler, but uses identifier.NewRandom() for ID.
 func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -117,41 +70,6 @@ func urlHandler(pathKey string) func(next http.Handler) http.Handler {
 			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 				return c.Str(pathKey, req.URL.Path)
 			})
-			next.ServeHTTP(w, req)
-		})
-	}
-}
-
-func etagHandler(fieldKey string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			defer func() {
-				etag := w.Header().Get("Etag")
-				if etag != "" {
-					etag = strings.ReplaceAll(etag, `"`, "")
-					logger := hlog.FromRequest(req)
-					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-						return c.Str(fieldKey, etag)
-					})
-				}
-			}()
-			next.ServeHTTP(w, req)
-		})
-	}
-}
-
-func responseHeaderHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			defer func() {
-				value := w.Header().Get(headerName)
-				if value != "" {
-					logger := hlog.FromRequest(req)
-					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-						return c.Str(fieldKey, value)
-					})
-				}
-			}()
 			next.ServeHTTP(w, req)
 		})
 	}

@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"mime"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -70,18 +69,6 @@ func canonicalLogger(ctx context.Context) *zerolog.Logger {
 		return l
 	}
 	return disabledLogger
-}
-
-func getHost(hostPort string) string {
-	if hostPort == "" {
-		return ""
-	}
-
-	host, _, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return hostPort
-	}
-	return host
 }
 
 // TODO: Use a pool of compression workers?
