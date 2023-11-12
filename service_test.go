@@ -804,6 +804,7 @@ func TestService(t *testing.T) {
 					assert.NoError(t, err)
 					log, err := io.ReadAll(pipeR)
 					pipeR.Close()
+					assert.NoError(t, err)
 					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
 					assert.Equal(t, tt.ExpectedBody, string(out))
 					assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
