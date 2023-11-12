@@ -739,7 +739,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	var ok bool
 	var f file
 
-	compressions := allCompressions
+	compressions := slices.Clone(allCompressions)
 	for {
 		contentEncoding = negotiateContentEncoding(req, compressions)
 		if contentEncoding == "" {
