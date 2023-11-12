@@ -5,8 +5,10 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"mime"
 	"net/http"
@@ -320,4 +322,12 @@ func postFormParsed(req *http.Request) bool {
 	}
 	ct, _, _ = mime.ParseMediaType(ct)
 	return ct == "application/x-www-form-urlencoded"
+}
+
+func computeEtag(data ...[]byte) string {
+	hash := sha256.New()
+	for _, d := range data {
+		_, _ = hash.Write(d)
+	}
+	return `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
 }

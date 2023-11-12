@@ -3,8 +3,6 @@ package waf
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -502,9 +500,7 @@ func (s *Service[SiteT]) computeEtags() errors.E {
 					return errE
 				}
 
-				hash := sha256.New()
-				_, _ = hash.Write(file.Data)
-				file.Etag = `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
+				file.Etag = computeEtag(file.Data)
 				site.files[compression][path] = file
 			}
 		}
@@ -697,10 +693,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 		return
 	}
 
-	hash := sha256.New()
-	_, _ = hash.Write(encoded)
-	_, _ = hash.Write(md)
-	etag := `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
+	etag := computeEtag(encoded, md)
 
 	w.Header().Set("Content-Type", "application/json")
 	if contentEncoding != compressionIdentity {
