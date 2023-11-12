@@ -612,7 +612,14 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	return b.Bytes(), nil
 }
 
-func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, contentEncoding string, data interface{}, metadata map[string]interface{}) {
+func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {
+	contentEncoding := negotiateContentEncoding(req, nil)
+	if contentEncoding == "" {
+		// If the client does not accept any compression we support (even no compression),
+		// we ignore that and just do not compress.
+		contentEncoding = compressionIdentity
+	}
+
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
 
@@ -696,10 +703,11 @@ func (s *Service[SiteT]) APIPath(name string, params Params, qs url.Values) (str
 
 // TODO: Use Vite's manifest.json to send preload headers.
 func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
-	contentEncoding := NegotiateContentEncoding(req, nil)
+	contentEncoding := negotiateContentEncoding(req, nil)
 	if contentEncoding == "" {
-		s.NotAcceptable(w, req)
-		return
+		// If the client does not accept any compression we support (even no compression),
+		// we ignore that and just do not compress.
+		contentEncoding = compressionIdentity
 	}
 
 	site := MustGetSite[SiteT](req.Context()).GetSite()

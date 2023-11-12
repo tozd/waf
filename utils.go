@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/andybalholm/brotli"
+	gddo "github.com/golang/gddo/httputil"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
@@ -69,6 +70,13 @@ func canonicalLogger(ctx context.Context) *zerolog.Logger {
 		return l
 	}
 	return disabledLogger
+}
+
+func negotiateContentEncoding(req *http.Request, offers []string) string {
+	if offers == nil {
+		offers = allCompressions
+	}
+	return gddo.NegotiateContentEncoding(req, offers)
 }
 
 // TODO: Use a pool of compression workers?

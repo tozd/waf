@@ -66,8 +66,6 @@ func (s *testService) HelperGet(w http.ResponseWriter, req *http.Request, p Para
 		s.NotFoundWithError(w, req, errors.New("test"))
 	case "MethodNotAllowed":
 		s.MethodNotAllowed(w, req, []string{http.MethodDelete, http.MethodGet})
-	case "NotAcceptable":
-		s.NotAcceptable(w, req)
 	case "InternalServerError":
 		s.InternalServerError(w, req)
 	case "InternalServerErrorWithError":
@@ -88,13 +86,7 @@ func (s *testService) PanicAPIGet(_ http.ResponseWriter, _ *http.Request, _ Para
 }
 
 func (s *testService) JSONAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
-	contentEncoding := NegotiateContentEncoding(req, nil)
-	if contentEncoding == "" {
-		s.NotAcceptable(w, req)
-		return
-	}
-
-	s.WriteJSON(w, req, contentEncoding, map[string]interface{}{"data": 123}, map[string]interface{}{"foobar": 42})
+	s.WriteJSON(w, req, map[string]interface{}{"data": 123}, map[string]interface{}{"foobar": 42})
 }
 
 func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Params) {
@@ -530,25 +522,6 @@ func TestService(t *testing.T) {
 				"Allow":                  {"DELETE, GET"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
-				"Content-Type":           {"text/plain; charset=utf-8"},
-				"Date":                   {""},
-				"Request-Id":             {""},
-				"X-Content-Type-Options": {"nosniff"},
-			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
-		},
-		{
-			func() *http.Request {
-				return newRequest(t, http.MethodGet, "https://example.com/helper/NotAcceptable", nil)
-			},
-			http.StatusNotAcceptable,
-			"Not Acceptable\n",
-			`{"level":"warn","method":"GET","path":"/helper/NotAcceptable","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":406,"responseBody":15,"requestBody":0,"metrics":{"t":}}` + "\n",
-			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Content-Length":         {"15"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
 				"Request-Id":             {""},

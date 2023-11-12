@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	gddo "github.com/golang/gddo/httputil"
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
@@ -54,13 +53,6 @@ func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
 	return s
 }
 
-func NegotiateContentEncoding(req *http.Request, offers []string) string {
-	if offers == nil {
-		offers = allCompressions
-	}
-	return gddo.NegotiateContentEncoding(req, offers)
-}
-
 // NotFound is a HTTP request handler which returns a 404 error to the client.
 func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
@@ -80,10 +72,6 @@ func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Requ
 func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request, allow []string) {
 	w.Header().Add("Allow", strings.Join(allow, ", "))
 	Error(w, req, http.StatusMethodNotAllowed)
-}
-
-func (s *Service[SiteT]) NotAcceptable(w http.ResponseWriter, req *http.Request) {
-	Error(w, req, http.StatusNotAcceptable)
 }
 
 func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request) {
