@@ -396,7 +396,12 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				mediaType = "application/octet-stream"
 			}
 
-			for _, compression := range allCompressions {
+			compressions := allCompressions
+			if len(data) <= minCompressionSize {
+				compressions = []string{compressionIdentity}
+			}
+
+			for _, compression := range compressions {
 				d, errE := compress(compression, data)
 				if errE != nil {
 					return errE
@@ -439,7 +444,12 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			return errE
 		}
 
-		for _, compression := range allCompressions {
+		compressions := allCompressions
+		if len(data) <= minCompressionSize {
+			compressions = []string{compressionIdentity}
+		}
+
+		for _, compression := range compressions {
 			if _, ok := site.files[compression]; !ok {
 				site.files[compression] = make(map[string]file)
 			}
@@ -713,19 +723,14 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 
 	file, ok := site.files[contentEncoding][path]
 	if !ok {
-		err := errors.New("no file for compression and path")
-		errors.Details(err)["compression"] = contentEncoding
-		errors.Details(err)["path"] = path
-		s.InternalServerErrorWithError(w, req, err)
-		return
-	}
-
-	if len(file.Data) <= minCompressionSize {
-		contentEncoding = compressionIdentity
-		file, ok = site.files[contentEncoding][path]
+		// There might be no file for compression because content is too short.
+		// We try no compression (identity compression).
+		if contentEncoding != compressionIdentity {
+			contentEncoding = compressionIdentity
+			file, ok = site.files[contentEncoding][path]
+		}
 		if !ok {
-			err := errors.New("no file for compression and path")
-			errors.Details(err)["compression"] = contentEncoding
+			err := errors.New("no file for path")
 			errors.Details(err)["path"] = path
 			s.InternalServerErrorWithError(w, req, err)
 			return
