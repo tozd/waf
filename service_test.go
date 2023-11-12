@@ -3,6 +3,7 @@ package waf
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -27,8 +28,27 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
+var compressibleData = bytes.Repeat([]byte{0}, 32*1024)
+var compressibleDataGzip []byte
+var nonCompressibleData = make([]byte, 32*1024)
+var nonCompressibleDataEtag string
+var nonCompressibleDataGzip []byte
+
 func init() { //nolint:gochecknoinits
 	zerolog.DurationFieldInteger = true
+	_, err := rand.Read(nonCompressibleData)
+	if err != nil {
+		panic(err)
+	}
+	compressibleDataGzip, err = compress(compressionGzip, compressibleData)
+	if err != nil {
+		panic(err)
+	}
+	nonCompressibleDataGzip, err = compress(compressionGzip, nonCompressibleData)
+	if err != nil {
+		panic(err)
+	}
+	nonCompressibleDataEtag = computeEtag(nonCompressibleData)
 }
 
 type testSite struct {
@@ -100,6 +120,12 @@ var testFiles = fstest.MapFS{ //nolint:gochecknoglobals
 	},
 	"data.txt": &fstest.MapFile{
 		Data: []byte("test data"),
+	},
+	"compressible.bin": &fstest.MapFile{
+		Data: compressibleData,
+	},
+	"noncompressible.bin": &fstest.MapFile{
+		Data: nonCompressibleData,
 	},
 	"index.html": &fstest.MapFile{
 		Data: []byte(`<!DOCTYPE html><html><head><title>{{ .Site.Title }}</title></head><body>{{ .Site.Description }}</body></html>`),
@@ -424,6 +450,157 @@ func TestService(t *testing.T) {
 				"Content-Type":           {"image/png"},
 				"Date":                   {""},
 				"Etag":                   {`"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "identity")
+				return req
+			},
+			http.StatusOK,
+			compressibleData,
+			`{"level":"info","method":"GET","path":"/compressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {`"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "identity")
+				// We just serve what we have and ignore the header.
+				req.Header.Add("Accept", "application/something")
+				return req
+			},
+			http.StatusOK,
+			compressibleData,
+			`{"level":"info","method":"GET","path":"/compressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {`"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "identity")
+				// We just serve what we have and ignore the header.
+				req.Header.Add("Accept-Encoding", "something")
+				return req
+			},
+			http.StatusOK,
+			compressibleData,
+			`{"level":"info","method":"GET","path":"/compressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {`"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			http.StatusOK,
+			compressibleDataGzip,
+			`{"level":"info","method":"GET","path":"/compressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":"gNjs0DVDKzajatdVAcvGk2jBlyyj_v_ier840Jzmwig","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":68,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"68"},
+				"Content-Type":           {"application/octet-stream"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {`"gNjs0DVDKzajatdVAcvGk2jBlyyj_v_ier840Jzmwig"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// It does not compress it because ratio is to bad.
+				req := newRequest(t, http.MethodGet, "https://example.com/noncompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			http.StatusOK,
+			nonCompressibleData,
+			`{"level":"info","method":"GET","path":"/noncompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + nonCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {nonCompressibleDataEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// It does not compress it because the file is too small.
+				req := newRequest(t, http.MethodGet, "https://example.com/data.txt", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			http.StatusOK,
+			[]byte(`test data`),
+			`{"level":"info","method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"9"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
 				"Request-Id":             {""},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
