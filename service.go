@@ -392,9 +392,8 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 
 			mediaType := mime.TypeByExtension(filepath.Ext(path))
 			if mediaType == "" {
-				errE := errors.New("unable to determine content type for file")
-				errors.Details(errE)["path"] = path
-				return errE
+				s.Logger.Debug().Str("path", path).Msg("unable to determine content type for file")
+				mediaType = "application/octet-stream"
 			}
 
 			for _, compression := range allCompressions {
