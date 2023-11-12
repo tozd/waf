@@ -308,6 +308,8 @@ func TestServicePath(t *testing.T) {
 {"level":"debug","handler":"JSONAPIConnect","name":"JSON","path":"/json","message":"route registration: API handler not found"}
 {"level":"debug","handler":"JSONAPIOptions","name":"JSON","path":"/json","message":"route registration: API handler not found"}
 {"level":"debug","handler":"JSONAPITrace","name":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","path":"/compressible.bin","message":"unable to determine content type for file"}
+{"level":"debug","path":"/noncompressible.bin","message":"unable to determine content type for file"}
 `, out.String())
 }
 
