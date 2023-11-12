@@ -778,18 +778,33 @@ func TestService(t *testing.T) {
 			t.Run(fmt.Sprintf("case=%d/http2=%t", k, http2), func(t *testing.T) {
 				t.Parallel()
 
-				log := &bytes.Buffer{}
+				pipeR, pipeW, err := os.Pipe()
+				t.Cleanup(func() {
+					// We might double close but we do not care.
+					pipeR.Close()
+					pipeW.Close()
+				})
+				require.NoError(t, err)
 
-				_, ts := newService(t, zerolog.New(log).Level(zerolog.InfoLevel), http2, "")
+				_, ts := newService(t, zerolog.New(pipeW).Level(zerolog.InfoLevel), http2, "")
+
+				// Close pipeW after serving.
+				h := ts.Config.Handler
+				ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					h.ServeHTTP(w, r)
+					pipeW.Close()
+				})
 
 				resp, err := ts.Client().Do(tt.Request())
 				if assert.NoError(t, err) {
 					t.Cleanup(func() { resp.Body.Close() })
 					out, err := io.ReadAll(resp.Body)
 					assert.NoError(t, err)
+					log, err := io.ReadAll(pipeR)
+					pipeR.Close()
 					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
 					assert.Equal(t, tt.ExpectedBody, string(out))
-					assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, log.String()))
+					assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
 					assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header))
 					if http2 {
 						assert.Equal(t, 2, resp.ProtoMajor)
