@@ -30,6 +30,8 @@ const (
 
 	// Compress only if content is larger than 1 KB.
 	minCompressionSize = 1024
+	// Compress only if compressed content is smaller than 99% of the original.
+	minCompressionRatio = 0.99
 )
 
 var allCompressions = []string{compressionBrotli, compressionGzip, compressionDeflate, compressionIdentity} //nolint:gochecknoglobals

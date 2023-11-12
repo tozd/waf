@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -407,6 +408,13 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 					return errE
 				}
 
+				// len(data) cannot be 0 for compression != compressionIdentity because
+				// 0 <= minCompressionSize and only compressionIdentity is tried then.
+				if compression != compressionIdentity && float64(len(d))/float64(len(data)) >= minCompressionRatio {
+					// No need to compress noncompressible files.
+					continue
+				}
+
 				site.files[compression][path] = file{
 					Data:      d,
 					Etag:      "",
@@ -457,6 +465,13 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			d, errE := compress(compression, data)
 			if errE != nil {
 				return errE
+			}
+
+			// len(data) cannot be 0 for compression != compressionIdentity because
+			// 0 <= minCompressionSize and only compressionIdentity is tried then.
+			if compression != compressionIdentity && float64(len(d))/float64(len(data)) >= minCompressionRatio {
+				// No need to compress noncompressible files.
+				continue
 			}
 
 			site.files[compression][contextPath] = file{
@@ -622,46 +637,59 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 }
 
 func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {
+	ctx := req.Context()
+	timing := servertiming.FromContext(ctx)
+
+	var encoded []byte
+	switch d := data.(type) {
+	case json.RawMessage:
+		m := timing.NewMetric("j").Start()
+		encoded = []byte(d)
+		m.Stop()
+	default:
+		m := timing.NewMetric("j").Start()
+		e, err := x.MarshalWithoutEscapeHTML(data)
+		m.Stop()
+
+		if err != nil {
+			s.InternalServerErrorWithError(w, req, errors.WithStack(err))
+			return
+		}
+
+		encoded = e
+	}
+
 	contentEncoding := negotiateContentEncoding(req, nil)
 	if contentEncoding == "" {
 		// If the client does not accept any compression we support (even no compression),
 		// we ignore that and just do not compress.
 		contentEncoding = compressionIdentity
-	}
-
-	ctx := req.Context()
-	timing := servertiming.FromContext(ctx)
-
-	m := timing.NewMetric("j").Start()
-
-	var encoded []byte
-	switch d := data.(type) {
-	case json.RawMessage:
-		encoded = []byte(d)
-	default:
-		e, err := x.MarshalWithoutEscapeHTML(data)
-		if err != nil {
-			s.InternalServerErrorWithError(w, req, errors.WithStack(err))
-			return
-		}
-		encoded = e
-	}
-
-	m.Stop()
-
-	if len(encoded) <= minCompressionSize {
+	} else if len(encoded) <= minCompressionSize {
 		contentEncoding = compressionIdentity
 	}
 
-	m = timing.NewMetric("c").Start()
+	if contentEncoding != compressionIdentity {
+		m := timing.NewMetric("c").Start()
+		compressed, errE := compress(contentEncoding, encoded)
+		m.Stop()
 
-	encoded, errE := compress(contentEncoding, encoded)
-	if errE != nil {
-		s.InternalServerErrorWithError(w, req, errE)
-		return
+		if errE != nil {
+			s.InternalServerErrorWithError(w, req, errE)
+			return
+		}
+
+		// len(encoded) cannot be 0 because 0 <= minCompressionSize
+		// and contentEncoding is set to compressionIdentity then.
+		if float64(len(compressed))/float64(len(encoded)) >= minCompressionRatio {
+			// No need to compress noncompressible files.
+			// We do not try if any other acceptable compression might have
+			// a better ratio to not take too much time trying them. We assume
+			// that the client prefers generally the best compression anyway.
+			contentEncoding = compressionIdentity
+		} else {
+			encoded = compressed
+		}
 	}
-
-	m.Stop()
 
 	md, errE := s.AddMetadata(w, req, metadata)
 	if errE != nil {
@@ -712,32 +740,41 @@ func (s *Service[SiteT]) APIPath(name string, params Params, qs url.Values) (str
 
 // TODO: Use Vite's manifest.json to send preload headers.
 func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
-	contentEncoding := negotiateContentEncoding(req, nil)
-	if contentEncoding == "" {
-		// If the client does not accept any compression we support (even no compression),
-		// we ignore that and just do not compress.
-		contentEncoding = compressionIdentity
-	}
-
 	site := MustGetSite[SiteT](req.Context()).GetSite()
 
-	file, ok := site.files[contentEncoding][path]
-	if !ok {
-		// There might be no file for compression because content is too short.
-		// We try no compression (identity compression).
-		if contentEncoding != compressionIdentity {
+	var contentEncoding string
+	var ok bool
+	var f file
+
+	compressions := allCompressions
+	for {
+		contentEncoding = negotiateContentEncoding(req, compressions)
+		if contentEncoding == "" {
+			// If the client does not accept any compression we support (even no compression),
+			// we ignore that and just do not compress.
 			contentEncoding = compressionIdentity
-			file, ok = site.files[contentEncoding][path]
 		}
-		if !ok {
+
+		f, ok = site.files[contentEncoding][path]
+		if ok {
+			break
+		}
+
+		if contentEncoding == compressionIdentity {
 			err := errors.New("no file for path")
 			errors.Details(err)["path"] = path
 			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
+
+		// There might be no file for compression because content is too short
+		// or noncompressible. We try another compression.
+		compressions = slices.DeleteFunc(compressions, func(c string) bool {
+			return c == contentEncoding
+		})
 	}
 
-	if file.Etag == "" {
+	if f.Etag == "" {
 		err := errors.New("no etag for file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
@@ -745,7 +782,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if file.MediaType == "" {
+	if f.MediaType == "" {
 		err := errors.New("no content type for file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
@@ -753,13 +790,13 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", file.MediaType)
+	w.Header().Set("Content-Type", f.MediaType)
 	if contentEncoding != compressionIdentity {
 		w.Header().Set("Content-Encoding", contentEncoding)
 	} else {
 		// TODO: Always set Content-Length.
 		//       See: https://github.com/golang/go/pull/50904
-		w.Header().Set("Content-Length", strconv.Itoa(len(file.Data)))
+		w.Header().Set("Content-Length", strconv.Itoa(len(f.Data)))
 	}
 	if immutable {
 		w.Header().Set("Cache-Control", "public,max-age=31536000,immutable,stale-while-revalidate=86400")
@@ -767,11 +804,11 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 	w.Header().Add("Vary", "Accept-Encoding")
-	w.Header().Set("Etag", file.Etag)
+	w.Header().Set("Etag", f.Etag)
 
 	// See: https://github.com/golang/go/issues/50905
 	// See: https://github.com/golang/go/pull/50903
-	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(file.Data))
+	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(f.Data))
 }
 
 func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
