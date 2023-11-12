@@ -23,9 +23,9 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
-	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
+	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/go/x"
 	z "gitlab.com/tozd/go/zerolog"
@@ -182,7 +182,9 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		timing := servertiming.FromContext(req.Context())
 		metrics := zerolog.Dict()
 		for _, metric := range timing.Metrics {
-			if metric.Duration > 0 {
+			// We log only really measured durations and not just initialized
+			// (it is impossible to both start and end the measurement with 0 duration).
+			if metric != nil && metric.Duration > 0 {
 				metrics.Dur(metric.Name, metric.Duration)
 			}
 		}

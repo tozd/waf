@@ -5,13 +5,13 @@ go 1.21
 require (
 	github.com/andybalholm/brotli v1.0.6
 	github.com/deckarep/golang-set/v2 v2.3.1
-	github.com/felixge/httpsnoop v1.0.3
+	github.com/felixge/httpsnoop v1.0.4
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/justinas/alice v1.2.0
-	github.com/mitchellh/go-server-timing v1.0.1
 	github.com/rs/zerolog v1.31.1-0.20231108200417-bb14b8b9de11
 	github.com/stretchr/testify v1.8.4
+	github.com/tozd/go-server-timing v0.0.0-20231112202017-1201ee47091a
 	gitlab.com/tozd/go/errors v0.8.0
 	gitlab.com/tozd/go/x v0.0.0-20231020213422-f3cd46ddd778
 	gitlab.com/tozd/identifier v0.1.0

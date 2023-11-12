@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/identifier"
 	"nhooyr.io/websocket"
 )

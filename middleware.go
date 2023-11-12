@@ -14,9 +14,9 @@ import (
 	"unicode"
 
 	"github.com/felixge/httpsnoop"
-	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
+	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
@@ -101,9 +101,9 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			defer func() {
 				// We use trailers only with http2.
 				if req.ProtoMajor > 1 {
-					milliseconds := float64(m.Duration) / float64(time.Millisecond)
+					milliseconds := int64(m.Duration / time.Millisecond)
 					// This writes the trailer.
-					w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%.1f", milliseconds))
+					w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%d", milliseconds))
 				}
 				f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) //nolint:forcetypeassert
 			}()

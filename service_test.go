@@ -19,13 +19,17 @@ import (
 	"testing/fstest"
 	"time"
 
-	servertiming "github.com/mitchellh/go-server-timing"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 )
+
+func init() { //nolint:gochecknoinits
+	zerolog.DurationFieldInteger = true
+}
 
 type testSite struct {
 	Site
@@ -39,7 +43,7 @@ type testService struct {
 
 func (s *testService) HomeGetAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
 	timing := servertiming.FromContext(req.Context())
-	timing.NewMetric("test").Duration = time.Second
+	timing.NewMetric("test").Duration = 123456789 * time.Microsecond
 
 	hlog.FromRequest(req).Info().Msg("test msg")
 
@@ -212,7 +216,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 	return service, ts
 }
 
-var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("[tjc]":)[0-9.]+`)
+var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("[tjc]":)[0-9]+`)
 
 func logCleanup(t *testing.T, http2 bool, log string) string {
 	t.Helper()
@@ -225,7 +229,7 @@ func logCleanup(t *testing.T, http2 bool, log string) string {
 	return logCleanupRegexp.ReplaceAllString(log, "$1$2$3$4$5$6$7")
 }
 
-var headerCleanupRegexp = regexp.MustCompile(`[0-9.]+`)
+var headerCleanupRegexp = regexp.MustCompile(`[0-9]+`)
 
 func headerCleanup(t *testing.T, header http.Header) http.Header {
 	t.Helper()
@@ -460,7 +464,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`,
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":1000,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -940,7 +944,7 @@ func TestReverseProxy(t *testing.T) {
 			http.StatusOK,
 			`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`,
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":1000,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
