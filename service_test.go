@@ -532,8 +532,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
-				return req
+				return newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
 			},
 			"",
 			http.StatusOK,
@@ -687,8 +686,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				return req
+				return newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
 			},
 			"",
 			http.StatusOK,
