@@ -249,6 +249,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}
+	client.Transport.(*http.Transport).DisableCompression = true //nolint:forcetypeassert
 
 	return service, ts
 }
@@ -504,7 +505,6 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				return req
 			},
 			"",
@@ -529,7 +529,6 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				// We just serve what we have and ignore the header.
 				req.Header.Add("Accept", "application/something")
 				return req
@@ -659,9 +658,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				return req
 			},
 			"",
@@ -712,9 +709,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				req.Header.Add("If-None-Match", semiCompressibleDataEtag)
 				return req
 			},
@@ -759,9 +754,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				req.Header.Add("Range", "bytes=100-200")
 				return req
 			},
@@ -815,9 +808,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				req.Header.Add("Range", "bytes=100-20000")
 				return req
 			},
@@ -872,9 +863,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				req.Header.Add("Range", "bytes=100-200")
 				req.Header.Add("If-None-Match", semiCompressibleDataEtag)
 				return req
@@ -921,9 +910,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				req.Header.Add("Range", "bytes=100-200")
 				req.Header.Add("If-None-Match", `"invalid"`)
 				return req
