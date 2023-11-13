@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
 	"github.com/rs/zerolog"
@@ -180,11 +181,15 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		}
 		timing := servertiming.FromContext(req.Context())
 		metrics := zerolog.Dict()
+		seenMetrics := mapset.NewThreadUnsafeSet[string]()
 		for _, metric := range timing.Metrics {
 			// We log only really measured durations and not just initialized
 			// (it is impossible to both start and end the measurement with 0 duration).
 			if metric != nil && metric.Duration > 0 {
 				metrics.Dur(metric.Name, metric.Duration)
+				if !seenMetrics.Add(metric.Name) {
+					s.Logger.Warn().Str("metric", metric.Name).Msg("duplicate metric")
+				}
 			}
 		}
 		// Full duration is added to the response as a trailer in accessHandler for HTTP2,
