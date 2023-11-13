@@ -746,16 +746,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {semiCompressibleDataEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {semiCompressibleDataEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -769,16 +766,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {semiCompressibleDataGzipEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {semiCompressibleDataGzipEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -901,16 +895,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {semiCompressibleDataEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {semiCompressibleDataEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -925,16 +916,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {semiCompressibleDataGzipEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {semiCompressibleDataGzipEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -1548,16 +1536,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {largeJSONEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {largeJSONEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -1571,16 +1556,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {largeJSONGzipEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {largeJSONGzipEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -1705,16 +1687,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {largeJSONEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {largeJSONEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {
@@ -1729,16 +1708,13 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
-				"Cache-Control":          {"no-cache"},
-				"Date":                   {""},
-				"Etag":                   {largeJSONGzipEtag},
-				"Request-Id":             {""},
-				"Vary":                   {"Accept-Encoding"},
-				"X-Content-Type-Options": {"nosniff"},
+				"Cache-Control": {"no-cache"},
+				"Date":          {""},
+				"Etag":          {largeJSONGzipEtag},
+				"Request-Id":    {""},
+				"Vary":          {"Accept-Encoding"},
 			},
-			http.Header{
-				"Server-Timing": {"t;dur="},
-			},
+			nil,
 		},
 		{
 			func() *http.Request {

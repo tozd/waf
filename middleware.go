@@ -84,10 +84,6 @@ func urlHandler(pathKey string) func(next http.Handler) http.Handler {
 func accessHandler(f func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// We use trailers only with HTTP2.
-			if req.ProtoMajor > 1 {
-				w.Header().Set("Trailer", servertiming.HeaderKey)
-			}
 			// We initialize Metrics ourselves so that if Code is never set it is logged as zero.
 			// This allows one to detect calls which has been canceled early and websocket upgrades.
 			// See: https://github.com/felixge/httpsnoop/issues/17
@@ -99,11 +95,11 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			body := newCounterReadCloser(req.Body)
 			req.Body = body
 			defer func() {
-				// We use trailers only with HTTP2.
-				if req.ProtoMajor > 1 {
+				// We use trailers only with HTTP2 and when status is not 304.
+				if req.ProtoMajor > 1 && m.Code != http.StatusNotModified {
 					milliseconds := int64(m.Duration / time.Millisecond)
 					// This writes the trailer.
-					w.Header().Set(servertiming.HeaderKey, fmt.Sprintf("t;dur=%d", milliseconds))
+					w.Header().Set(http.TrailerPrefix+servertiming.HeaderKey, fmt.Sprintf("t;dur=%d", milliseconds))
 				}
 				f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) //nolint:forcetypeassert
 			}()
