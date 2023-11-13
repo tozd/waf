@@ -39,7 +39,7 @@ var (
 	semiCompressibleDataEtag     string
 	semiCompressibleDataGzip     []byte
 	semiCompressibleDataGzipEtag string
-	largeJSON                    = []byte(`{"x":"` + strings.Repeat("a", 32*1024) + `"}`)
+	largeJSON                    []byte
 	largeJSONEtag                string
 	largeJSONGzip                []byte
 	largeJSONGzipEtag            string
@@ -69,6 +69,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	largeJSON = []byte(fmt.Sprintf(`{"x":"%x"}`, nonCompressibleData))
 	largeJSONGzip, err = compress(compressionGzip, largeJSON)
 	if err != nil {
 		panic(err)
@@ -1492,11 +1493,11 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSON,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32776,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
-				"Content-Length":         {"32776"},
+				"Content-Length":         {"65544"},
 				"Content-Type":           {"application/json"},
 				"Date":                   {""},
 				"Etag":                   {largeJSONEtag},
@@ -1517,11 +1518,12 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSONGzip,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":79,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
-				"Accept-Ranges":          {"bytes"},
-				"Cache-Control":          {"no-cache"},
-				"Content-Length":         {"79"},
+				"Accept-Ranges": {"bytes"},
+				"Cache-Control": {"no-cache"},
+				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
+				// "Content-Length": {strconv.Itoa(len(largeJSONGzip))},
 				"Content-Type":           {"application/json"},
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},
