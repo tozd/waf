@@ -54,6 +54,8 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 				})
 			}
 			if headerName != "" {
+				// TODO: Should this header be included in 304 responses? Probably not.
+				//       See: https://github.com/w3c/trace-context/issues/554
 				w.Header().Set(headerName, id.String())
 			}
 			next.ServeHTTP(w, req)
