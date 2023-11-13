@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -28,19 +29,22 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
-var compressibleData = bytes.Repeat([]byte{0}, 32*1024)
-var compressibleDataGzip []byte
-var nonCompressibleData = make([]byte, 32*1024)
-var nonCompressibleDataEtag string
-var nonCompressibleDataGzip []byte
+var (
+	compressibleData             = bytes.Repeat([]byte{0}, 32*1024)
+	compressibleDataGzip         []byte
+	nonCompressibleData          = make([]byte, 32*1024)
+	nonCompressibleDataEtag      string
+	nonCompressibleDataGzip      []byte
+	semiCompressibleData         []byte
+	semiCompressibleDataEtag     string
+	semiCompressibleDataGzip     []byte
+	semiCompressibleDataGzipEtag string
+	testFiles                    fstest.MapFS
+)
 
-func init() { //nolint:gochecknoinits
+func init() {
 	zerolog.DurationFieldInteger = true
 	_, err := rand.Read(nonCompressibleData)
-	if err != nil {
-		panic(err)
-	}
-	compressibleDataGzip, err = compress(compressionGzip, compressibleData)
 	if err != nil {
 		panic(err)
 	}
@@ -49,6 +53,39 @@ func init() { //nolint:gochecknoinits
 		panic(err)
 	}
 	nonCompressibleDataEtag = computeEtag(nonCompressibleData)
+	semiCompressibleData = append([]byte{}, nonCompressibleData[:30*1024]...)
+	semiCompressibleData = append(semiCompressibleData, bytes.Repeat([]byte{0}, 2*1024)...)
+	semiCompressibleDataGzip, err = compress(compressionGzip, semiCompressibleData)
+	if err != nil {
+		panic(err)
+	}
+	semiCompressibleDataEtag = computeEtag(semiCompressibleData)
+	semiCompressibleDataGzipEtag = computeEtag(semiCompressibleDataGzip)
+	compressibleDataGzip, err = compress(compressionGzip, compressibleData)
+	if err != nil {
+		panic(err)
+	}
+
+	testFiles = fstest.MapFS{
+		"assets/image.png": &fstest.MapFile{
+			Data: []byte("test image"),
+		},
+		"data.txt": &fstest.MapFile{
+			Data: []byte("test data"),
+		},
+		"compressible.bin": &fstest.MapFile{
+			Data: compressibleData,
+		},
+		"noncompressible.bin": &fstest.MapFile{
+			Data: nonCompressibleData,
+		},
+		"semicompressible.bin": &fstest.MapFile{
+			Data: semiCompressibleData,
+		},
+		"index.html": &fstest.MapFile{
+			Data: []byte(`<!DOCTYPE html><html><head><title>{{ .Site.Title }}</title></head><body>{{ .Site.Description }}</body></html>`),
+		},
+	}
 }
 
 type testSite struct {
@@ -112,24 +149,6 @@ func (s *testService) JSONAPIGet(w http.ResponseWriter, req *http.Request, _ Par
 func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Params) {
 	w.WriteHeader(http.StatusAccepted)
 	_, _ = w.Write([]byte(req.Form.Encode()))
-}
-
-var testFiles = fstest.MapFS{ //nolint:gochecknoglobals
-	"assets/image.png": &fstest.MapFile{
-		Data: []byte("test image"),
-	},
-	"data.txt": &fstest.MapFile{
-		Data: []byte("test data"),
-	},
-	"compressible.bin": &fstest.MapFile{
-		Data: compressibleData,
-	},
-	"noncompressible.bin": &fstest.MapFile{
-		Data: nonCompressibleData,
-	},
-	"index.html": &fstest.MapFile{
-		Data: []byte(`<!DOCTYPE html><html><head><title>{{ .Site.Title }}</title></head><body>{{ .Site.Description }}</body></html>`),
-	},
 }
 
 func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
@@ -336,6 +355,7 @@ func TestServicePath(t *testing.T) {
 {"level":"debug","handler":"JSONAPITrace","name":"JSON","path":"/json","message":"route registration: API handler not found"}
 {"level":"debug","path":"/compressible.bin","message":"unable to determine content type for file"}
 {"level":"debug","path":"/noncompressible.bin","message":"unable to determine content type for file"}
+{"level":"debug","path":"/semicompressible.bin","message":"unable to determine content type for file"}
 `, out.String())
 }
 
@@ -511,7 +531,6 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
-				req.Header.Add("Accept-Encoding", "identity")
 				// We just serve what we have and ignore the header.
 				req.Header.Add("Accept-Encoding", "something")
 				return req
@@ -601,6 +620,57 @@ func TestService(t *testing.T) {
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
 				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// No compression because we explicitly do not ask for it (Go client by default does ask for it).
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "identity")
+				return req
+			},
+			http.StatusOK,
+			semiCompressibleData,
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			http.StatusOK,
+			semiCompressibleDataGzip,
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges": {"bytes"},
+				"Cache-Control": {"no-cache"},
+				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
+				// "Content-Length": {strconv.Itoa(len(semiCompressibleDataGzip))},.
+				"Content-Type":           {"application/octet-stream"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataGzipEtag},
 				"Request-Id":             {""},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},

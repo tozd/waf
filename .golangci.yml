@@ -142,6 +142,8 @@ issues:
     - path: .*_test\.go
       linters:
         - exhaustruct
+        - gochecknoglobals
+        - gochecknoinits
         - goconst
         - lll
         - maintidx
