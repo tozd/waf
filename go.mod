@@ -11,7 +11,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/rs/zerolog v1.31.1-0.20231108200417-bb14b8b9de11
 	github.com/stretchr/testify v1.8.4
-	github.com/tozd/go-server-timing v0.0.0-20231112202017-1201ee47091a
+	github.com/tozd/go-server-timing v0.0.0-20231113212332-4f06011726eb
 	gitlab.com/tozd/go/errors v0.8.0
 	gitlab.com/tozd/go/x v0.0.0-20231020213422-f3cd46ddd778
 	gitlab.com/tozd/identifier v0.1.0

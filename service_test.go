@@ -1539,6 +1539,379 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("If-None-Match", largeJSONEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("If-None-Match", largeJSONGzipEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSON[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSONGzip[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/" + strconv.Itoa(len(largeJSONGzip))},
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-20000")
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSON[100:20001],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19901"},
+				"Content-Range":          {"bytes 100-20000/65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-20000")
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSONGzip[100:20001],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges": {"bytes"},
+				"Cache-Control": {"no-cache"},
+				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
+				// "Content-Length": {"19901"},.
+				"Content-Range":          {"bytes 100-20000/" + strconv.Itoa(len(largeJSONGzip))},
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-None-Match", largeJSONEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-None-Match", largeJSONGzipEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-None-Match", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSON[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-None-Match", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSONGzip[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/" + strconv.Itoa(len(largeJSONGzip))},
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", largeJSONEtag)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSON[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", largeJSONGzipEtag)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			largeJSONGzip[100:201],
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/" + strconv.Itoa(len(largeJSONGzip))},
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusOK,
+			largeJSON,
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusOK,
+			largeJSONGzip,
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges": {"bytes"},
+				"Cache-Control": {"no-cache"},
+				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
+				// "Content-Length": {strconv.Itoa(len(largeJSONGzip))},.
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
 				return newRequest(t, http.MethodGet, "https://example.com/", nil)
 			},
 			proxy.URL,

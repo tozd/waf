@@ -152,6 +152,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/tozd/go-server-timing v0.0.0-20231112202017-1201ee47091a h1:c+JmVBWrWXe9SoWieRXsC3Iml3afq1Q7X/rmf7n9rD8=
 github.com/tozd/go-server-timing v0.0.0-20231112202017-1201ee47091a/go.mod h1:2fyCBIZ3Z6D0C8Smc/DGIVCfAyBRkhSzJg7YGhgEglQ=
+github.com/tozd/go-server-timing v0.0.0-20231113212332-4f06011726eb h1:jIhskLo+tQJ853EZEPUBd2QNiRtuWIB0T3FL0jlOjRI=
+github.com/tozd/go-server-timing v0.0.0-20231113212332-4f06011726eb/go.mod h1:2fyCBIZ3Z6D0C8Smc/DGIVCfAyBRkhSzJg7YGhgEglQ=
 github.com/whilp/git-urls v1.0.0 h1:95f6UMWN5FKW71ECsXRUd3FVYiXdrE7aX4NZKcPmIjU=
 github.com/whilp/git-urls v1.0.0/go.mod h1:J16SAmobsqc3Qcy98brfl5f5+e0clUvg1krgwk/qCfE=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=
