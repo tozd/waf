@@ -659,7 +659,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				// No compression because we explicitly do not ask for it (Go client by default does ask for it).
+				// No compression because we explicitly ask for none (Go client by default does ask for it).
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
 				req.Header.Add("Accept-Encoding", "identity")
 				return req
@@ -700,6 +700,53 @@ func TestService(t *testing.T) {
 				// "Content-Length": {strconv.Itoa(len(semiCompressibleDataGzip))},.
 				"Content-Type":           {"application/octet-stream"},
 				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataGzipEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// No compression because we explicitly ask for none (Go client by default does ask for it).
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "identity")
+				req.Header.Add("If-None-Match", semiCompressibleDataEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("If-None-Match", semiCompressibleDataGzipEtag)
+				return req
+			},
+			"",
+			http.StatusNotModified,
+			[]byte{},
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Cache-Control":          {"no-cache"},
 				"Date":                   {""},
 				"Etag":                   {semiCompressibleDataGzipEtag},
 				"Request-Id":             {""},
