@@ -1330,8 +1330,8 @@ func TestService(t *testing.T) {
 				// Close pipeW after serving.
 				h := ts.Config.Handler
 				ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer pipeW.Close()
 					h.ServeHTTP(w, r)
-					pipeW.Close()
 				})
 
 				resp, err := ts.Client().Do(tt.Request())

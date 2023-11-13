@@ -226,10 +226,10 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 		_, _ = netConn.Write(response)
 	}))
 	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer pipeW.Close()
 		h.ServeHTTP(w, r)
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
-		pipeW.Close()
 	})
 	h3 := setCanonicalLogger(h2)
 	h3 = hlog.NewHandler(zerolog.New(pipeW))(h3)
@@ -282,10 +282,10 @@ func TestWebsocketHandler(t *testing.T) {
 		c.Close(websocket.StatusNormalClosure, "")
 	}))
 	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer pipeW.Close()
 		h.ServeHTTP(w, r)
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
-		pipeW.Close()
 	})
 	h3 := setCanonicalLogger(h2)
 	h3 = hlog.NewHandler(zerolog.New(pipeW))(h3)
