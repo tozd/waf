@@ -638,10 +638,10 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 
 	var encoded []byte
 	switch d := data.(type) {
+	case []byte:
+		encoded = d
 	case json.RawMessage:
-		m := timing.NewMetric("j").Start()
 		encoded = []byte(d)
-		m.Stop()
 	default:
 		m := timing.NewMetric("j").Start()
 		e, err := x.MarshalWithoutEscapeHTML(data)
