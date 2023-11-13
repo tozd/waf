@@ -549,7 +549,7 @@ func TestRouterPath(t *testing.T) {
 			errE := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
 			require.NoError(t, errE, "% -+#.1v", errE)
 
-			path, errE := r.path("PathName", tt.params, tt.qs, tt.inputAPI)
+			path, errE := r.reverse("PathName", tt.params, tt.qs, tt.inputAPI)
 
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, errE, tt.expectedError)
@@ -569,7 +569,7 @@ func TestRouterMissing(t *testing.T) {
 	errE := r.Handle("PathName", http.MethodGet, "/", false, func(http.ResponseWriter, *http.Request, Params) {})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
-	_, errE = r.path("PathNameMissing", nil, nil, false)
+	_, errE = r.reverse("PathNameMissing", nil, nil, false)
 	assert.ErrorContains(t, errE, "route does not exist")
 
 	errE = r.Handle("HandlerMissing", http.MethodGet, "/missing", false, nil)

@@ -308,24 +308,24 @@ func TestServicePath(t *testing.T) {
 
 	service, _ := newService(t, zerolog.New(out), false, "")
 
-	p, errE := service.Path("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
+	p, errE := service.Reverse("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/?a=b&a=c&x=y`, p)
 
-	p, errE = service.APIPath("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
+	p, errE = service.APIReverse("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/api/?a=b&a=c&x=y`, p)
 
-	_, errE = service.Path("HomeGet", Params{"x": "y"}, nil)
+	_, errE = service.Reverse("HomeGet", Params{"x": "y"}, nil)
 	assert.ErrorContains(t, errE, "extra parameters")
 
-	_, errE = service.Path("HelperGet", nil, nil)
+	_, errE = service.Reverse("HelperGet", nil, nil)
 	assert.ErrorContains(t, errE, "parameter is missing")
 
-	_, errE = service.Path("JSON", nil, nil)
+	_, errE = service.Reverse("JSON", nil, nil)
 	assert.ErrorContains(t, errE, "route has no GET handler")
 
-	_, errE = service.Path("something", nil, nil)
+	_, errE = service.Reverse("something", nil, nil)
 	assert.ErrorContains(t, errE, "route does not exist")
 
 	assert.Equal(t, `{"level":"debug","handler":"HomeGet","name":"HomeGet","path":"/","message":"route registration: handler found"}
@@ -1551,7 +1551,7 @@ func TestService(t *testing.T) {
 			http2 := http2
 
 			t.Run(fmt.Sprintf("case=%d/http2=%t", k, http2), func(t *testing.T) {
-				// t.Parallel().
+				t.Parallel()
 
 				pipeR, pipeW, err := os.Pipe()
 				t.Cleanup(func() {

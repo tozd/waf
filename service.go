@@ -723,12 +723,12 @@ func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ir
 	return *new(SiteT), err
 }
 
-func (s *Service[SiteT]) Path(name string, params Params, qs url.Values) (string, errors.E) {
-	return s.router.Path(name, params, qs)
+func (s *Service[SiteT]) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
+	return s.router.Reverse(name, params, qs)
 }
 
-func (s *Service[SiteT]) APIPath(name string, params Params, qs url.Values) (string, errors.E) {
-	return s.router.APIPath(name, params, qs)
+func (s *Service[SiteT]) APIReverse(name string, params Params, qs url.Values) (string, errors.E) {
+	return s.router.APIReverse(name, params, qs)
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.

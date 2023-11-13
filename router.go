@@ -321,7 +321,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) path(name string, params Params, qs url.Values, api bool) (string, errors.E) {
+func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (string, errors.E) {
 	ro, ok := r.routes[name]
 	if !ok {
 		err := errors.New("route does not exist")
@@ -398,10 +398,10 @@ func (r *Router) path(name string, params Params, qs url.Values, api bool) (stri
 	return res.String(), nil
 }
 
-func (r *Router) Path(name string, params Params, qs url.Values) (string, errors.E) {
-	return r.path(name, params, qs, false)
+func (r *Router) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
+	return r.reverse(name, params, qs, false)
 }
 
-func (r *Router) APIPath(name string, params Params, qs url.Values) (string, errors.E) {
-	return r.path(name, params, qs, true)
+func (r *Router) APIReverse(name string, params Params, qs url.Values) (string, errors.E) {
+	return r.reverse(name, params, qs, true)
 }
