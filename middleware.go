@@ -342,6 +342,7 @@ func setCanonicalLogger(next http.Handler) http.Handler {
 // addNosniffHeader sets nosniff header on all responses.
 func addNosniffHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// TODO: This should probably not be set for 304 responses.
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, req)
 	})
