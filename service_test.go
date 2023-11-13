@@ -39,6 +39,10 @@ var (
 	semiCompressibleDataEtag     string
 	semiCompressibleDataGzip     []byte
 	semiCompressibleDataGzipEtag string
+	largeJSON                    = []byte(`{"x":"` + strings.Repeat("a", 32*1024) + `"}`)
+	largeJSONEtag                string
+	largeJSONGzip                []byte
+	largeJSONGzipEtag            string
 	testFiles                    fstest.MapFS
 )
 
@@ -65,6 +69,12 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	largeJSONGzip, err = compress(compressionGzip, largeJSON)
+	if err != nil {
+		panic(err)
+	}
+	largeJSONEtag = computeEtag(largeJSON)
+	largeJSONGzipEtag = computeEtag(largeJSONGzip)
 
 	testFiles = fstest.MapFS{
 		"assets/image.png": &fstest.MapFile{
@@ -151,6 +161,10 @@ func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Pa
 	_, _ = w.Write([]byte(req.Form.Encode()))
 }
 
+func (s *testService) LargeAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.WriteJSON(w, req, largeJSON, nil)
+}
+
 func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
 	t.Helper()
 
@@ -188,6 +202,12 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				{
 					Name: "JSON",
 					Path: "/json",
+					API:  true,
+					Get:  false,
+				},
+				{
+					Name: "Large",
+					Path: "/large",
 					API:  true,
 					Get:  false,
 				},
@@ -354,6 +374,14 @@ func TestServicePath(t *testing.T) {
 {"level":"debug","handler":"JSONAPIConnect","name":"JSON","path":"/json","message":"route registration: API handler not found"}
 {"level":"debug","handler":"JSONAPIOptions","name":"JSON","path":"/json","message":"route registration: API handler not found"}
 {"level":"debug","handler":"JSONAPITrace","name":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIGet","name":"Large","path":"/large","message":"route registration: API handler found"}
+{"level":"debug","handler":"LargeAPIPost","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIPut","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIPatch","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIDelete","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIConnect","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPIOptions","name":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeAPITrace","name":"Large","path":"/large","message":"route registration: API handler not found"}
 {"level":"debug","path":"/compressible.bin","message":"unable to determine content type for file"}
 {"level":"debug","path":"/noncompressible.bin","message":"unable to determine content type for file"}
 {"level":"debug","path":"/semicompressible.bin","message":"unable to determine content type for file"}
@@ -1453,6 +1481,56 @@ func TestService(t *testing.T) {
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
 				"Request-Id":             {""},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+			},
+			"",
+			http.StatusOK,
+			largeJSON,
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32776,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32776"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			"",
+			http.StatusOK,
+			largeJSONGzip,
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":79,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"79"},
+				"Content-Type":           {"application/json"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
