@@ -37,6 +37,8 @@ func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 }
 
 // requestIDHandler is similar to hlog.RequestIDHandler, but uses identifier.NewRandom() for ID.
+//
+// It does not set headerName header on 304 responses.
 func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -54,10 +56,38 @@ func requestIDHandler(fieldKey, headerName string) func(next http.Handler) http.
 				})
 			}
 			if headerName != "" {
-				// TODO: Should this header be included in 304 responses? Probably not.
-				//       See: https://github.com/w3c/trace-context/issues/554
-				w.Header().Set(headerName, id.String())
+				headerWritten := false
+				headers := w.Header()
+				defer func() {
+					if !headerWritten {
+						headerWritten = true
+						headers.Set(headerName, id.String())
+					}
+				}()
+				w = httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
+					WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+						return func(code int) {
+							headerWritten = true
+							if code != http.StatusNotModified {
+								headers.Set(headerName, id.String())
+							}
+							next(code)
+						}
+					},
+					Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
+						return func(b []byte) (int, error) {
+							if !headerWritten {
+								// Calling Write without WriteHeader is the same as first
+								// calling WriteHeader(http.StatusOK), so we set the header.
+								headerWritten = true
+								headers.Set(headerName, id.String())
+							}
+							return next(b)
+						}
+					},
+				})
 			}
+
 			next.ServeHTTP(w, req)
 		})
 	}
@@ -342,6 +372,12 @@ func addNosniffHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		headerWritten := false
 		headers := w.Header()
+		defer func() {
+			if !headerWritten {
+				headerWritten = true
+				headers.Set("X-Content-Type-Options", "nosniff")
+			}
+		}()
 		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 				return func(code int) {
