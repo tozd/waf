@@ -580,6 +580,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
+				// It does not compress it because the file is too small.
 				req := newRequest(t, http.MethodGet, "https://example.com/compressible.bin", nil)
 				req.Header.Add("Accept-Encoding", "gzip")
 				return req
@@ -1233,6 +1234,34 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				return newRequest(t, http.MethodGet, "https://example.com/api/json", nil)
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{"data":123}`),
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"12"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE"`},
+				"Request-Id":             {""},
+				"Test-Metadata":          {"foobar=42"},
+				"Server-Timing":          {"j;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// It does not compress it because the content is too small.
+				req := newRequest(t, http.MethodGet, "https://example.com/api/json", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
 			},
 			"",
 			http.StatusOK,
