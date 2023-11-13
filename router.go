@@ -402,6 +402,6 @@ func (r *Router) Reverse(name string, params Params, qs url.Values) (string, err
 	return r.reverse(name, params, qs, false)
 }
 
-func (r *Router) APIReverse(name string, params Params, qs url.Values) (string, errors.E) {
+func (r *Router) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
 	return r.reverse(name, params, qs, true)
 }

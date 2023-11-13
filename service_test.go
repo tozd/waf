@@ -312,7 +312,7 @@ func TestServicePath(t *testing.T) {
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/?a=b&a=c&x=y`, p)
 
-	p, errE = service.APIReverse("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
+	p, errE = service.ReverseAPI("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/api/?a=b&a=c&x=y`, p)
 

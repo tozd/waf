@@ -727,8 +727,8 @@ func (s *Service[SiteT]) Reverse(name string, params Params, qs url.Values) (str
 	return s.router.Reverse(name, params, qs)
 }
 
-func (s *Service[SiteT]) APIReverse(name string, params Params, qs url.Values) (string, errors.E) {
-	return s.router.APIReverse(name, params, qs)
+func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
+	return s.router.ReverseAPI(name, params, qs)
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.
