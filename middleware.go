@@ -84,7 +84,7 @@ func urlHandler(pathKey string) func(next http.Handler) http.Handler {
 func accessHandler(f func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// We use trailers only with http2.
+			// We use trailers only with HTTP2.
 			if req.ProtoMajor > 1 {
 				w.Header().Set("Trailer", servertiming.HeaderKey)
 			}
@@ -99,7 +99,7 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			body := newCounterReadCloser(req.Body)
 			req.Body = body
 			defer func() {
-				// We use trailers only with http2.
+				// We use trailers only with HTTP2.
 				if req.ProtoMajor > 1 {
 					milliseconds := int64(m.Duration / time.Millisecond)
 					// This writes the trailer.
