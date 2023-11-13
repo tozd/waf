@@ -559,4 +559,18 @@ func TestAddNosniffHeader(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+
+	h = addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotModified)
+	}))
+
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest(http.MethodGet, "/", nil)
+	h.ServeHTTP(w, r)
+	res = w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Equal(t, http.StatusNotModified, res.StatusCode)
+	assert.Equal(t, "", res.Header.Get("X-Content-Type-Options"))
 }

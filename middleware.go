@@ -337,11 +337,32 @@ func setCanonicalLogger(next http.Handler) http.Handler {
 	})
 }
 
-// addNosniffHeader sets nosniff header on all responses.
+// addNosniffHeader sets nosniff header on all responses except 304 responses.
 func addNosniffHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// TODO: This should probably not be set for 304 responses.
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		next.ServeHTTP(w, req)
+		headerWritten := false
+		headers := w.Header()
+		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
+			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+				return func(code int) {
+					headerWritten = true
+					if code != http.StatusNotModified {
+						headers.Set("X-Content-Type-Options", "nosniff")
+					}
+					next(code)
+				}
+			},
+			Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
+				return func(b []byte) (int, error) {
+					if !headerWritten {
+						// Calling Write without WriteHeader is the same as first
+						// calling WriteHeader(http.StatusOK), so we set the header.
+						headerWritten = true
+						headers.Set("X-Content-Type-Options", "nosniff")
+					}
+					return next(b)
+				}
+			},
+		}), req)
 	})
 }
