@@ -967,6 +967,117 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", semiCompressibleDataEtag)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			semiCompressibleData[100:201],
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", semiCompressibleDataGzipEtag)
+				return req
+			},
+			"",
+			http.StatusPartialContent,
+			semiCompressibleDataGzip[100:201],
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"101"},
+				"Content-Range":          {"bytes 100-200/" + strconv.Itoa(len(semiCompressibleDataGzip))},
+				"Content-Type":           {"application/octet-stream"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataGzipEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusOK,
+			semiCompressibleData,
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.bin", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				req.Header.Add("Range", "bytes=100-200")
+				req.Header.Add("If-Range", `"invalid"`)
+				return req
+			},
+			"",
+			http.StatusOK,
+			semiCompressibleDataGzip,
+			`{"level":"info","method":"GET","path":"/semicompressible.bin","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges": {"bytes"},
+				"Cache-Control": {"no-cache"},
+				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
+				// "Content-Length": {strconv.Itoa(len(semiCompressibleDataGzip))},.
+				"Content-Type":           {"application/octet-stream"},
+				"Content-Encoding":       {"gzip"},
+				"Date":                   {""},
+				"Etag":                   {semiCompressibleDataGzipEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
 				return newRequest(t, http.MethodGet, "https://example.com/missing", nil)
 			},
 			"",
