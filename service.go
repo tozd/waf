@@ -261,7 +261,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	for _, route := range s.Routes {
 		if !route.Get && !route.API {
 			errE := errors.New(`at least one of "get" and "api" has to be true`)
-			errors.Details(errE)["name"] = route.Name
+			errors.Details(errE)["route"] = route.Name
 			errors.Details(errE)["path"] = route.Path
 			return errE
 		}
@@ -272,17 +272,17 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			if !m.IsValid() {
 				errE := errors.New("handler not found")
 				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
 			}
-			s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: handler found")
+			s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: handler found")
 			// We cannot use Handler here because it is a named type.
 			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 			if !ok {
 				errE := errors.New("invalid route handler type")
 				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 				return errE
@@ -291,7 +291,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
 			if errE != nil {
 				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
 			}
@@ -306,17 +306,17 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				handlerName := fmt.Sprintf("%sAPI%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
 				m := v.MethodByName(handlerName)
 				if !m.IsValid() {
-					s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
+					s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
 					continue
 				}
-				s.Logger.Debug().Str("handler", handlerName).Str("name", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
+				s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
 				foundAnyAPIHandler = true
 				// We cannot use Handler here because it is a named type.
 				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 				if !ok {
 					errE := errors.New("invalid route handler type")
 					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["name"] = route.Name
+					errors.Details(errE)["route"] = route.Name
 					errors.Details(errE)["path"] = route.Path
 					errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 					return errE
@@ -325,7 +325,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				errE := s.router.Handle(route.Name, method, route.Path, true, h)
 				if errE != nil {
 					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["name"] = route.Name
+					errors.Details(errE)["route"] = route.Name
 					errors.Details(errE)["path"] = route.Path
 					return errE
 				}
@@ -333,7 +333,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
 					if errE != nil {
 						errors.Details(errE)["handler"] = handlerName
-						errors.Details(errE)["name"] = route.Name
+						errors.Details(errE)["route"] = route.Name
 						errors.Details(errE)["path"] = route.Path
 						return errE
 					}
@@ -341,7 +341,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			}
 			if !foundAnyAPIHandler {
 				errE := errors.New("no route API handler found")
-				errors.Details(errE)["name"] = route.Name
+				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
 			}
