@@ -763,6 +763,8 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		if contentEncoding == compressionIdentity {
 			err := errors.New("no file for path")
 			errors.Details(err)["path"] = path
+			// This should not really happen. We should not register
+			// the static file handler for this path if the file does not exist.
 			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
@@ -778,6 +780,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		err := errors.New("no etag for file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
+		// This should not really happen. We should have computed etags for all files.
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
@@ -786,6 +789,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		err := errors.New("no content type for file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
+		// This should not really happen. We should have content types for all files.
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
