@@ -164,7 +164,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			if segment.Parameter {
 				if !parameters.Add(segment.Value) {
 					err := errors.New("duplicate parameter")
-					errors.Details(err)["name"] = segment.Value
+					errors.Details(err)["parameter"] = segment.Value
 					errors.Details(err)["path"] = path
 					errors.Details(err)["route"] = name
 					return err
@@ -355,7 +355,7 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		val := params[segment.Value]
 		if val == "" {
 			err := errors.New("parameter is missing")
-			errors.Details(err)["name"] = segment.Value
+			errors.Details(err)["parameter"] = segment.Value
 			errors.Details(err)["route"] = name
 			return "", err
 		}
