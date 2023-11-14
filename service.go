@@ -682,7 +682,8 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 		// len(encoded) cannot be 0 because 0 <= minCompressionSize
 		// and contentEncoding is set to compressionIdentity then.
 		if float64(len(compressed))/float64(len(encoded)) >= minCompressionRatio {
-			// No need to compress noncompressible files.
+			// No need to send noncompressible files. We already used time to compress
+			// but we throw that away so that the client does not have to spend time decompressing.
 			// We do not try if any other acceptable compression might have
 			// a better ratio to not take too much time trying them. We assume
 			// that the client prefers generally the best compression anyway.
