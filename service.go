@@ -280,7 +280,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			// We cannot use Handler here because it is a named type.
 			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 			if !ok {
-				errE := errors.New("invalid route handler type")
+				errE := errors.New("invalid handler type")
 				errors.Details(errE)["handler"] = handlerName
 				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
@@ -303,7 +303,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
 				http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace,
 			} {
-				handlerName := fmt.Sprintf("%sAPI%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
+				handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
 				m := v.MethodByName(handlerName)
 				if !m.IsValid() {
 					s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
@@ -314,7 +314,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				// We cannot use Handler here because it is a named type.
 				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
 				if !ok {
-					errE := errors.New("invalid route handler type")
+					errE := errors.New("invalid API handler type")
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["route"] = route.Name
 					errors.Details(errE)["path"] = route.Path

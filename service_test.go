@@ -109,7 +109,7 @@ type testService struct {
 	Service[*testSite]
 }
 
-func (s *testService) HomeGetAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params) {
 	timing := servertiming.FromContext(req.Context())
 	timing.NewMetric("test").Duration = 123456789 * time.Microsecond
 
@@ -118,7 +118,7 @@ func (s *testService) HomeGetAPIGet(w http.ResponseWriter, req *http.Request, _ 
 	s.serveStaticFile(w, req, "/index.json", false)
 }
 
-func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) Home(w http.ResponseWriter, req *http.Request, _ Params) {
 	if s.Development != "" {
 		s.Proxy(w, req)
 	} else {
@@ -126,7 +126,7 @@ func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params
 	}
 }
 
-func (s *testService) HelperGet(w http.ResponseWriter, req *http.Request, p Params) {
+func (s *testService) Helper(w http.ResponseWriter, req *http.Request, p Params) {
 	switch p["name"] {
 	case "NotFound":
 		s.NotFound(w, req)
@@ -149,22 +149,24 @@ func (s *testService) HelperGet(w http.ResponseWriter, req *http.Request, p Para
 	}
 }
 
-func (s *testService) PanicAPIGet(_ http.ResponseWriter, _ *http.Request, _ Params) {
+func (s *testService) PanicGet(_ http.ResponseWriter, _ *http.Request, _ Params) {
 	panic(errors.New("test"))
 }
 
-func (s *testService) JSONAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) JSONGet(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.WriteJSON(w, req, map[string]interface{}{"data": 123}, map[string]interface{}{"foobar": 42})
 }
 
-func (s *testService) JSONAPIPost(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) JSONPost(w http.ResponseWriter, req *http.Request, _ Params) {
 	w.WriteHeader(http.StatusAccepted)
 	_, _ = w.Write([]byte(req.Form.Encode()))
 }
 
-func (s *testService) LargeAPIGet(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) LargeGet(w http.ResponseWriter, req *http.Request, _ Params) {
 	s.WriteJSON(w, req, largeJSON, nil)
 }
+
+func (s *testService) InvalidHandlerTypeGet() {}
 
 func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
 	t.Helper()
@@ -183,13 +185,13 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 			Files:  testFiles,
 			Routes: []Route{
 				{
-					Name: "HomeGet",
+					Name: "Home",
 					Path: "/",
 					API:  true,
 					Get:  true,
 				},
 				{
-					Name: "HelperGet",
+					Name: "Helper",
 					Path: "/helper/:name",
 					API:  false,
 					Get:  true,
@@ -322,6 +324,97 @@ func TestRouteWith(t *testing.T) {
 	assert.ErrorContains(t, errE, "RouteWith called more than once")
 }
 
+func TestServiceConfigureRoutes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		Routes []Route
+		Err    string
+	}{
+		{
+			nil,
+			"",
+		},
+		{
+			[]Route{
+				{
+					Name: "Home",
+					Path: "/",
+					API:  false,
+					Get:  false,
+				},
+			},
+			`at least one of "get" and "api" has to be true`,
+		},
+		{
+			[]Route{
+				{
+					Name: "SomethingMissing",
+					Path: "/",
+					API:  false,
+					Get:  true,
+				},
+			},
+			`handler not found`,
+		},
+		{
+			[]Route{
+				{
+					Name: "Proxy",
+					Path: "/",
+					API:  false,
+					Get:  true,
+				},
+			},
+			`invalid handler type`,
+		},
+		{
+			[]Route{
+				{
+					Name: "SomethingMissing",
+					Path: "/",
+					API:  true,
+					Get:  false,
+				},
+			},
+			`no API handler found`,
+		},
+		{
+			[]Route{
+				{
+					Name: "InvalidHandlerType",
+					Path: "/",
+					API:  true,
+					Get:  false,
+				},
+			},
+			`invalid API handler type`,
+		},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			s := &testService{
+				Service: Service[*testSite]{
+					router: &Router{},
+					Routes: tt.Routes,
+				},
+			}
+
+			errE := s.configureRoutes(s)
+			if tt.Err != "" {
+				assert.ErrorContains(t, errE, tt.Err)
+			} else {
+				assert.NoError(t, errE, "% -+#.1v", errE)
+			}
+		})
+	}
+}
+
 func TestServiceReverse(t *testing.T) {
 	t.Parallel()
 
@@ -329,18 +422,18 @@ func TestServiceReverse(t *testing.T) {
 
 	service, _ := newService(t, zerolog.New(out), false, "")
 
-	p, errE := service.Reverse("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
+	p, errE := service.Reverse("Home", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/?a=b&a=c&x=y`, p)
 
-	p, errE = service.ReverseAPI("HomeGet", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
+	p, errE = service.ReverseAPI("Home", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, `/api/?a=b&a=c&x=y`, p)
 
-	_, errE = service.Reverse("HomeGet", Params{"x": "y"}, nil)
+	_, errE = service.Reverse("Home", Params{"x": "y"}, nil)
 	assert.ErrorContains(t, errE, "extra parameters")
 
-	_, errE = service.Reverse("HelperGet", nil, nil)
+	_, errE = service.Reverse("Helper", nil, nil)
 	assert.ErrorContains(t, errE, "parameter is missing")
 
 	_, errE = service.Reverse("JSON", nil, nil)
@@ -349,40 +442,40 @@ func TestServiceReverse(t *testing.T) {
 	_, errE = service.Reverse("something", nil, nil)
 	assert.ErrorContains(t, errE, "route does not exist")
 
-	assert.Equal(t, `{"level":"debug","handler":"HomeGet","name":"HomeGet","path":"/","message":"route registration: handler found"}
-{"level":"debug","handler":"HomeGetAPIGet","name":"HomeGet","path":"/","message":"route registration: API handler found"}
-{"level":"debug","handler":"HomeGetAPIPost","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPIPut","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPIPatch","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPIDelete","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPIConnect","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPIOptions","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HomeGetAPITrace","name":"HomeGet","path":"/","message":"route registration: API handler not found"}
-{"level":"debug","handler":"HelperGet","name":"HelperGet","path":"/helper/:name","message":"route registration: handler found"}
-{"level":"debug","handler":"PanicAPIGet","name":"Panic","path":"/panic","message":"route registration: API handler found"}
-{"level":"debug","handler":"PanicAPIPost","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPIPut","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPIPatch","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPIDelete","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPIConnect","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPIOptions","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"PanicAPITrace","name":"Panic","path":"/panic","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPIGet","name":"JSON","path":"/json","message":"route registration: API handler found"}
-{"level":"debug","handler":"JSONAPIPost","name":"JSON","path":"/json","message":"route registration: API handler found"}
-{"level":"debug","handler":"JSONAPIPut","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPIPatch","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPIDelete","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPIConnect","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPIOptions","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"JSONAPITrace","name":"JSON","path":"/json","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIGet","name":"Large","path":"/large","message":"route registration: API handler found"}
-{"level":"debug","handler":"LargeAPIPost","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIPut","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIPatch","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIDelete","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIConnect","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPIOptions","name":"Large","path":"/large","message":"route registration: API handler not found"}
-{"level":"debug","handler":"LargeAPITrace","name":"Large","path":"/large","message":"route registration: API handler not found"}
+	assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","message":"route registration: handler found"}
+{"level":"debug","handler":"HomeGet","route":"Home","path":"/","message":"route registration: API handler found"}
+{"level":"debug","handler":"HomePost","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomePut","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomePatch","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeDelete","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeConnect","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeOptions","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeTrace","route":"Home","path":"/","message":"route registration: API handler not found"}
+{"level":"debug","handler":"Helper","route":"Helper","path":"/helper/:name","message":"route registration: handler found"}
+{"level":"debug","handler":"PanicGet","route":"Panic","path":"/panic","message":"route registration: API handler found"}
+{"level":"debug","handler":"PanicPost","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicPut","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicPatch","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicDelete","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicConnect","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicOptions","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"PanicTrace","route":"Panic","path":"/panic","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONGet","route":"JSON","path":"/json","message":"route registration: API handler found"}
+{"level":"debug","handler":"JSONPost","route":"JSON","path":"/json","message":"route registration: API handler found"}
+{"level":"debug","handler":"JSONPut","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONPatch","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONDelete","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONConnect","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONOptions","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"JSONTrace","route":"JSON","path":"/json","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeGet","route":"Large","path":"/large","message":"route registration: API handler found"}
+{"level":"debug","handler":"LargePost","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargePut","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargePatch","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeDelete","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeConnect","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeOptions","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"LargeTrace","route":"Large","path":"/large","message":"route registration: API handler not found"}
 {"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for file"}
 {"level":"debug","path":"/noncompressible.foobar","message":"unable to determine content type for file"}
 {"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for file"}
@@ -425,7 +518,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			[]byte(`<!DOCTYPE html><html><head><title>test</title></head><body>test site</body></html>`),
-			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Home","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1115,7 +1208,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			[]byte(`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1139,7 +1232,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotFound,
 			[]byte("Not Found\n"),
-			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
@@ -1159,7 +1252,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotFound,
 			[]byte("Not Found\n"),
-			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
@@ -1179,7 +1272,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusMethodNotAllowed,
 			[]byte("Method Not Allowed\n"),
-			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Allow":                  {"DELETE, GET"},
 				"Cache-Control":          {"no-cache"},
@@ -1200,7 +1293,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusInternalServerError,
 			[]byte("Internal Server Error\n"),
-			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
@@ -1220,7 +1313,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusInternalServerError,
 			[]byte("Internal Server Error\n"),
-			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
@@ -1240,7 +1333,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusRequestTimeout,
 			[]byte("Request Timeout\n"),
-			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","context":"canceled","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"16"},
@@ -1260,7 +1353,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusRequestTimeout,
 			[]byte("Request Timeout\n"),
-			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","context":"deadline exceeded","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"16"},
@@ -1280,7 +1373,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusInternalServerError,
 			[]byte("Internal Server Error\n"),
-			`{"level":"error","method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","error":"Proxy called while not in development","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"Proxy called while not in development","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
@@ -1300,7 +1393,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusBadRequest,
 			[]byte("Bad Request\n"),
-			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HelperGet","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"warn","method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
@@ -1320,7 +1413,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusInternalServerError,
 			[]byte("Internal Server Error\n"),
-			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicAPIGet","panic":true,"error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"error","method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicGet","panic":true,"error":"test","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
@@ -1360,7 +1453,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			[]byte(`{"data":123}`),
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1388,7 +1481,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			[]byte(`{"data":123}`),
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1435,7 +1528,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusAccepted,
 			[]byte(`data=abcde&foo=1`),
-			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"JSONAPIPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"JSONPost","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Content-Length":         {"16"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1477,7 +1570,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSON,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1502,7 +1595,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSONGzip,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
@@ -1530,7 +1623,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotModified,
 			[]byte{},
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
@@ -1549,7 +1642,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotModified,
 			[]byte{},
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
@@ -1567,7 +1660,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSON[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1594,7 +1687,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSONGzip[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1622,7 +1715,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSON[100:20001],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1649,7 +1742,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSONGzip[100:20001],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":19901,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
@@ -1679,7 +1772,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotModified,
 			[]byte{},
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
@@ -1699,7 +1792,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusNotModified,
 			[]byte{},
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
@@ -1718,7 +1811,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSON[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1746,7 +1839,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSONGzip[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1775,7 +1868,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSON[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1803,7 +1896,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusPartialContent,
 			largeJSONGzip[100:201],
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1832,7 +1925,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSON,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -1859,7 +1952,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusOK,
 			largeJSONGzip,
-			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeAPIGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
@@ -1885,7 +1978,7 @@ func TestService(t *testing.T) {
 			proxy.URL,
 			http.StatusOK,
 			[]byte("test\npost data: \ndata: \n"),
-			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","proxied":"","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Home","proxied":"","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1968,7 +2061,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			[]byte(`{"site":{"domain":"example.com","title":"test","description":"test site"},"build":{"version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGetAPIGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
+				`{"level":"info","method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"aj4IanxlXD_73WR2wutz11Tk3JWHdZqpvuIvB1ivNWk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":161,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -2012,7 +2105,7 @@ func TestService(t *testing.T) {
 			proxy.URL,
 			http.StatusOK,
 			[]byte(`{"data":123}`),
-			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONAPIGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
+			`{"level":"info","method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
