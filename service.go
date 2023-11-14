@@ -340,7 +340,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				}
 			}
 			if !foundAnyAPIHandler {
-				errE := errors.New("no route API handler found")
+				errE := errors.New("no API handler found")
 				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
