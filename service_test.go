@@ -701,6 +701,32 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/compressible.foobar", nil)
+				// We just serve what we have and ignore the header.
+				req.Header.Add("Accept-Encoding", "identity;q=0.0")
+				return req
+			},
+			"",
+			http.StatusOK,
+			compressibleData,
+			`{"level":"info","method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/octet-stream"},
+				"Date":                   {""},
+				"Etag":                   {`"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
 				// It does not compress it because the file is too small.
 				req := newRequest(t, http.MethodGet, "https://example.com/compressible.foobar", nil)
 				req.Header.Add("Accept-Encoding", "gzip")
@@ -1566,6 +1592,32 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				return newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+			},
+			"",
+			http.StatusOK,
+			largeJSON,
+			`{"level":"info","method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"65544"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {largeJSONEtag},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/large", nil)
+				// We just serve what we have and ignore the header.
+				req.Header.Add("Accept-Encoding", "identity;q=0.0")
+				return req
 			},
 			"",
 			http.StatusOK,
