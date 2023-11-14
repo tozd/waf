@@ -322,7 +322,7 @@ func TestRouteWith(t *testing.T) {
 	require.ErrorContains(t, errE, "RouteWith called more than once")
 }
 
-func TestServicePath(t *testing.T) {
+func TestServiceReverse(t *testing.T) {
 	t.Parallel()
 
 	out := &bytes.Buffer{}
