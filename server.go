@@ -43,9 +43,8 @@ type Server[SiteT hasSite] struct {
 	Logger zerolog.Logger `kong:"-" yaml:"-"`
 
 	Development bool   `help:"Run in development mode and proxy unknown requests." short:"d"                                                                    yaml:"development"`
-	ProxyTo     string `default:"${defaultProxyTo}"                                help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL"                                                                              short:"P"          yaml:"proxyTo"`
+	ProxyTo     string `default:"${defaultProxyTo}"                                help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL"  short:"P" yaml:"proxyTo"`
 	TLS         TLS    `embed:""                                                   prefix:"tls."                                                                yaml:"tls"`
-	Title       string `default:"${defaultTitle}"                                  group:"Sites:"                                                               help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." placeholder:"NAME" short:"T"      yaml:"title"`
 
 	server   *http.Server
 	managers []*certificateManager
@@ -202,7 +201,6 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		st, site := newSiteT[SiteT]()
 		*site = Site{
 			Domain:   s.TLS.Domain,
-			Title:    s.Title,
 			CertFile: "",
 			KeyFile:  "",
 			files:    nil,
@@ -246,7 +244,6 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 			st, site := newSiteT[SiteT]()
 			*site = Site{
 				Domain:   leaf.Subject.CommonName,
-				Title:    s.Title,
 				CertFile: "",
 				KeyFile:  "",
 				files:    nil,
@@ -257,7 +254,6 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 			st, site := newSiteT[SiteT]()
 			*site = Site{
 				Domain:   san,
-				Title:    s.Title,
 				CertFile: "",
 				KeyFile:  "",
 				files:    nil,

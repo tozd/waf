@@ -21,7 +21,7 @@ require (
 	nhooyr.io/websocket v1.8.10
 )
 
-require github.com/alecthomas/kong v0.8.1 // indirect
+require github.com/alecthomas/kong v0.8.1
 
 require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
@@ -51,5 +51,5 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

@@ -101,9 +101,10 @@ func init() {
 }
 
 type testSite struct {
-	Site
+	Site `yaml:",inline"`
 
-	Description string `json:"description"`
+	Title       string `json:"title"       yaml:"title"`
+	Description string `json:"description" yaml:"description"`
 }
 
 type testService struct {
@@ -233,8 +234,8 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				"example.com": {
 					Site: Site{
 						Domain: "example.com",
-						Title:  "test",
 					},
+					Title:       "test",
 					Description: "test site",
 				},
 			},

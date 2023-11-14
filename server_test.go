@@ -63,13 +63,12 @@ func TestServer(t *testing.T) {
 			KeyFile:  keyPath,
 		},
 		ProxyTo: "http://localhost:8000",
-		Title:   "example",
 	}
 	sites, errE := server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "example"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -82,13 +81,12 @@ func TestServer(t *testing.T) {
 		},
 		ProxyTo:     "http://localhost:8000",
 		Development: true,
-		Title:       "example",
 	}
 	sites, errE = server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "example"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "http://localhost:8000", server.InDevelopment())
@@ -101,13 +99,12 @@ func TestServer(t *testing.T) {
 		},
 		ProxyTo:     "",
 		Development: true,
-		Title:       "example",
 	}
 	sites, errE = server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "example"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -116,20 +113,20 @@ func TestServer(t *testing.T) {
 		Logger: zerolog.Nop(),
 	}
 	sites, errE = server.Init(map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
-		"localhost":   {Domain: "localhost", Title: "localhost", CertFile: certPath, KeyFile: keyPath},
+		"example.com": {Domain: "example.com", CertFile: certPath, KeyFile: keyPath},
+		"localhost":   {Domain: "localhost", CertFile: certPath, KeyFile: keyPath},
 	})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
-		"localhost":   {Domain: "localhost", Title: "localhost", CertFile: certPath, KeyFile: keyPath},
+		"example.com": {Domain: "example.com", CertFile: certPath, KeyFile: keyPath},
+		"localhost":   {Domain: "localhost", CertFile: certPath, KeyFile: keyPath},
 	}, sites)
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
 	}
 	_, errE = server.Init(map[string]*Site{
-		"example.com": {Domain: "something.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
+		"example.com": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
 	assert.ErrorContains(t, errE, "domain does not match site's domain")
 
@@ -137,7 +134,7 @@ func TestServer(t *testing.T) {
 		Logger: zerolog.Nop(),
 	}
 	_, errE = server.Init(map[string]*Site{
-		"": {Domain: "something.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
+		"": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
 	assert.ErrorContains(t, errE, "domain does not match site's domain")
 
@@ -145,7 +142,7 @@ func TestServer(t *testing.T) {
 		Logger: zerolog.Nop(),
 	}
 	_, errE = server.Init(map[string]*Site{
-		"example.com": {Domain: "", Title: "example", CertFile: certPath, KeyFile: keyPath},
+		"example.com": {Domain: "", CertFile: certPath, KeyFile: keyPath},
 	})
 	assert.ErrorContains(t, errE, "site's domain is required")
 
@@ -153,7 +150,7 @@ func TestServer(t *testing.T) {
 		Logger: zerolog.Nop(),
 	}
 	_, errE = server.Init(map[string]*Site{
-		"something.com": {Domain: "something.com", Title: "example", CertFile: certPath, KeyFile: keyPath},
+		"something.com": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
 	assert.ErrorContains(t, errE, "certificate is not valid for domain")
 
@@ -165,13 +162,13 @@ func TestServer(t *testing.T) {
 		},
 	}
 	sites, errE = server.Init(map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "localhost"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "localhost"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	server = &Server[*Site]{
@@ -182,7 +179,7 @@ func TestServer(t *testing.T) {
 		},
 	}
 	_, errE = server.Init(map[string]*Site{
-		"something.com": {Domain: "something.com", Title: "example"},
+		"something.com": {Domain: "something.com"},
 	})
 	assert.ErrorContains(t, errE, "certificate is not valid for domain")
 
@@ -200,13 +197,12 @@ func TestServer(t *testing.T) {
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
-		Title: "example",
 	}
 	sites, errE = server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example"},
-		"localhost":   {Domain: "localhost", Title: "example"},
+		"example.com": {Domain: "example.com"},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -271,13 +267,13 @@ func TestServerConnection(t *testing.T) {
 		},
 	}
 	sites, errE := server.Init(map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example", CertFile: cert2Path, KeyFile: key2Path},
-		"localhost":   {Domain: "localhost", Title: "localhost"},
+		"example.com": {Domain: "example.com", CertFile: cert2Path, KeyFile: key2Path},
+		"localhost":   {Domain: "localhost"},
 	})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"example.com": {Domain: "example.com", Title: "example", CertFile: cert2Path, KeyFile: key2Path},
-		"localhost":   {Domain: "localhost", Title: "localhost"},
+		"example.com": {Domain: "example.com", CertFile: cert2Path, KeyFile: key2Path},
+		"localhost":   {Domain: "localhost"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
@@ -347,12 +343,11 @@ func TestServerACME(t *testing.T) {
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
 		},
-		Title: "example",
 	}
 	sites, errE := server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
-		"site.test": {Domain: "site.test", Title: "example"},
+		"site.test": {Domain: "site.test"},
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())

@@ -48,7 +48,6 @@ type file struct {
 
 type Site struct {
 	Domain string `json:"domain" yaml:"domain"`
-	Title  string `json:"title"  yaml:"title"`
 
 	// We do not expose certificate and key file paths in JSON.
 	CertFile string `json:"-" yaml:"cert,omitempty"`
