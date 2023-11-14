@@ -143,7 +143,7 @@ func TestCompileRegexp(t *testing.T) {
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
 			re, paramMapFunc, errE := compileRegexp(tt.inputSegments)

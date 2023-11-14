@@ -117,7 +117,7 @@ func TestAccessHandler(t *testing.T) {
 		for _, protocol := range []int{1, 2} {
 			protocol := protocol
 
-			t.Run(fmt.Sprintf("case=#%d/protocol=%d", k, protocol), func(t *testing.T) {
+			t.Run(fmt.Sprintf("case=%d/protocol=%d", k, protocol), func(t *testing.T) {
 				t.Parallel()
 
 				out := &bytes.Buffer{}
@@ -361,7 +361,7 @@ func TestParseForm(t *testing.T) {
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
 			out := &bytes.Buffer{}
@@ -446,7 +446,7 @@ func TestValidatePath(t *testing.T) {
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
 			w := httptest.NewRecorder()
@@ -510,7 +510,7 @@ func TestValidateSite(t *testing.T) {
 	for k, tt := range tests {
 		tt := tt
 
-		t.Run(fmt.Sprintf("case=#%d", k), func(t *testing.T) {
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
 			w := httptest.NewRecorder()
