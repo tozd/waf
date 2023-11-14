@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -163,7 +164,14 @@ func (s *testService) JSONPost(w http.ResponseWriter, req *http.Request, _ Param
 }
 
 func (s *testService) LargeGet(w http.ResponseWriter, req *http.Request, _ Params) {
-	s.WriteJSON(w, req, largeJSON, nil)
+	s.WriteJSON(w, req, json.RawMessage(largeJSON), nil)
+}
+
+func (s *testService) NonCompressibleJSONGet(w http.ResponseWriter, req *http.Request, _ Params) {
+	// Do not do this. We are misusing support for []byte here to pass raw random bytes which are not valid JSON.
+	// We need this to test the non-compressible code path in WriteJSON which seems it will never be taken
+	// with valid JSON which seems to be always compressible.
+	s.WriteJSON(w, req, nonCompressibleData, nil)
 }
 
 func (s *testService) InvalidHandlerTypeGet() {}
@@ -211,6 +219,12 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				{
 					Name: "Large",
 					Path: "/large",
+					API:  true,
+					Get:  false,
+				},
+				{
+					Name: "NonCompressibleJSON",
+					Path: "/noncompressible",
 					API:  true,
 					Get:  false,
 				},
@@ -476,6 +490,14 @@ func TestServiceReverse(t *testing.T) {
 {"level":"debug","handler":"LargeConnect","route":"Large","path":"/large","message":"route registration: API handler not found"}
 {"level":"debug","handler":"LargeOptions","route":"Large","path":"/large","message":"route registration: API handler not found"}
 {"level":"debug","handler":"LargeTrace","route":"Large","path":"/large","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONGet","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler found"}
+{"level":"debug","handler":"NonCompressibleJSONPost","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONPut","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONPatch","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONDelete","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONConnect","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONOptions","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"NonCompressibleJSONTrace","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
 {"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for file"}
 {"level":"debug","path":"/noncompressible.foobar","message":"unable to determine content type for file"}
 {"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for file"}
@@ -2014,6 +2036,33 @@ func TestService(t *testing.T) {
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
+				"Request-Id":             {""},
+				"Server-Timing":          {"c;dur="},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				// It does not compress it because ratio is to bad.
+				req := newRequest(t, http.MethodGet, "https://example.com/api/noncompressible", nil)
+				req.Header.Add("Accept-Encoding", "gzip")
+				return req
+			},
+			"",
+			http.StatusOK,
+			nonCompressibleData,
+			`{"level":"info","method":"GET","path":"/api/noncompressible","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"NonCompressibleJSONGet","etag":` + nonCompressibleDataEtag + `,"build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"code":200,"responseBody":32768,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
+			http.Header{
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"32768"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {nonCompressibleDataEtag},
 				"Request-Id":             {""},
 				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
