@@ -319,7 +319,7 @@ func TestRouteWith(t *testing.T) {
 	_, errE := s.RouteWith(s, router)
 	require.NoError(t, errE, "% -+#.1v", errE)
 	_, errE = s.RouteWith(s, router)
-	require.ErrorContains(t, errE, "RouteWith called more than once")
+	assert.ErrorContains(t, errE, "RouteWith called more than once")
 }
 
 func TestServiceReverse(t *testing.T) {
