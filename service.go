@@ -144,18 +144,14 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 }
 
 type Service[SiteT hasSite] struct {
-	Logger      zerolog.Logger
-	WithContext func(context.Context) (context.Context, func(), func())
+	Logger          zerolog.Logger
+	CanonicalLogger zerolog.Logger
+	WithContext     func(context.Context) (context.Context, func(), func())
 
 	Files           fs.ReadFileFS
 	Routes          []Route
 	Sites           map[string]SiteT
 	SiteContextPath string
-
-	// Build metadata.
-	Version        string
-	BuildTimestamp string
-	Revision       string
 
 	MetadataHeaderPrefix string
 
@@ -180,7 +176,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	}
 
 	if s.Development != "" {
-		errE := s.renderAndCompressContext()
+		errE := s.renderAndCompressSiteContext()
 		if errE != nil {
 			return nil, errE
 		}
@@ -202,7 +198,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.renderAndCompressContext()
+		errE = s.renderAndCompressSiteContext()
 		if errE != nil {
 			return nil, errE
 		}
@@ -224,7 +220,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c := alice.New()
 
 	// We first create a canonical log line logger as context logger.
-	c = c.Append(hlog.NewHandler(s.Logger))
+	c = c.Append(hlog.NewHandler(s.CanonicalLogger))
 	// Then we set the canonical log line logger under its own context key as well.
 	c = c.Append(setCanonicalLogger)
 	// It has to be before accessHandler so that it can access the timing context.
@@ -256,20 +252,6 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		// but it is not added to timing.Metrics. So we add it here to the log.
 		metrics.Dur("t", duration)
 		l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
-		if s.Revision != "" || s.BuildTimestamp != "" || s.Version != "" {
-			build := zerolog.Dict()
-			// In alphabetical order, so that it is the same as JSON marshal.
-			if s.Revision != "" {
-				build = build.Str("r", s.Revision)
-			}
-			if s.BuildTimestamp != "" {
-				build = build.Str("t", s.BuildTimestamp)
-			}
-			if s.Version != "" {
-				build = build.Str("v", s.Version)
-			}
-			l = l.Dict("build", build)
-		}
 		if code != 0 {
 			l = l.Int("code", code)
 		}
@@ -510,7 +492,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 	return errors.WithStack(err)
 }
 
-func (s *Service[SiteT]) renderAndCompressContext() errors.E {
+func (s *Service[SiteT]) renderAndCompressSiteContext() errors.E {
 	if s.SiteContextPath == "" {
 		return nil
 	}
@@ -525,7 +507,7 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			site.initializeFiles()
 		}
 
-		data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
+		data, errE := x.MarshalWithoutEscapeHTML(siteT)
 		if errE != nil {
 			return errE
 		}
@@ -623,13 +605,13 @@ func (s *Service[SiteT]) serveFiles() errors.E {
 	return nil
 }
 
-func (s *Service[SiteT]) render(path string, data []byte, site SiteT) ([]byte, errors.E) {
+func (s *Service[SiteT]) render(path string, data []byte, siteT SiteT) ([]byte, errors.E) {
 	t, err := template.New(path).Parse(string(data))
 	if err != nil {
 		return nil, errors.WithDetails(err, "path", path)
 	}
 	var out bytes.Buffer
-	err = t.Execute(&out, s.getSiteContext(site))
+	err = t.Execute(&out, siteT)
 	if err != nil {
 		return nil, errors.WithDetails(err, "path", path)
 	}
