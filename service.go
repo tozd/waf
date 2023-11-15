@@ -155,6 +155,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
+		errE = s.serveFiles()
+		if errE != nil {
+			return nil, errE
+		}
 		errE = s.makeReverseProxy()
 		if errE != nil {
 			return nil, errE
