@@ -353,7 +353,6 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 // TODO: De-duplicate storing same file's content in memory multiple times (all non .html files are the same between sites).
 
 func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
-	// Each site might render HTML files differently.
 	for domain, siteT := range s.Sites {
 		site := siteT.GetSite()
 
@@ -367,24 +366,43 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 			site.files[compression] = make(map[string]file)
 		}
 
-		err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if d.IsDir() {
-				return nil
-			}
+		// Map cannot be modified directly, so we modify the copy
+		// and store it back into the map.
+		s.Sites[domain] = siteT
+	}
 
-			path = strings.TrimPrefix(path, ".")
+	if s.Files == nil {
+		return nil
+	}
 
-			data, err := s.Files.ReadFile(path)
-			if err != nil {
-				errE := errors.WithStack(err)
-				errors.Details(errE)["path"] = path
-				return errE
-			}
+	err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if d.IsDir() {
+			return nil
+		}
 
-			path = "/" + path
+		path = strings.TrimPrefix(path, ".")
+
+		data, err := s.Files.ReadFile(path)
+		if err != nil {
+			errE := errors.WithStack(err)
+			errors.Details(errE)["path"] = path
+			return errE
+		}
+
+		path = "/" + path
+
+		mediaType := mime.TypeByExtension(filepath.Ext(path))
+		if mediaType == "" {
+			s.Logger.Debug().Str("path", path).Msg("unable to determine content type for file")
+			mediaType = "application/octet-stream"
+		}
+
+		// Each site might render HTML files differently.
+		for domain, siteT := range s.Sites {
+			site := siteT.GetSite()
 
 			var errE errors.E
 			if strings.HasSuffix(path, ".html") {
@@ -393,12 +411,6 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 					errors.Details(errE)["path"] = path
 					return errE
 				}
-			}
-
-			mediaType := mime.TypeByExtension(filepath.Ext(path))
-			if mediaType == "" {
-				s.Logger.Debug().Str("path", path).Msg("unable to determine content type for file")
-				mediaType = "application/octet-stream"
 			}
 
 			compressions := allCompressions
@@ -426,18 +438,15 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				}
 			}
 
-			return nil
-		})
-		if err != nil {
-			return errors.WithStack(err)
+			// Map cannot be modified directly, so we modify the copy
+			// and store it back into the map.
+			s.Sites[domain] = siteT
 		}
 
-		// Map cannot be modified directly, so we modify the copy
-		// and store it back into the map.
-		s.Sites[domain] = siteT
-	}
+		return nil
+	})
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (s *Service[SiteT]) renderAndCompressContext() errors.E {
