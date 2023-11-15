@@ -350,6 +350,8 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	return nil
 }
 
+// TODO: De-duplicate storing same file's content in memory multiple times (all non .html files are the same between sites).
+
 func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 	// Each site might render HTML files differently.
 	for domain, siteT := range s.Sites {
