@@ -219,6 +219,9 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 
 	c := alice.New()
 
+	// TODO: Skip installing middleware for canonical log line logger if it is disabled.
+	//       See: https://github.com/rs/zerolog/pull/617
+
 	// We first create a canonical log line logger as context logger.
 	c = c.Append(hlog.NewHandler(s.CanonicalLogger))
 	// Then we set the canonical log line logger under its own context key as well.
