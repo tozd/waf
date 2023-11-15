@@ -31,8 +31,6 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-const SiteContextPath = "/index.json"
-
 type Route struct {
 	Name string `json:"name"`
 	Path string `json:"path"`

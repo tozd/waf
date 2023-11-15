@@ -1,5 +1,7 @@
 package waf
 
+const SiteContextPath = "/index.json"
+
 type buildContext struct {
 	Version        string `json:"version,omitempty"`
 	BuildTimestamp string `json:"buildTimestamp,omitempty"`
