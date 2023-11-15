@@ -117,14 +117,14 @@ func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params
 
 	hlog.FromRequest(req).Info().Msg("test msg")
 
-	s.serveStaticFile(w, req, "/index.json", false)
+	s.ServeFile(w, req, "/index.json", false)
 }
 
 func (s *testService) Home(w http.ResponseWriter, req *http.Request, _ Params) {
 	if s.Development != "" {
 		s.Proxy(w, req)
 	} else {
-		s.serveStaticFile(w, req, "/index.html", false)
+		s.ServeFile(w, req, "/index.html", false)
 	}
 }
 
@@ -248,7 +248,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				return strings.HasPrefix(path, "/assets/")
 			},
 			SkipStaticFile: func(path string) bool {
-				return path == "/index.html" || path == contextPath
+				return path == "/index.html" || path == ContextPath
 			},
 		},
 	}

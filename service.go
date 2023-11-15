@@ -31,7 +31,7 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-const contextPath = "/index.json"
+const ContextPath = "/index.json"
 
 type Route struct {
 	Name string `json:"name"`
@@ -60,6 +60,44 @@ type Site struct {
 
 func (s *Site) GetSite() *Site {
 	return s
+}
+
+func (s *Site) initializeFiles() {
+	s.files = make(map[string]map[string]file)
+
+	for _, compression := range allCompressions {
+		s.files[compression] = make(map[string]file)
+	}
+}
+
+func (s *Site) addFile(path, mediaType string, data []byte) errors.E {
+	compressions := allCompressions
+	if len(data) <= minCompressionSize {
+		compressions = []string{compressionIdentity}
+	}
+
+	for _, compression := range compressions {
+		d, errE := compress(compression, data)
+		if errE != nil {
+			errors.Details(errE)["path"] = path
+			return errE
+		}
+
+		// len(data) cannot be 0 for compression != compressionIdentity because
+		// 0 <= minCompressionSize and only compressionIdentity is tried then.
+		if compression != compressionIdentity && float64(len(d))/float64(len(data)) >= minCompressionRatio {
+			// No need to compress noncompressible files.
+			continue
+		}
+
+		s.files[compression][path] = file{
+			Data:      d,
+			Etag:      computeEtag(d),
+			MediaType: mediaType,
+		}
+	}
+
+	return nil
 }
 
 type hasSite interface {
@@ -119,10 +157,6 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.computeEtags()
-		if errE != nil {
-			return nil, errE
-		}
 		errE = s.makeReverseProxy()
 		if errE != nil {
 			return nil, errE
@@ -141,11 +175,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.computeEtags()
-		if errE != nil {
-			return nil, errE
-		}
-		errE = s.serveStaticFiles()
+		errE = s.serveFiles()
 		if errE != nil {
 			return nil, errE
 		}
@@ -350,25 +380,15 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	return nil
 }
 
-// TODO: De-duplicate storing same file's content in memory multiple times (all non .html files are the same between sites).
-
 func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
-	for domain, siteT := range s.Sites {
+	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
 
 		if site.files != nil {
 			return errors.New("renderAndCompressFiles called more than once")
 		}
 
-		site.files = make(map[string]map[string]file)
-
-		for _, compression := range allCompressions {
-			site.files[compression] = make(map[string]file)
-		}
-
-		// Map cannot be modified directly, so we modify the copy
-		// and store it back into the map.
-		s.Sites[domain] = siteT
+		site.initializeFiles()
 	}
 
 	if s.Files == nil {
@@ -401,17 +421,24 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 		}
 
 		// Each site might render HTML files differently.
-		for domain, siteT := range s.Sites {
-			site := siteT.GetSite()
+		if strings.HasSuffix(path, ".html") {
+			for _, siteT := range s.Sites {
+				site := siteT.GetSite()
 
-			var errE errors.E
-			if strings.HasSuffix(path, ".html") {
-				data, errE = s.render(path, data, siteT)
+				htmlData, errE := s.render(path, data, siteT)
 				if errE != nil {
-					errors.Details(errE)["path"] = path
+					return errE
+				}
+
+				errE = site.addFile(path, mediaType, htmlData)
+				if errE != nil {
 					return errE
 				}
 			}
+		} else {
+			// We do not use Site.addFile here so that we can reuse and deduplicate compressed
+			// files across all sites by inverting loops (here we first iterate over
+			// compressions and then over sites).
 
 			compressions := allCompressions
 			if len(data) <= minCompressionSize {
@@ -421,6 +448,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 			for _, compression := range compressions {
 				d, errE := compress(compression, data)
 				if errE != nil {
+					errors.Details(errE)["path"] = path
 					return errE
 				}
 
@@ -431,16 +459,18 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 					continue
 				}
 
-				site.files[compression][path] = file{
-					Data:      d,
-					Etag:      "",
-					MediaType: mediaType,
+				etag := computeEtag(d)
+
+				for _, siteT := range s.Sites {
+					site := siteT.GetSite()
+
+					site.files[compression][path] = file{
+						Data:      d,
+						Etag:      etag,
+						MediaType: mediaType,
+					}
 				}
 			}
-
-			// Map cannot be modified directly, so we modify the copy
-			// and store it back into the map.
-			s.Sites[domain] = siteT
 		}
 
 		return nil
@@ -450,14 +480,14 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 }
 
 func (s *Service[SiteT]) renderAndCompressContext() errors.E {
-	for domain, siteT := range s.Sites {
+	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
 
 		// In development, this method could be called first and files are not yet
 		// initialized (as requests for other files are proxied), while in production
 		// files has already been initialized and populated by built static files.
 		if site.files == nil {
-			site.files = make(map[string]map[string]file)
+			site.initializeFiles()
 		}
 
 		data, errE := x.MarshalWithoutEscapeHTML(s.getSiteContext(siteT))
@@ -465,64 +495,10 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			return errE
 		}
 
-		compressions := allCompressions
-		if len(data) <= minCompressionSize {
-			compressions = []string{compressionIdentity}
+		errE = site.addFile(ContextPath, "application/json", data)
+		if errE != nil {
+			return errE
 		}
-
-		for _, compression := range compressions {
-			if _, ok := site.files[compression]; !ok {
-				site.files[compression] = make(map[string]file)
-			}
-
-			d, errE := compress(compression, data)
-			if errE != nil {
-				return errE
-			}
-
-			// len(data) cannot be 0 for compression != compressionIdentity because
-			// 0 <= minCompressionSize and only compressionIdentity is tried then.
-			if compression != compressionIdentity && float64(len(d))/float64(len(data)) >= minCompressionRatio {
-				// No need to compress noncompressible files.
-				continue
-			}
-
-			site.files[compression][contextPath] = file{
-				Data:      d,
-				Etag:      "",
-				MediaType: "application/json",
-			}
-		}
-
-		// Map cannot be modified directly, so we modify the copy
-		// and store it back into the map.
-		s.Sites[domain] = siteT
-	}
-
-	return nil
-}
-
-func (s *Service[SiteT]) computeEtags() errors.E {
-	for domain, siteT := range s.Sites {
-		site := siteT.GetSite()
-
-		for compression, files := range site.files {
-			for path, file := range files {
-				if file.Etag != "" {
-					errE := errors.New("etag already computed")
-					errors.Details(errE)["compression"] = compression
-					errors.Details(errE)["path"] = path
-					return errE
-				}
-
-				file.Etag = computeEtag(file.Data)
-				site.files[compression][path] = file
-			}
-		}
-
-		// Map cannot be modified directly, so we modify the copy
-		// and store it back into the map.
-		s.Sites[domain] = siteT
 	}
 
 	return nil
@@ -575,7 +551,7 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 	return nil
 }
 
-func (s *Service[SiteT]) serveStaticFiles() errors.E {
+func (s *Service[SiteT]) serveFiles() errors.E {
 	staticH := logHandlerName("StaticFile", toHandler(s.staticFile))
 	immutableH := logHandlerName("ImmutableFile", toHandler(s.immutableFile))
 
@@ -748,7 +724,7 @@ func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.
-func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
+func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
 	site := MustGetSite[SiteT](req.Context()).GetSite()
 
 	var contentEncoding string
@@ -774,8 +750,8 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		if contentEncoding == compressionIdentity {
 			err := errors.New("no file for path")
 			errors.Details(err)["path"] = path
-			// This should not really happen. We should not register
-			// the static file handler for this path if the file does not exist.
+			// This should not really happen. ServeFile should not be called for a file
+			// which is not among service's Files.
 			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
@@ -827,11 +803,11 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 }
 
 func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
-	s.serveStaticFile(w, req, req.URL.Path, false)
+	s.ServeFile(w, req, req.URL.Path, false)
 }
 
 func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request) {
-	s.serveStaticFile(w, req, req.URL.Path, true)
+	s.ServeFile(w, req, req.URL.Path, true)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
