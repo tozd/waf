@@ -31,7 +31,7 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-const ContextPath = "/index.json"
+const SiteContextPath = "/index.json"
 
 type Route struct {
 	Name string `json:"name"`
@@ -495,7 +495,7 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			return errE
 		}
 
-		errE = site.addFile(ContextPath, "application/json", data)
+		errE = site.addFile(SiteContextPath, "application/json", data)
 		if errE != nil {
 			return errE
 		}

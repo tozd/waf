@@ -248,7 +248,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				return strings.HasPrefix(path, "/assets/")
 			},
 			SkipStaticFile: func(path string) bool {
-				return path == "/index.html" || path == ContextPath
+				return path == "/index.html" || path == SiteContextPath
 			},
 		},
 	}
