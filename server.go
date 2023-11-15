@@ -51,9 +51,6 @@ type Server[SiteT hasSite] struct {
 }
 
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
-	// TODO: How to shutdown ACME manager?
-	//       See: https://github.com/golang/go/issues/63706
-
 	// TODO: How to shutdown websocket connections?
 
 	// TODO: Add limits on max idle time and min speed for writing the whole response.
