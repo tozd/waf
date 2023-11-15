@@ -69,6 +69,19 @@ func (s *Site) initializeFiles() {
 }
 
 func (s *Site) addFile(path, mediaType string, data []byte) errors.E {
+	if !strings.HasPrefix(path, "/") {
+		errE := errors.New(`path does not start with "/"`)
+		errors.Details(errE)["path"] = path
+		return errE
+	}
+
+	_, ok := s.files[compressionIdentity][path]
+	if ok {
+		errE := errors.New(`file for path already exists`)
+		errors.Details(errE)["path"] = path
+		return errE
+	}
+
 	compressions := allCompressions
 	if len(data) <= minCompressionSize {
 		compressions = []string{compressionIdentity}
@@ -119,9 +132,10 @@ type Service[SiteT hasSite] struct {
 	Logger      zerolog.Logger
 	WithContext func(context.Context) (context.Context, func(), func())
 
-	Files  fs.ReadFileFS
-	Routes []Route
-	Sites  map[string]SiteT
+	Files           fs.ReadFileFS
+	Routes          []Route
+	Sites           map[string]SiteT
+	SiteContextPath string
 
 	// Build metadata.
 	Version        string
@@ -133,7 +147,7 @@ type Service[SiteT hasSite] struct {
 	Development string
 
 	IsImmutableFile func(path string) bool
-	SkipStaticFile  func(path string) bool
+	SkipServingFile func(path string) bool
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
@@ -482,6 +496,10 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 }
 
 func (s *Service[SiteT]) renderAndCompressContext() errors.E {
+	if s.SiteContextPath == "" {
+		return nil
+	}
+
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
 
@@ -497,7 +515,7 @@ func (s *Service[SiteT]) renderAndCompressContext() errors.E {
 			return errE
 		}
 
-		errE = site.addFile(SiteContextPath, "application/json", data)
+		errE = site.addFile(s.SiteContextPath, "application/json", data)
 		if errE != nil {
 			return errE
 		}
@@ -562,7 +580,7 @@ func (s *Service[SiteT]) serveFiles() errors.E {
 
 		// We can use any compression to obtain all static paths, so we use compressionIdentity.
 		for path := range site.files[compressionIdentity] {
-			if s.SkipStaticFile != nil && s.SkipStaticFile(path) {
+			if s.SkipServingFile != nil && s.SkipServingFile(path) {
 				continue
 			}
 
