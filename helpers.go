@@ -11,6 +11,12 @@ import (
 	"gitlab.com/tozd/identifier"
 )
 
+// Error replies to the request with the specified HTTP code.
+// Error message is automatically generated based on the HTTP code
+// using [http.StatusText].
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func Error(w http.ResponseWriter, _ *http.Request, code int) {
 	body := http.StatusText(code)
 	w.Header().Set("Cache-Control", "no-cache")
@@ -19,6 +25,10 @@ func Error(w http.ResponseWriter, _ *http.Request, code int) {
 	http.Error(w, body, code)
 }
 
+// RequestID returns the request identifier from context ctx and true
+// if the request identifier is stored in the context.
+//
+// Note, Waf service always stores the request identifier in the request context.
 func RequestID(ctx context.Context) (identifier.Identifier, bool) {
 	v := ctx.Value(requestIDContextKey)
 	if v == nil {
@@ -28,6 +38,10 @@ func RequestID(ctx context.Context) (identifier.Identifier, bool) {
 	return i, ok
 }
 
+// MustRequestID returns the request identifier from context ctx or panics
+// if the request identifier is not stored in the context.
+//
+// Note, Waf service always stores the request identifier in the request context.
 func MustRequestID(ctx context.Context) identifier.Identifier {
 	i, ok := RequestID(ctx)
 	if !ok {
@@ -36,6 +50,11 @@ func MustRequestID(ctx context.Context) identifier.Identifier {
 	return i
 }
 
+// GetSite returns the site from context ctx and true
+// if the site is stored in the context.
+//
+// Note, Waf service always stores the site (based on host header in the request)
+// in the request context.
 func GetSite[SiteT hasSite](ctx context.Context) (SiteT, bool) { //nolint:ireturn
 	v := ctx.Value(siteContextKey)
 	if v == nil {
@@ -45,6 +64,11 @@ func GetSite[SiteT hasSite](ctx context.Context) (SiteT, bool) { //nolint:iretur
 	return s, ok
 }
 
+// MustGetSite returns the site from context ctx or panics
+// if the site is not stored in the context.
+//
+// Note, Waf service always stores the site (based on host header in the request)
+// in the request context.
 func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
 	s, ok := GetSite[SiteT](ctx)
 	if !ok {
@@ -53,13 +77,22 @@ func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
 	return s
 }
 
-// NotFound is a HTTP request handler which returns a 404 error to the client.
+// NotFound replies to the request with the 404 (not found) HTTP code and the corresponding
+// error message.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
 	// is different from what http.NotFound uses, and we want to use the same pattern.
 	Error(w, req, http.StatusNotFound)
 }
 
+// NotFoundWithError replies to the request with the 404 (not found) HTTP code and the corresponding
+// error message. Error err is logged to the canonical log line.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := canonicalLogger(req.Context())
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
@@ -69,15 +102,31 @@ func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Requ
 	s.NotFound(w, req)
 }
 
+// MethodNotAllowed replies to the request with the 405 (method not allowed) HTTP code and the corresponding
+// error message. It adds Allow response header based on the list of allowed methods
+// in allow.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) MethodNotAllowed(w http.ResponseWriter, req *http.Request, allow []string) {
 	w.Header().Add("Allow", strings.Join(allow, ", "))
 	Error(w, req, http.StatusMethodNotAllowed)
 }
 
+// BadRequest replies to the request with the 400 (bad request) HTTP code and the corresponding
+// error message.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusBadRequest)
 }
 
+// BadRequestWithError replies to the request with the 400 (bad request) HTTP code and the corresponding
+// error message. Error err is logged to the canonical log line.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := canonicalLogger(req.Context())
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
@@ -87,10 +136,24 @@ func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Re
 	s.BadRequest(w, req)
 }
 
+// InternalServerError replies to the request with the 500 (internal server error) HTTP code and the corresponding
+// error message.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusInternalServerError)
 }
 
+// InternalServerErrorWithError replies to the request with the 500 (internal server error) HTTP code and the corresponding
+// error message. Error err is logged to the canonical log line.
+//
+// As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it instead replies
+// with the 408 (request timeout) HTTP code, the corresponding error message, and logs to the canonical log line
+// that the context has been canceled or that deadline exceeded, respectively.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
 func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
 	logger := canonicalLogger(req.Context())
 
@@ -120,6 +183,7 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 	s.InternalServerError(w, req)
 }
 
+// Proxy proxies request to the development backend (e.g., Vite).
 func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	if s.Development == "" {
 		s.InternalServerErrorWithError(w, req, errors.New("Proxy called while not in development"))
@@ -133,7 +197,8 @@ func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
 
-// TemporaryRedirect redirects the client to a new URL while keeping the method and body not changed.
+// TemporaryRedirect redirects the client to a new URL with the 307 (temporary redirect) HTTP code which makes
+// the client redo the request with the same method and body.
 func (s *Service[SiteT]) TemporaryRedirect(w http.ResponseWriter, req *http.Request, location string) {
 	http.Redirect(w, req, location, http.StatusTemporaryRedirect)
 }

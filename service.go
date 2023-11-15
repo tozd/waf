@@ -31,6 +31,9 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
+// Route is a high-level route definition which is used by a service
+// to register handlers with the router. It can also be used by Vue Router
+// to register routes there.
 type Route struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
@@ -44,12 +47,24 @@ type file struct {
 	MediaType string
 }
 
+// Site describes a site at a domain.
+//
+// A service can have multiple sites which share files and handlers,
+// but have different configuration and rendered HTML files. Core
+// such configuration is site's domain, but you can provide your own
+// site struct and embed Site to add additional configuration.
+// Your site struct is then used when rendering HTML files and
+// as site context to the frontend at SiteContextPath URL path.
+//
+// We do not expose certificate and key file paths in JSON in site context.
 type Site struct {
 	Domain string `json:"domain" yaml:"domain"`
 
-	// We do not expose certificate and key file paths in JSON.
+	// Certificate file path. Used when Let's En.
 	CertFile string `json:"-" yaml:"cert,omitempty"`
-	KeyFile  string `json:"-" yaml:"key,omitempty"`
+
+	// Key file path.
+	KeyFile string `json:"-" yaml:"key,omitempty"`
 
 	// Maps between content types, paths, and data/etag/media type.
 	// They are per site because they can include rendered per-site content.

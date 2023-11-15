@@ -27,7 +27,7 @@ const (
 
 //nolint:lll
 type TLS struct {
-	CertFile string `group:"File certificate:"    help:"Default  certificate for TLS, when not using Let's Encrypt."                           name:"cert"                                                          placeholder:"PATH" short:"k"     type:"existingfile" yaml:"cert"`
+	CertFile string `group:"File certificate:"    help:"Default certificate for TLS, when not using Let's Encrypt."                            name:"cert"                                                          placeholder:"PATH" short:"k"     type:"existingfile" yaml:"cert"`
 	KeyFile  string `group:"File certificate:"    help:"Default certificate's private key, when not using Let's Encrypt."                      name:"key"                                                           placeholder:"PATH" short:"K"     type:"existingfile" yaml:"key"`
 	Domain   string `group:"Let's Encrypt:"       help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING"                                                 short:"D"          yaml:"domain"`
 	Email    string `group:"Let's Encrypt:"       help:"Contact e-mail to use with Let's Encrypt."                                             short:"E"                                                            yaml:"email"`
@@ -38,18 +38,39 @@ type TLS struct {
 	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
 }
 
-//nolint:lll
+// Server listens to HTTP/1.1 and HTTP2 requests on TLS enabled port 8080 and
+// serves requests using the provided handler. Server is production ready and
+// can be exposed directly on open Internet.
+//
+// Certificates for TLS can be provided as files (which are daily reread to allow updating them)
+// or can be automatically obtained (and updated) using [Let's Encrypt] (when running
+// accessible from the Internet).
+//
+// [Let's Encrypt]: https://letsencrypt.org/
 type Server[SiteT hasSite] struct {
+	// Logger to be used by the server.
 	Logger zerolog.Logger `kong:"-" yaml:"-"`
 
-	Development bool   `help:"Run in development mode and proxy unknown requests." short:"d"                                                                    yaml:"development"`
-	ProxyTo     string `default:"${defaultProxyTo}"                                help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL"  short:"P" yaml:"proxyTo"`
-	TLS         TLS    `embed:""                                                   prefix:"tls."                                                                yaml:"tls"`
+	// Run in development mode and proxy unknown requests.
+	Development bool `help:"Run in development mode and proxy unknown requests." short:"d" yaml:"development"`
 
-	server   *http.Server
+	// Base URL to proxy to in development mode.
+	ProxyTo string `default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL" short:"P" yaml:"proxyTo"`
+
+	// TLS configuration.
+	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
+
+	server *http.Server
+
+	// Autocert managers do not have to be stopped, but certificate managers do.
 	managers []*certificateManager
 }
 
+// Init determines the set of sites based on TLS configuration and sites provided,
+// returning possibly updated and expanded set of sites.
+//
+// If sites parameter is empty, sites are determined from domain names found in TLS
+// certificates.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
 
@@ -321,6 +342,8 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	return sites, nil
 }
 
+// InDevelopment returns ProxyTo base URL if Development is true.
+// Otherwise it returns an empty string.
 func (s *Server[SiteT]) InDevelopment() string {
 	development := s.ProxyTo
 	if !s.Development {
@@ -329,6 +352,10 @@ func (s *Server[SiteT]) InDevelopment() string {
 	return development
 }
 
+// Run runs the server serving requests using the provided handler.
+//
+// It returns only on error or if the server is gracefully shut down
+// when the context is canceled.
 func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E {
 	if s.server == nil {
 		return errors.New("server not configured")

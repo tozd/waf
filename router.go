@@ -106,8 +106,14 @@ type route struct {
 	APIHandlers map[string]Handler
 }
 
+// Params are parsed from the request URL path based on the
+// matched route. Map keys are parameter names.
 type Params map[string]string
 
+// Handler type defines Waf router handler function signature.
+//
+// The function signature is similar to [http.HandlerFunc], but
+// has additional parameter with Params parsed from the request URL path.
 type Handler func(http.ResponseWriter, *http.Request, Params)
 
 func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
@@ -119,17 +125,50 @@ func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 // TODO: Implement RedirectTrailingSlash = true
 // TODO: Implement RedirectFixedPath = true.
 
+// Router calls handlers for HTTP requests based on URL path and HTTP method.
+//
+// The goal of the router is to match routes in the same way as [Vue Router].
+// In addition, it supports also API handlers matched on HTTP method.
+// API handlers share the same route name but have their path automatically
+// prefixed with /api.
+//
+// [Vue Router]: https://router.vuejs.org/
 type Router struct {
-	NotFound         func(http.ResponseWriter, *http.Request)
+	// NotFound is called if no route matches URL path.
+	// If not defined, the request is replied with the 404 (not found) HTTP code error.
+	NotFound func(http.ResponseWriter, *http.Request)
+
+	// MethodNotAllowed is called the route does not support used HTTP method.
+	// If not defined, the request is replied with the 405 (method not allowed) HTTP code error.
 	MethodNotAllowed func(http.ResponseWriter, *http.Request, Params, []string)
-	Panic            func(w http.ResponseWriter, req *http.Request, err interface{})
-	EncodeQuery      func(qs url.Values) string
+
+	// Panic is called if handler panics instead of returning.
+	// If not defined, panics propagate.
+	Panic func(w http.ResponseWriter, req *http.Request, err interface{})
+
+	// EncodeQuery allows customization of how query strings are encoded
+	// when reversing a route in Reverse and ReverseAPI methods.
+	EncodeQuery func(qs url.Values) string
 
 	// A map between route name and routes.
 	routes   map[string]*route
 	matchers []matcher
 }
 
+// Handle registers the route handler with route name at path and with HTTP method.
+//
+// Path can contain parameters which start with ":". E.g., "/post/:id" is a path with
+// one parameter "id". Those parameters are parsed from the request URL and passed to
+// handlers.
+//
+// Routes are matched in the order in which they are registered.
+//
+// Non-API handlers can use only GET HTTP method, which is used also for HEAD HTTP method
+// automatically.
+//
+// Route is identified with the name and can have only one path associated with it, but
+// it can have different handlers for different HTTP methods and can have both API and non-API handlers.
+// Path for API handlers is automatically prefixed with /api, so you must not prefix it yourself.
 func (r *Router) Handle(name, method, path string, api bool, handler Handler) errors.E {
 	if name == "" {
 		err := errors.New("name cannot be empty")
@@ -252,6 +291,16 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 
 // TODO: Compile all regexes into one large regex.
 
+// ServeHTTP matches the route for the given request based on URL
+// path, extracts Params from the path, and calls route's handler for
+// the HTTP method.
+//
+// If no route matches URL path, NotFound is called, if defined, or
+// the request is replied with the 404 (not found) HTTP code error.
+//
+// If the route does not support used HTTP method, MethodNotAllowed
+// is called, if defined, or the request is replied with the
+// 405 (method not allowed) HTTP code error.
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if r.Panic != nil {
 		defer r.recv(w, req)
@@ -398,10 +447,14 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 	return res.String(), nil
 }
 
+// Reverse constructs the path and query string portion of an URL based on the route name,
+// Params, and query string values.
 func (r *Router) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
 	return r.reverse(name, params, qs, false)
 }
 
+// ReverseAPI constructs the path and query string portion of an URL for API calls
+// based on the route name, Params, and query string values.
 func (r *Router) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
 	return r.reverse(name, params, qs, true)
 }
