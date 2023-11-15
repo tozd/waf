@@ -239,6 +239,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 					Description: "test site",
 				},
 			},
+			SiteContextPath:      "/index.json",
 			Version:              "vTEST",
 			Revision:             "abcde",
 			BuildTimestamp:       "2023-11-03T00:51:07Z",
