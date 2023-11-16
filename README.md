@@ -58,7 +58,7 @@ TLS configuration to Waf.
 ### Vue Router integration
 
 You can create JSON with routes in your repository, e.g., `routes.json` which you can then
-use both in your Go code and Vue Router:
+use both in your Go code and Vue Router as a single source of truth for routes:
 
 ```json
 {
