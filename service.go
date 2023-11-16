@@ -64,7 +64,7 @@ type file struct {
 // Your site struct is then used when rendering HTML files and
 // as site context to the frontend at SiteContextPath URL path.
 //
-// We do not expose certificate and key file paths in site context JSON.
+// Certificate and key file paths are not exposed in site context JSON.
 type Site struct {
 	Domain string `json:"domain" yaml:"domain"`
 
