@@ -263,16 +263,33 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		s.router.NotFound = logHandlerFuncName("NotFound", s.NotFound)
-		s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
-			logger := canonicalLogger(req.Context())
-			logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-				return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
-			})
-			s.MethodNotAllowed(w, req, allow)
+		if s.router.NotFound == nil {
+			s.router.NotFound = logHandlerFuncName("NotFound", s.NotFound)
+		} else {
+			s.router.NotFound = logHandlerFuncName("NotFound", s.router.NotFound)
+		}
+		if s.router.MethodNotAllowed == nil {
+			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
+				logger := canonicalLogger(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
+				})
+				s.MethodNotAllowed(w, req, allow)
+			}
+		} else {
+			m := s.router.MethodNotAllowed
+			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
+				logger := canonicalLogger(req.Context())
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
+				})
+				m(w, req, params, allow)
+			}
 		}
 	}
-	s.router.Panic = s.handlePanic
+	if s.router.Panic == nil {
+		s.router.Panic = s.handlePanic
+	}
 
 	c := alice.New()
 
