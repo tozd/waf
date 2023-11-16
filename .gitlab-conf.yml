@@ -51,7 +51,7 @@ project:
   # The default branch name. Type: string
   default_branch: main
   # Short project description. Type: string
-  description: Web application framework.
+  description: Vue-compatible web application framework.
   # Enable email notifications. Type: boolean
   emails_enabled: true
   # Enforce auth checks on uploads. Type: boolean
