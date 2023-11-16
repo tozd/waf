@@ -106,9 +106,9 @@ type testSite struct {
 	Title       string `json:"title"       yaml:"title"`
 	Description string `json:"description" yaml:"description"`
 
-	Version        string `json:"version,omitempty" yaml:"-"`
+	Version        string `json:"version,omitempty"        yaml:"-"`
 	BuildTimestamp string `json:"buildTimestamp,omitempty" yaml:"-"`
-	Revision       string `json:"revision,omitempty" yaml:"-"`
+	Revision       string `json:"revision,omitempty"       yaml:"-"`
 }
 
 type testService struct {
@@ -121,14 +121,14 @@ func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params
 
 	hlog.FromRequest(req).Info().Msg("test msg")
 
-	s.ServeFile(w, req, "/index.json", false)
+	s.ServeFile(w, req, "/index.json")
 }
 
 func (s *testService) Home(w http.ResponseWriter, req *http.Request, _ Params) {
 	if s.Development != "" {
 		s.Proxy(w, req)
 	} else {
-		s.ServeFile(w, req, "/index.html", false)
+		s.ServeFile(w, req, "/index.html")
 	}
 }
 

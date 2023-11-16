@@ -25,13 +25,24 @@ const (
 	idleTimeout       = 10 * time.Minute
 )
 
+// TLS configuration used by the server.
+//
 //nolint:lll
 type TLS struct {
-	CertFile string `group:"File certificate:"    help:"Default certificate for TLS, when not using Let's Encrypt."                            name:"cert"                                                          placeholder:"PATH" short:"k"     type:"existingfile" yaml:"cert"`
-	KeyFile  string `group:"File certificate:"    help:"Default certificate's private key, when not using Let's Encrypt."                      name:"key"                                                           placeholder:"PATH" short:"K"     type:"existingfile" yaml:"key"`
-	Domain   string `group:"Let's Encrypt:"       help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING"                                                 short:"D"          yaml:"domain"`
-	Email    string `group:"Let's Encrypt:"       help:"Contact e-mail to use with Let's Encrypt."                                             short:"E"                                                            yaml:"email"`
-	Cache    string `default:"${defaultTLSCache}" group:"Let's Encrypt:"                                                                       help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." placeholder:"PATH" short:"C"     type:"path"         yaml:"cache"`
+	// Default certificate for TLS, when not using Let's Encrypt.
+	CertFile string `group:"File certificate:" help:"Default certificate for TLS, when not using Let's Encrypt." name:"cert" placeholder:"PATH" short:"k" type:"existingfile" yaml:"cert"`
+
+	// Default certificate's private key, when not using Let's Encrypt.
+	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
+
+	// Domain name to request for Let's Encrypt's certificate when sites are not configured.
+	Domain string `group:"Let's Encrypt:" help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING" short:"D" yaml:"domain"`
+
+	// Contact e-mail to use with Let's Encrypt.
+	Email string `group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." short:"E" yaml:"email"`
+
+	// Let's Encrypt's cache directory.
+	Cache string `default:"${defaultTLSCache}" group:"Let's Encrypt:" help:"Let's Encrypt's cache directory. Default: ${defaultTLSCache}." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
@@ -71,6 +82,8 @@ type Server[SiteT hasSite] struct {
 //
 // If sites parameter is empty, sites are determined from domain names found in TLS
 // certificates.
+//
+// Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
 

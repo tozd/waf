@@ -35,10 +35,18 @@ import (
 // to register handlers with the router. It can also be used by Vue Router
 // to register routes there.
 type Route struct {
+	// Name of the route. It should be unique.
 	Name string `json:"name"`
+
+	// Path for the route. It can contain parameters.
 	Path string `json:"path"`
-	API  bool   `json:"api,omitempty"`
-	Get  bool   `json:"get,omitempty"`
+
+	// Does this route support API handlers.
+	// API paths are automatically prefixed with /api.
+	API bool `json:"api,omitempty"`
+
+	// Does this route have a non-API handler.
+	Get bool `json:"get,omitempty"`
 }
 
 type file struct {
@@ -47,7 +55,7 @@ type file struct {
 	MediaType string
 }
 
-// Site describes a site at a domain.
+// Site describes the site at a domain.
 //
 // A service can have multiple sites which share files and handlers,
 // but have different configuration and rendered HTML files. Core
@@ -56,21 +64,26 @@ type file struct {
 // Your site struct is then used when rendering HTML files and
 // as site context to the frontend at SiteContextPath URL path.
 //
-// We do not expose certificate and key file paths in JSON in site context.
+// We do not expose certificate and key file paths in site context JSON.
 type Site struct {
 	Domain string `json:"domain" yaml:"domain"`
 
-	// Certificate file path. Used when Let's En.
+	// Certificate file path for the site. It should be valid for the domain.
+	// Used when Let's Encrypt is not configured.
 	CertFile string `json:"-" yaml:"cert,omitempty"`
 
-	// Key file path.
+	// Key file path. Used when Let's Encrypt is not configured.
 	KeyFile string `json:"-" yaml:"key,omitempty"`
 
 	// Maps between content types, paths, and data/etag/media type.
-	// They are per site because they can include rendered per-site content.
+	// They are per site because they can include rendered per-site data.
 	files map[string]map[string]file
 }
 
+// GetSite returns Site. This is used when you want to provide your own
+// site struct to access the Site struct. If you embed Site inside your
+// site struct then this method propagates to your site struct and does
+// the right thing automatically.
 func (s *Site) GetSite() *Site {
 	return s
 }
@@ -143,27 +156,71 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 	return st, site
 }
 
+// Service defines the application logic for your service.
+//
+// You should embed the Service struct inside your service struct on which
+// you define handlers as methods with [Handler] signature. Handlers together
+// with Files, Routes and Sites define how should the service handle HTTP
+// requests.
 type Service[SiteT hasSite] struct {
-	Logger          zerolog.Logger
-	CanonicalLogger zerolog.Logger
-	WithContext     func(context.Context) (context.Context, func(), func())
+	// General logger for the service.
+	Logger zerolog.Logger
 
-	Files           fs.ReadFileFS
-	Routes          []Route
-	Sites           map[string]SiteT
+	// Canonical log line logger for the service which logs one log entry per
+	// request. It is automatically populated with data about the request.
+	CanonicalLogger zerolog.Logger
+
+	// WithContext is a function which adds to the context a logger.
+	// It is then accessible using zerolog.Ctx(ctx).
+	// The first function is called when the request is handled and allows
+	// any cleanup necessary. The second function is called on panic.
+	// If WithContext is not set, Logger is used instead.
+	WithContext func(context.Context) (context.Context, func(), func())
+
+	// Files to be served by the service. All paths must start with "/".
+	// HTML files (those with ".html" extension) are rendered using html/template
+	// with site struct as data. Other files are served as-is.
+	Files fs.ReadFileFS
+
+	// Routes to be handled by the service and mapped to its Handler methods.
+	Routes []Route
+
+	// Sites configured for the service. Key in the map must match site's domain.
+	// This should generally be set to sites returned from Server.Init method.
+	Sites map[string]SiteT
+
+	// SiteContextPath is the path at which site context (JSON of site struct)
+	// should be added to files.
 	SiteContextPath string
 
+	// MetadataHeaderPrefix is an optional prefix to the Metadata response header.
 	MetadataHeaderPrefix string
 
+	// Development is a base URL to proxy to during development, if set.
+	// This should generally be set to result of Server.InDevelopment method.
+	// If set, Files are not served by the service so that they can be proxied instead.
 	Development string
 
+	// IsImmutableFile should return true if the file is immutable and
+	// should have such caching headers.
 	IsImmutableFile func(path string) bool
+
+	// SkipServingFile should return true if the file should not be automatically
+	// registered with the router to be served. It can still be served using ServeFile.
 	SkipServingFile func(path string) bool
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
 }
 
+// RouteWith registers with the router files and handlers based on Routes and service [Handler]
+// methods and returns a [http.Handler] to be used with the [Server].
+//
+// You should generally pass your service struct with embedded Service struct as service
+// parameter so that handler methods can be detected. Non-API handler methods should
+// have the same name as the route. While API handler methods should have the name
+// matching the route name with HTTP method name as suffix (e.g., "CommentPost" for
+// route with name "Comment" and POST HTTP method).
 func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Handler, errors.E) {
 	if s.router != nil {
 		return nil, errors.New("RouteWith called more than once")
@@ -254,7 +311,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		// Full duration is added to the response as a trailer in accessHandler for HTTP2,
 		// but it is not added to timing.Metrics. So we add it here to the log.
 		metrics.Dur("t", duration)
-		l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
+		l := hlog.FromRequest(req).WithLevel(level)
 		if code != 0 {
 			l = l.Int("code", code)
 		}
@@ -621,6 +678,12 @@ func (s *Service[SiteT]) render(path string, data []byte, siteT SiteT) ([]byte, 
 	return out.Bytes(), nil
 }
 
+// AddMetadata adds header with metadata to the response.
+//
+// Metadata is encoded based on [RFC 8941]. Header name is "Metadata" with
+// optional MetadataHeaderPrefix.
+//
+// [RFC 8941]: https://www.rfc-editor.org/rfc/rfc8941
 func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, metadata map[string]interface{}) ([]byte, errors.E) {
 	if len(metadata) == 0 {
 		return nil, nil
@@ -643,6 +706,15 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	return b.Bytes(), nil
 }
 
+// WriteJSON replies to the request by writing data as JSON.
+//
+// Optional metadata is added as the response header.
+//
+// Besides other types, data can be of type []byte and [json.RawMessage] in which
+// case it is expected that it already contains a well-formed JSON and is written
+// as-is.
+//
+// It does not otherwise end the request; the caller should ensure no further writes are done to w.
 func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
@@ -735,16 +807,30 @@ func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ir
 	return *new(SiteT), err
 }
 
+// Reverse calls router's Reverse.
 func (s *Service[SiteT]) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
 	return s.router.Reverse(name, params, qs)
 }
 
+// Reverse calls router's ReverseAPI.
 func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
 	return s.router.ReverseAPI(name, params, qs)
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.
-func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
+
+// ServeFile replies to the request by serving the file at path from service's files.
+//
+// It does not otherwise end the request; the caller should ensure no further writes are done to w.
+func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, path string) {
+	immutable := false
+	if s.IsImmutableFile != nil {
+		immutable = s.IsImmutableFile(path)
+	}
+	s.serveFile(w, req, path, immutable)
+}
+
+func (s *Service[SiteT]) serveFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
 	site := MustGetSite[SiteT](req.Context()).GetSite()
 
 	var contentEncoding string
@@ -771,7 +857,7 @@ func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, pat
 			err := errors.New("no file for path")
 			errors.Details(err)["path"] = path
 			// This should not really happen. ServeFile should not be called for a file
-			// which is not among service's Files.
+			// which is not among service's files.
 			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
@@ -823,11 +909,11 @@ func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, pat
 }
 
 func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
-	s.ServeFile(w, req, req.URL.Path, false)
+	s.serveFile(w, req, req.URL.Path, false)
 }
 
 func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request) {
-	s.ServeFile(w, req, req.URL.Path, true)
+	s.serveFile(w, req, req.URL.Path, true)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
