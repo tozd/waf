@@ -40,6 +40,103 @@ It requires Go 1.21 or newer.
 
 See full package documentation on [pkg.go.dev](https://pkg.go.dev/gitlab.com/tozd/waf#section-documentation).
 
+### Local execution
+
+To run apps locally, you need a HTTPS TLS certificate (as required by HTTP2). When running locally
+you can use [mkcert](https://github.com/FiloSottile/mkcert), a tool to create a local CA
+keypair which is then used to create a TLS certificate. Use Go 1.19 or newer.
+
+```sh
+go install filippo.io/mkcert@latest
+mkcert -install
+mkcert localhost 127.0.0.1 ::1
+```
+
+This creates two files, `localhost+2.pem` and l`ocalhost+2-key.pem`, which you can then pass in
+TLS configuration to Waf.
+
+### Vue Router integration
+
+You can create JSON with routes in your repository, e.g., `routes.json` which you can then
+use both in your Go code and Vue Router:
+
+```json
+{
+  "routes": [
+    {
+      "name": "Home",
+      "path": "/",
+      "api": false,
+      "get": true
+    }
+  ]
+}
+```
+
+To populate [Service's Routes](https://pkg.go.dev/gitlab.com/tozd/waf#Service):
+
+```go
+import _ "embed"
+import "encoding/json"
+
+import "gitlab.com/tozd/waf"
+
+//go:embed routes.json
+var routesConfiguration []byte
+
+func newService() (*waf.Service, err) {
+  var config struct {
+    Routes []waf.Route `json:"routes"`
+  }
+  err := json.Unmarshal(routesConfiguration, &config)
+  if err != nil {
+    return err
+  }
+  return &waf.Service[*waf.Site]{
+    Routes: config.Routes,
+    // ... the rest ...
+  }
+}
+```
+
+On the frontend:
+
+```ts
+import { createRouter, createWebHistory } from "vue-router";
+import { routes } from "@/../routes.json";
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: routes
+    .filter((route) => route.get)
+    .map((route) => ({
+      path: route.path,
+      name: route.name,
+      component: () => import(`./views/${route.name}.vue`),
+      props: true,
+    })),
+});
+
+const apiRouter = createRouter({
+  history: createWebHistory(),
+  routes: routes
+    .filter((route) => route.api)
+    .map((route) => ({
+      path: `/api${route.path}`,
+      name: route.name,
+      component: () => null,
+      props: true,
+    })),
+});
+
+router.apiResolve = apiRouter.resolve.bind(apiRouter);
+
+// ... create the app, use router, and mount the app ...
+```
+
+You can then use `router.resolve` to resolve non-API routes and `router.apiResolve`
+to resolve API routes.
+
 ## Related projects
 
 There are many great projects doing similar things.

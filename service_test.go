@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +30,9 @@ import (
 	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 )
+
+//go:embed testdata/routes.json
+var routesConfiguration []byte
 
 var (
 	compressibleData             = bytes.Repeat([]byte{0}, 32*1024)
@@ -2329,5 +2333,22 @@ func TestService(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRoutesConfiguration(t *testing.T) {
+	t.Parallel()
+
+	var config struct {
+		Routes []Route `json:"routes"`
+	}
+	err := json.Unmarshal(routesConfiguration, &config)
+	assert.NoError(t, err)
+	assert.Equal(t, []Route{
+		{Name: "Home", Path: "/", API: false, Get: true},
+	}, config.Routes)
+
+	_ = &Service[*Site]{
+		Routes: config.Routes,
 	}
 }
