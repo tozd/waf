@@ -36,6 +36,11 @@ go get gitlab.com/tozd/waf
 
 It requires Go 1.21 or newer.
 
+Automatic media type detection uses file extensions and a file extension database has to be available
+on the system.
+On Alpine this can be `mailcap` package.
+On Debina/Ubuntu `media-types` package.
+
 ## Usage
 
 See full package documentation on [pkg.go.dev](https://pkg.go.dev/gitlab.com/tozd/waf#section-documentation).
