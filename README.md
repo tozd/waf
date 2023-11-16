@@ -55,6 +55,17 @@ mkcert localhost 127.0.0.1 ::1
 This creates two files, `localhost+2.pem` and l`ocalhost+2-key.pem`, which you can then pass in
 TLS configuration to Waf.
 
+### Vite integration
+
+During development you might want to use [Vite](https://vitejs.dev/).
+Vite compiles frontend files and serves them. It also watches for changes in frontend files,
+recompiles them, and hot-reloads the frontend as necessary. Node 16 or newer is required.
+
+After installing dependencies and running `vite serve`, Vite listens on `http://localhost:3000`.
+Pass that to [Service's Development](https://pkg.go.dev/gitlab.com/tozd/waf#Service).
+Open [https://localhost:8080/](https://localhost:8080/) in your browser, which will connect
+you to the backend which then proxies unknown requests (non-API requests) to Vite, the frontend.
+
 ### Vue Router integration
 
 You can create JSON with routes in your repository, e.g., `routes.json` which you can then
