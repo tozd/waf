@@ -49,6 +49,27 @@ type TLS struct {
 	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
 }
 
+// Validate is used by Kong to validate the struct.
+func (t *TLS) Validate() error {
+	if t.CertFile != "" || t.KeyFile != "" {
+		if t.CertFile == "" {
+			return errors.New("missing file certificate for provided private key")
+		}
+		if t.KeyFile == "" {
+			return errors.New("missing file certificate's matching private key")
+		}
+	}
+
+	if t.Domain != "" && t.Email == "" {
+		return errors.New("contact e-mail is required for Let's Encrypt's certificate")
+	}
+	if t.Email != "" && t.Cache == "" {
+		return errors.New("cache directory is required for Let's Encrypt's certificate")
+	}
+
+	return nil
+}
+
 // Server listens to HTTP/1.1 and HTTP2 requests on TLS enabled port 8080 and
 // serves requests using the provided handler. Server is production ready and
 // can be exposed directly on open Internet.
