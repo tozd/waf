@@ -49,7 +49,7 @@ type Route struct {
 	Get bool `json:"get,omitempty"`
 }
 
-type file struct {
+type staticFile struct {
 	Data      []byte
 	Etag      string
 	MediaType string
@@ -57,7 +57,7 @@ type file struct {
 
 // Site describes the site at a domain.
 //
-// A service can have multiple sites which share files and handlers,
+// A service can have multiple sites which share static files and handlers,
 // but have different configuration and rendered HTML files. Core
 // such configuration is site's domain, but you can provide your own
 // site struct and embed Site to add additional configuration.
@@ -77,7 +77,8 @@ type Site struct {
 
 	// Maps between content types, paths, and data/etag/media type.
 	// They are per site because they can include rendered per-site data.
-	files map[string]map[string]file
+	// File contents are deduplicated between sites if they are the same.
+	staticFiles map[string]map[string]staticFile
 }
 
 // GetSite returns Site. This is used when you want to provide your own
@@ -88,24 +89,24 @@ func (s *Site) GetSite() *Site {
 	return s
 }
 
-func (s *Site) initializeFiles() {
-	s.files = make(map[string]map[string]file)
+func (s *Site) initializeStaticFiles() {
+	s.staticFiles = make(map[string]map[string]staticFile)
 
 	for _, compression := range allCompressions {
-		s.files[compression] = make(map[string]file)
+		s.staticFiles[compression] = make(map[string]staticFile)
 	}
 }
 
-func (s *Site) addFile(path, mediaType string, data []byte) errors.E {
+func (s *Site) addStaticFile(path, mediaType string, data []byte) errors.E {
 	if !strings.HasPrefix(path, "/") {
 		errE := errors.New(`path does not start with "/"`)
 		errors.Details(errE)["path"] = path
 		return errE
 	}
 
-	_, ok := s.files[compressionIdentity][path]
+	_, ok := s.staticFiles[compressionIdentity][path]
 	if ok {
-		errE := errors.New(`file for path already exists`)
+		errE := errors.New(`static file for path already exists`)
 		errors.Details(errE)["path"] = path
 		return errE
 	}
@@ -129,7 +130,7 @@ func (s *Site) addFile(path, mediaType string, data []byte) errors.E {
 			continue
 		}
 
-		s.files[compression][path] = file{
+		s.staticFiles[compression][path] = staticFile{
 			Data:      d,
 			Etag:      computeEtag(d),
 			MediaType: mediaType,
@@ -160,7 +161,7 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 //
 // You should embed the Service struct inside your service struct on which
 // you define handlers as methods with [Handler] signature. Handlers together
-// with Files, Routes and Sites define how should the service handle HTTP
+// with StaticFiles, Routes and Sites define how should the service handle HTTP
 // requests.
 type Service[SiteT hasSite] struct {
 	// General logger for the service.
@@ -177,10 +178,10 @@ type Service[SiteT hasSite] struct {
 	// If WithContext is not set, Logger is used instead.
 	WithContext func(context.Context) (context.Context, func(), func())
 
-	// Files to be served by the service. All paths must start with "/".
+	// StaticFiles to be served by the service. All paths are anchored at / when served.
 	// HTML files (those with ".html" extension) are rendered using html/template
 	// with site struct as data. Other files are served as-is.
-	Files fs.ReadFileFS
+	StaticFiles fs.ReadFileFS
 
 	// Routes to be handled by the service and mapped to its Handler methods.
 	Routes []Route
@@ -190,7 +191,7 @@ type Service[SiteT hasSite] struct {
 	Sites map[string]SiteT
 
 	// SiteContextPath is the path at which site context (JSON of site struct)
-	// should be added to files.
+	// should be added to static files.
 	SiteContextPath string
 
 	// MetadataHeaderPrefix is an optional prefix to the Metadata response header.
@@ -198,22 +199,23 @@ type Service[SiteT hasSite] struct {
 
 	// Development is a base URL to proxy to during development, if set.
 	// This should generally be set to result of Server.InDevelopment method.
-	// If set, Files are not served by the service so that they can be proxied instead.
+	// If set, StaticFiles are not served by the service so that they can be proxied instead.
 	Development string
 
-	// IsImmutableFile should return true if the file is immutable and
-	// should have such caching headers.
+	// IsImmutableFile should return true if the static file is immutable and
+	// should have such caching headers. Static files are those which do not change
+	// during a runtime of the program. Immutable files are those which are never changed.
 	IsImmutableFile func(path string) bool
 
-	// SkipServingFile should return true if the file should not be automatically
-	// registered with the router to be served. It can still be served using ServeFile.
+	// SkipServingFile should return true if the static file should not be automatically
+	// registered with the router to be served. It can still be served using ServeStaticFile.
 	SkipServingFile func(path string) bool
 
 	router       *Router
 	reverseProxy *httputil.ReverseProxy
 }
 
-// RouteWith registers with the router files and handlers based on Routes and service [Handler]
+// RouteWith registers static files and handlers with the router based on Routes and service [Handler]
 // methods and returns a [http.Handler] to be used with the [Server].
 //
 // You should generally pass your service struct with embedded Service struct as service
@@ -237,7 +239,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.serveFiles()
+		errE = s.serveStaticFiles()
 		if errE != nil {
 			return nil, errE
 		}
@@ -251,7 +253,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			p(w, req)
 		}
 	} else {
-		errE := s.renderAndCompressFiles()
+		errE := s.renderAndCompressStaticFiles()
 		if errE != nil {
 			return nil, errE
 		}
@@ -259,7 +261,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		if errE != nil {
 			return nil, errE
 		}
-		errE = s.serveFiles()
+		errE = s.serveStaticFiles()
 		if errE != nil {
 			return nil, errE
 		}
@@ -470,22 +472,22 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	return nil
 }
 
-func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
+func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
 
-		if site.files != nil {
-			return errors.New("renderAndCompressFiles called more than once")
+		if site.staticFiles != nil {
+			return errors.New("renderAndCompressStaticFiles called more than once")
 		}
 
-		site.initializeFiles()
+		site.initializeStaticFiles()
 	}
 
-	if s.Files == nil {
+	if s.StaticFiles == nil {
 		return nil
 	}
 
-	err := fs.WalkDir(s.Files, ".", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(s.StaticFiles, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -495,7 +497,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 
 		path = strings.TrimPrefix(path, ".")
 
-		data, err := s.Files.ReadFile(path)
+		data, err := s.StaticFiles.ReadFile(path)
 		if err != nil {
 			errE := errors.WithStack(err)
 			errors.Details(errE)["path"] = path
@@ -506,7 +508,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 
 		mediaType := mime.TypeByExtension(filepath.Ext(path))
 		if mediaType == "" {
-			s.Logger.Debug().Str("path", path).Msg("unable to determine content type for file")
+			s.Logger.Debug().Str("path", path).Msg("unable to determine content type for static file")
 			mediaType = "application/octet-stream"
 		}
 
@@ -520,14 +522,14 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 					return errE
 				}
 
-				errE = site.addFile(path, mediaType, htmlData)
+				errE = site.addStaticFile(path, mediaType, htmlData)
 				if errE != nil {
 					return errE
 				}
 			}
 		} else {
 			// We do not use Site.addFile here so that we can reuse and deduplicate compressed
-			// files across all sites by inverting loops (here we first iterate over
+			// static files across all sites by inverting loops (here we first iterate over
 			// compressions and then over sites).
 
 			compressions := allCompressions
@@ -554,7 +556,7 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				for _, siteT := range s.Sites {
 					site := siteT.GetSite()
 
-					site.files[compression][path] = file{
+					site.staticFiles[compression][path] = staticFile{
 						Data:      d,
 						Etag:      etag,
 						MediaType: mediaType,
@@ -562,6 +564,8 @@ func (s *Service[SiteT]) renderAndCompressFiles() errors.E {
 				}
 			}
 		}
+
+		s.Logger.Debug().Str("path", path).Msg("added file to static files")
 
 		return nil
 	})
@@ -577,11 +581,11 @@ func (s *Service[SiteT]) renderAndCompressSiteContext() errors.E {
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
 
-		// In development, this method could be called first and files are not yet
-		// initialized (as requests for other files are proxied), while in production
-		// files has already been initialized and populated by built static files.
-		if site.files == nil {
-			site.initializeFiles()
+		// In development, this method could be called first and static files are not yet
+		// initialized (as requests for other static files are proxied), while in production
+		// static files has already been initialized and populated.
+		if site.staticFiles == nil {
+			site.initializeStaticFiles()
 		}
 
 		data, errE := x.MarshalWithoutEscapeHTML(siteT)
@@ -589,11 +593,13 @@ func (s *Service[SiteT]) renderAndCompressSiteContext() errors.E {
 			return errE
 		}
 
-		errE = site.addFile(s.SiteContextPath, "application/json", data)
+		errE = site.addStaticFile(s.SiteContextPath, "application/json", data)
 		if errE != nil {
 			return errE
 		}
 	}
+
+	s.Logger.Debug().Str("path", s.SiteContextPath).Msg("added file to static files")
 
 	return nil
 }
@@ -645,7 +651,7 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 	return nil
 }
 
-func (s *Service[SiteT]) serveFiles() errors.E {
+func (s *Service[SiteT]) serveStaticFiles() errors.E {
 	staticH := logHandlerName("StaticFile", toHandler(s.staticFile))
 	immutableH := logHandlerName("ImmutableFile", toHandler(s.immutableFile))
 
@@ -653,7 +659,7 @@ func (s *Service[SiteT]) serveFiles() errors.E {
 		site := siteT.GetSite()
 
 		// We can use any compression to obtain all static paths, so we use compressionIdentity.
-		for path := range site.files[compressionIdentity] {
+		for path := range site.staticFiles[compressionIdentity] {
 			if s.SkipServingFile != nil && s.SkipServingFile(path) {
 				continue
 			}
@@ -839,23 +845,23 @@ func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (
 
 // TODO: Use Vite's manifest.json to send preload headers.
 
-// ServeFile replies to the request by serving the file at path from service's files.
+// ServeStaticFile replies to the request by serving the file at path from service's static files.
 //
 // It does not otherwise end the request; the caller should ensure no further writes are done to w.
-func (s *Service[SiteT]) ServeFile(w http.ResponseWriter, req *http.Request, path string) {
+func (s *Service[SiteT]) ServeStaticFile(w http.ResponseWriter, req *http.Request, path string) {
 	immutable := false
 	if s.IsImmutableFile != nil {
 		immutable = s.IsImmutableFile(path)
 	}
-	s.serveFile(w, req, path, immutable)
+	s.serveStaticFile(w, req, path, immutable)
 }
 
-func (s *Service[SiteT]) serveFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
+func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Request, path string, immutable bool) {
 	site := MustGetSite[SiteT](req.Context()).GetSite()
 
 	var contentEncoding string
 	var ok bool
-	var f file
+	var f staticFile
 
 	// TODO: When searching for a suitable compression, we should also search by etag from If-None-Match.
 	//       If-None-Match might have an etag for a compression which is not picked here. This is probably rare though.
@@ -868,16 +874,16 @@ func (s *Service[SiteT]) serveFile(w http.ResponseWriter, req *http.Request, pat
 			contentEncoding = compressionIdentity
 		}
 
-		f, ok = site.files[contentEncoding][path]
+		f, ok = site.staticFiles[contentEncoding][path]
 		if ok {
 			break
 		}
 
 		if contentEncoding == compressionIdentity {
-			err := errors.New("no file for path")
+			err := errors.New("no static file for path")
 			errors.Details(err)["path"] = path
-			// This should not really happen. ServeFile should not be called for a file
-			// which is not among service's files.
+			// This should not really happen. ServeStaticFile should not be called for a file
+			// which is not among service's static files.
 			s.InternalServerErrorWithError(w, req, err)
 			return
 		}
@@ -890,19 +896,19 @@ func (s *Service[SiteT]) serveFile(w http.ResponseWriter, req *http.Request, pat
 	}
 
 	if f.Etag == "" {
-		err := errors.New("no etag for file")
+		err := errors.New("no etag for static file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
-		// This should not really happen. We should have computed etags for all files.
+		// This should not really happen. We should have computed etags for all static files.
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
 
 	if f.MediaType == "" {
-		err := errors.New("no content type for file")
+		err := errors.New("no content type for static file")
 		errors.Details(err)["compression"] = contentEncoding
 		errors.Details(err)["path"] = path
-		// This should not really happen. We should have content types for all files.
+		// This should not really happen. We should have content types for all static files.
 		s.InternalServerErrorWithError(w, req, err)
 		return
 	}
@@ -929,11 +935,11 @@ func (s *Service[SiteT]) serveFile(w http.ResponseWriter, req *http.Request, pat
 }
 
 func (s *Service[SiteT]) staticFile(w http.ResponseWriter, req *http.Request) {
-	s.serveFile(w, req, req.URL.Path, false)
+	s.serveStaticFile(w, req, req.URL.Path, false)
 }
 
 func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request) {
-	s.serveFile(w, req, req.URL.Path, true)
+	s.serveStaticFile(w, req, req.URL.Path, true)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {

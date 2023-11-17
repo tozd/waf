@@ -252,10 +252,10 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 		st, site := newSiteT[SiteT]()
 		*site = Site{
-			Domain:   s.TLS.Domain,
-			CertFile: "",
-			KeyFile:  "",
-			files:    nil,
+			Domain:      s.TLS.Domain,
+			CertFile:    "",
+			KeyFile:     "",
+			staticFiles: nil,
 		}
 		sites = map[string]SiteT{
 			s.TLS.Domain: st,
@@ -295,20 +295,20 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		if leaf.Subject.CommonName != "" && len(leaf.DNSNames) == 0 {
 			st, site := newSiteT[SiteT]()
 			*site = Site{
-				Domain:   leaf.Subject.CommonName,
-				CertFile: "",
-				KeyFile:  "",
-				files:    nil,
+				Domain:      leaf.Subject.CommonName,
+				CertFile:    "",
+				KeyFile:     "",
+				staticFiles: nil,
 			}
 			sites[leaf.Subject.CommonName] = st
 		}
 		for _, san := range leaf.DNSNames {
 			st, site := newSiteT[SiteT]()
 			*site = Site{
-				Domain:   san,
-				CertFile: "",
-				KeyFile:  "",
-				files:    nil,
+				Domain:      san,
+				CertFile:    "",
+				KeyFile:     "",
+				staticFiles: nil,
 			}
 			sites[san] = st
 		}

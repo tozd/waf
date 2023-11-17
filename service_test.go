@@ -125,14 +125,14 @@ func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params
 
 	hlog.FromRequest(req).Info().Msg("test msg")
 
-	s.ServeFile(w, req, "/index.json")
+	s.ServeStaticFile(w, req, "/index.json")
 }
 
 func (s *testService) Home(w http.ResponseWriter, req *http.Request, _ Params) {
 	if s.Development != "" {
 		s.Proxy(w, req)
 	} else {
-		s.ServeFile(w, req, "/index.html")
+		s.ServeStaticFile(w, req, "/index.html")
 	}
 }
 
@@ -206,7 +206,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 		Service: Service[*testSite]{
 			Logger:          logger,
 			CanonicalLogger: canonicalLogger,
-			Files:           testFiles,
+			StaticFiles:     testFiles,
 			Routes: []Route{
 				{
 					Name: "Home",
