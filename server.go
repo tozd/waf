@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -99,6 +100,8 @@ type Server[SiteT hasSite] struct {
 
 	// Autocert managers do not have to be stopped, but certificate managers do.
 	managers []*certificateManager
+
+	domains []string
 }
 
 // Init determines the set of sites based on TLS configuration and sites provided,
@@ -155,6 +158,8 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		ConnContext:       s.connContext,
 	}
 
+	domains := []string{}
+
 	var fileGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var letsEncryptGetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	var nextProtos []string
@@ -176,6 +181,8 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				errors.Details(err)["domain2"] = site.Domain
 				return sites, err
 			}
+
+			domains = append(domains, site.Domain)
 
 			if site.CertFile != "" && site.KeyFile != "" {
 				manager := &certificateManager{
@@ -268,6 +275,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		sites = map[string]SiteT{
 			s.TLS.Domain: st,
 		}
+		domains = append(domains, site.Domain)
 	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 		manager := &certificateManager{
 			CertFile:    s.TLS.CertFile,
@@ -309,8 +317,12 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				staticFiles: nil,
 			}
 			sites[leaf.Subject.CommonName] = st
+			domains = append(domains, site.Domain)
 		}
 		for _, san := range leaf.DNSNames {
+			if _, ok := sites[san]; ok {
+				continue
+			}
 			st, site := newSiteT[SiteT]()
 			*site = Site{
 				Domain:      san,
@@ -319,6 +331,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				staticFiles: nil,
 			}
 			sites[san] = st
+			domains = append(domains, site.Domain)
 		}
 
 		if len(sites) == 0 {
@@ -381,6 +394,9 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 	s.server = server
 
+	sort.Strings(domains)
+	s.domains = domains
+
 	return sites, nil
 }
 
@@ -420,7 +436,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 	g, errCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		s.Logger.Info().Msgf("server starting on %s", defaultListenAddr)
+		s.Logger.Info().Str("listenAddr", s.server.Addr).Strs("domains", s.domains).Msg("server starting")
 
 		err := s.server.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
