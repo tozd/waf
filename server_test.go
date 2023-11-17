@@ -343,6 +343,8 @@ func TestServerACME(t *testing.T) {
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
 		},
+		// Pebble uses this port by default for the TLS-ALPN-01 challenge.
+		ListenAddr: ":5001",
 	}
 	sites, errE := server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
@@ -352,8 +354,6 @@ func TestServerACME(t *testing.T) {
 
 	assert.Equal(t, "", server.InDevelopment())
 
-	// Pebble uses this port by default for the TLS-ALPN-01 challenge.
-	server.server.Addr = ":5001"
 	// We extract the address on which the server listens.
 	var listenAddr atomic.Value
 	server.server.BaseContext = func(l net.Listener) context.Context {

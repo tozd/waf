@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	listenAddr        = ":8080"
+	defaultListenAddr = ":5001"
 	readHeaderTimeout = 10 * time.Second
 	idleTimeout       = 10 * time.Minute
 )
@@ -92,6 +92,9 @@ type Server[SiteT hasSite] struct {
 	// TLS configuration.
 	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
 
+	// Used primarily for testing.
+	ListenAddr string `json:"-" kong:"-" yaml:"-"`
+
 	server *http.Server
 
 	// Autocert managers do not have to be stopped, but certificate managers do.
@@ -106,6 +109,11 @@ type Server[SiteT hasSite] struct {
 //
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
+	listenAddr := defaultListenAddr
+	if s.ListenAddr != "" {
+		listenAddr = s.ListenAddr
+	}
+
 	// TODO: How to shutdown websocket connections?
 
 	// TODO: Add limits on max idle time and min speed for writing the whole response.
@@ -412,7 +420,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 	g, errCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		s.Logger.Info().Msgf("server starting on %s", listenAddr)
+		s.Logger.Info().Msgf("server starting on %s", defaultListenAddr)
 
 		err := s.server.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {

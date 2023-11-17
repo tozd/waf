@@ -69,6 +69,7 @@ func main() {
 		if os.Getenv("PEBBLE_HOST") != "" {
 			app.Server.TLS.ACMEDirectory = fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000"))
 			app.Server.TLS.ACMEDirectoryRootCAs = "../testdata/pebble.minica.pem"
+			app.Server.ListenAddr = ":5001"
 		}
 
 		// Sites are automatically constructed based on the certificate or domain name for Let's Encrypt.
