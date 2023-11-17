@@ -256,7 +256,7 @@ func parseCertPoolFrom(certsPath string) (*x509.CertPool, errors.E) {
 	certs, err := os.ReadFile(certsPath)
 	if err != nil {
 		errE := errors.WithMessage(err, "unable to read file")
-		errors.Details(err)["certsPath"] = certsPath
+		errors.Details(errE)["certsPath"] = certsPath
 		return nil, errE
 	}
 	certpool, errE := parseCertPool(certs)
