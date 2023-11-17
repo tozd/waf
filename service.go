@@ -504,7 +504,9 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 			return errE
 		}
 
-		path = "/" + path
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
 
 		mediaType := mime.TypeByExtension(filepath.Ext(path))
 		if mediaType == "" {
