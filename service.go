@@ -235,6 +235,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	}
 
 	if s.Development != "" {
+		s.Logger.Debug().Str("proxy", s.Development).Msg("running in development mode")
 		errE := s.renderAndCompressSiteContext()
 		if errE != nil {
 			return nil, errE
