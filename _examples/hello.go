@@ -32,11 +32,13 @@ type App struct {
 	Server          waf.Server[*Site] `embed:""                                            yaml:",inline"`
 }
 
+// We extend Site with a title.
 type Site struct {
 	waf.Site
 	Title string `json:"title"`
 }
 
+// We extend Service with our handlers.
 type Service struct {
 	waf.Service[*Site]
 }
