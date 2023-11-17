@@ -29,9 +29,12 @@ import (
 	"github.com/stretchr/testify/require"
 	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
+
+	// This is here because _examples/hello.go needs this dependency.
+	_ "gitlab.com/tozd/go/cli"
 )
 
-//go:embed testdata/routes.json
+//go:embed _examples/routes.json
 var routesConfiguration []byte
 
 var (

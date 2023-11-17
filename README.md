@@ -45,6 +45,8 @@ On Debina/Ubuntu `media-types` package.
 
 See full package documentation on [pkg.go.dev](https://pkg.go.dev/gitlab.com/tozd/waf#section-documentation).
 
+See [examples](./_examples/) to see how can components combine together into an app.
+
 ### Local execution
 
 To run apps locally, you need a HTTPS TLS certificate (as required by HTTP2). When running locally
