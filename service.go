@@ -816,11 +816,14 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 }
 
 func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ireturn
-	if site, ok := s.Sites[req.Host]; req.Host != "" && ok {
-		return site, nil
+	host := getHost(req.Host)
+	if host != "" {
+		if site, ok := s.Sites[host]; ok {
+			return site, nil
+		}
 	}
 	err := errors.New("site not found for host")
-	errors.Details(err)["host"] = req.Host
+	errors.Details(err)["host"] = host
 	return *new(SiteT), err
 }
 

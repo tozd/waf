@@ -505,6 +505,7 @@ func TestValidateSite(t *testing.T) {
 	}{
 		{"localhost", http.StatusOK},
 		{"example.com", http.StatusNotFound},
+		{"localhost:8080", http.StatusOK},
 	}
 
 	for k, tt := range tests {

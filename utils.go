@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -330,4 +331,17 @@ func computeEtag(data ...[]byte) string {
 		_, _ = hash.Write(d)
 	}
 	return `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
+}
+
+// Same as in zerolog/hlog/hlog.go.
+func getHost(hostPort string) string {
+	if hostPort == "" {
+		return ""
+	}
+
+	host, _, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return hostPort
+	}
+	return host
 }
