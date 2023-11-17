@@ -518,9 +518,16 @@ func TestServiceReverse(t *testing.T) {
 {"level":"debug","handler":"NonCompressibleJSONConnect","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
 {"level":"debug","handler":"NonCompressibleJSONOptions","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
 {"level":"debug","handler":"NonCompressibleJSONTrace","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
-{"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for file"}
-{"level":"debug","path":"/noncompressible.foobar","message":"unable to determine content type for file"}
-{"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for file"}
+{"level":"debug","path":"/assets/image.png","message":"added file to static files"}
+{"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for static file"}
+{"level":"debug","path":"/compressible.foobar","message":"added file to static files"}
+{"level":"debug","path":"/data.txt","message":"added file to static files"}
+{"level":"debug","path":"/index.html","message":"added file to static files"}
+{"level":"debug","path":"/noncompressible.foobar","message":"unable to determine content type for static file"}
+{"level":"debug","path":"/noncompressible.foobar","message":"added file to static files"}
+{"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for static file"}
+{"level":"debug","path":"/semicompressible.foobar","message":"added file to static files"}
+{"level":"debug","path":"/index.json","message":"added file to static files"}
 `, out.String())
 }
 

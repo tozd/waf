@@ -237,7 +237,7 @@ func TestServer(t *testing.T) {
 	// Server does not really start on :8080, but that is OK.
 	assert.Equal(
 		t,
-		`{"level":"info","message":"server starting on :8080"}`+"\n"+
+		`{"level":"info","listenAddr":"localhost:0","domains":["example.com","localhost"],"message":"server starting"}`+"\n"+
 			`{"level":"info","message":"server stopping"}`+"\n",
 		string(out),
 	)
