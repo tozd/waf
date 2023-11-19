@@ -59,7 +59,9 @@ test:
       - coverage.xml
     expire_in: never
 
-  coverage: '/coverage: \d+\.\d+% of statements/'
+  # "\s" at the beginning is important so that we match only output from
+  # "go tool covdata percent" and not one from "go test" itself.
+  coverage: '/\scoverage: \d+\.\d+% of statements/'
 
   parallel:
     matrix:

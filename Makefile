@@ -3,10 +3,13 @@ SHELL = /bin/bash -o pipefail
 .PHONY: test test-ci lint lint-ci fmt fmt-ci clean release lint-docs audit encrypt decrypt sops
 
 test:
-	gotestsum --format pkgname --packages ./... -- -race -timeout 10m -cover -covermode atomic
+	rm -rf coverage
+	mkdir -p coverage
+	GOCOVERDIR=coverage gotestsum --format pkgname --packages ./... -- -race -timeout 10m -cover -covermode atomic -args -test.gocoverdir=coverage
+	go tool covdata percent -i=coverage -pkg=gitlab.com/tozd/waf
 
-test-ci:
-	gotestsum --format pkgname --packages ./... --junitfile tests.xml -- -race -timeout 10m -coverprofile=coverage.txt -covermode atomic
+test-ci: test
+	go tool covdata textfmt -i=coverage -pkg=gitlab.com/tozd/waf -o coverage.txt
 	gocover-cobertura < coverage.txt > coverage.xml
 	go tool cover -html=coverage.txt -o coverage.html
 

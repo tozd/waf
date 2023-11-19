@@ -14,15 +14,18 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"testing/fstest"
 	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
@@ -311,7 +314,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 	return service, ts
 }
 
-var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("[tjc]":)[0-9]+`)
+var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("time":")[^"]+(")|("[tjc]":)[0-9]+`)
 
 func logCleanup(t *testing.T, http2 bool, log string) string {
 	t.Helper()
@@ -321,7 +324,7 @@ func logCleanup(t *testing.T, http2 bool, log string) string {
 		log = strings.ReplaceAll(log, `Go-http-client/1.1`, `Go-http-client/2.0`)
 	}
 
-	return logCleanupRegexp.ReplaceAllString(log, "$1$2$3$4$5$6$7")
+	return logCleanupRegexp.ReplaceAllString(log, "$1$2$3$4$5$6$7$8$9")
 }
 
 var headerCleanupRegexp = regexp.MustCompile(`[0-9]+`)
@@ -2360,5 +2363,163 @@ func TestRoutesConfiguration(t *testing.T) {
 
 	_ = &Service[*Site]{
 		Routes: config.Routes,
+	}
+}
+
+// We do not enable t.Parallel() here because it uses 5001 port
+// and can conflict with other tests using the same port.
+func TestRunExamples(t *testing.T) { //nolint:paralleltest
+	if os.Getenv("PEBBLE_HOST") == "" {
+		t.Skip("PEBBLE_HOST is not available")
+	}
+
+	if os.Getenv("GOCOVERDIR") == "" {
+		t.Skip("GOCOVERDIR is not available")
+	}
+
+	files, err := filepath.Glob("_examples/*.go")
+	require.NoError(t, err)
+
+	// We do not enable t.Parallel() here because it uses 5001 port
+	// and can conflict with other tests using the same port.
+	for _, path := range files { //nolint:paralleltest
+		dir, file := filepath.Split(path)
+
+		// TODO: Currently for all files we expect same calls to be made with same results. Change that.
+		t.Run(file, func(t *testing.T) {
+			base := strings.TrimSuffix(file, filepath.Ext(file))
+
+			assert.Equal(t, "_examples/", dir)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			output := &bytes.Buffer{}
+
+			cmd := exec.CommandContext(ctx, "go", "run", "-race", "-cover", "-covermode", "atomic", file, "--config", base+".yml")
+			cmd.Dir = dir
+			cmd.Stdout = output
+			cmd.Stderr = output
+			// TODO: Remove workaround.
+			//       Currently we hard-code GOCOVERDIR because GOCOVERDIR gets overridden.
+			//       See: https://github.com/golang/go/issues/60182
+			cmd.Env = append(os.Environ(), "GOCOVERDIR=../coverage")
+			// We have to make a process group and send signals to the whole group.
+			// See: https://github.com/golang/go/issues/40467
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setpgid: true,
+			}
+			cmd.Cancel = func() error {
+				if cmd.Process.Pid < 1 {
+					return nil
+				}
+				// We kill whole process group.
+				e := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				if errors.Is(e, syscall.ESRCH) {
+					return os.ErrProcessDone
+				}
+				return e
+			}
+
+			err = cmd.Start()
+			require.NoError(t, err)
+
+			time.Sleep(10 * time.Second)
+
+			transport := cleanhttp.DefaultTransport()
+			transport.ForceAttemptHTTP2 = true
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if addr == "site.test:443" {
+					addr = "localhost:5001"
+				}
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
+			}
+			transport.TLSClientConfig = &tls.Config{ //nolint:gosec
+				RootCAs: getACMERootCAs(t),
+			}
+
+			client := &http.Client{
+				Transport: transport,
+			}
+
+			resp, err := client.Get("https://site.test") //nolint:noctx
+			if assert.NoError(t, err) {
+				t.Cleanup(func() { resp.Body.Close() })
+				out, err := io.ReadAll(resp.Body) //nolint:govet
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.Equal(t, 2, resp.ProtoMajor)
+				assert.Equal(t, `<!DOCTYPE html>`+"\n"+
+					`<html>`+"\n"+
+					`  <head>`+"\n"+
+					`    <title>Hello site</title>`+"\n"+
+					`  </head>`+"\n"+
+					`  <body>Hello world!</body>`+"\n"+
+					`</html>`, string(out))
+				assert.Equal(t, http.Header{
+					"Server-Timing": {"t;dur="},
+				}, headerCleanup(t, resp.Trailer))
+				assert.Equal(t, http.Header{
+					"Accept-Ranges":          {"bytes"},
+					"Cache-Control":          {"no-cache"},
+					"Content-Length":         {"107"},
+					"Content-Type":           {"text/html; charset=utf-8"},
+					"Date":                   {""},
+					"Etag":                   {`"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q"`},
+					"Request-Id":             {""},
+					"Vary":                   {"Accept-Encoding"},
+					"X-Content-Type-Options": {"nosniff"},
+				}, headerCleanup(t, resp.Header))
+			}
+
+			resp, err = client.Get("https://site.test/api") //nolint:noctx
+			if assert.NoError(t, err) {
+				t.Cleanup(func() { resp.Body.Close() })
+				out, err := io.ReadAll(resp.Body) //nolint:govet
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.Equal(t, 2, resp.ProtoMajor)
+				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out))
+				assert.Equal(t, http.Header{
+					"Server-Timing": {"t;dur="},
+				}, headerCleanup(t, resp.Trailer))
+				assert.Equal(t, http.Header{
+					"Accept-Ranges":          {"bytes"},
+					"Cache-Control":          {"no-cache"},
+					"Content-Length":         {"43"},
+					"Content-Type":           {"application/json"},
+					"Date":                   {""},
+					"Etag":                   {`"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE"`},
+					"Request-Id":             {""},
+					"Vary":                   {"Accept-Encoding"},
+					"X-Content-Type-Options": {"nosniff"},
+				}, headerCleanup(t, resp.Header))
+			}
+
+			err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
+			assert.NoError(t, err)
+
+			err = cmd.Wait()
+			var exitError *exec.ExitError
+			// TODO: Remove workaround.
+			//       Currently "go run" does not return zero exit code when we send INT signal
+			//       to the whole process group even if the child process exits with zero exit code.
+			//       See: https://github.com/golang/go/issues/40467
+			if errors.As(err, &exitError) && exitError.ExitCode() > 0 {
+				assert.Equal(t, 1, exitError.ExitCode())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}
+{"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
+{"level":"debug","path":"/api","time":"","message":"added file to static files"}
+{"level":"info","listenAddr":":5001","domains":["site.test"],"time":"","message":"server starting"}
+{"level":"info","request":"","time":"","message":"hello from Home handler"}
+{"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"Home","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":""}
+{"level":"info","method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"StaticFile","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}
+{"level":"info","time":"","message":"server stopping"}
+`, logCleanup(t, true, output.String()))
+		})
 	}
 }

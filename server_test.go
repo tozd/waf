@@ -3,6 +3,7 @@ package waf
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -325,9 +326,28 @@ func TestServerConnection(t *testing.T) {
 	}
 }
 
-func TestServerACME(t *testing.T) {
-	t.Parallel()
+func getACMERootCAs(t *testing.T) *x509.CertPool {
+	t.Helper()
 
+	acmeClient, errE := acmeClient("testdata/pebble.minica.pem")
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	resp, err := acmeClient.Get(fmt.Sprintf("https://%s/roots/0", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "15000"))) //nolint:noctx
+	require.NoError(t, err)
+	t.Cleanup(func() { resp.Body.Close() })
+	acmeRootCAsData, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	acmeRootCAs, errE := parseCertPool(acmeRootCAsData)
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	return acmeRootCAs
+}
+
+// We do not enable t.Parallel() here because it uses 5001 port
+// and can conflict with other tests using the same port.
+func TestServerACME(t *testing.T) { //nolint:paralleltest
 	if os.Getenv("PEBBLE_HOST") == "" {
 		t.Skip("PEBBLE_HOST is not available")
 	}
@@ -361,24 +381,11 @@ func TestServerACME(t *testing.T) {
 		return context.Background()
 	}
 
-	acmeClient, errE := acmeClient("testdata/pebble.minica.pem")
-	require.NoError(t, errE, "% -+#.1v", errE)
-
-	resp, err := acmeClient.Get(fmt.Sprintf("https://%s/roots/0", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "15000"))) //nolint:noctx
-	require.NoError(t, err)
-	t.Cleanup(func() { resp.Body.Close() })
-	acmeRootCAsData, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
 	getCertificate := server.server.TLSConfig.GetCertificate
 	server.server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 		t.Logf("clientHelloInfo: %+v", hello)
 		return getCertificate(hello)
 	}
-
-	acmeRootCAs, errE := parseCertPool(acmeRootCAsData)
-	require.NoError(t, errE, "% -+#.1v", errE)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -406,14 +413,14 @@ func TestServerACME(t *testing.T) {
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}
 	transport.TLSClientConfig = &tls.Config{ //nolint:gosec
-		RootCAs: acmeRootCAs,
+		RootCAs: getACMERootCAs(t),
 	}
 
 	client := &http.Client{
 		Transport: transport,
 	}
 
-	resp, err = client.Get("https://site.test") //nolint:noctx
+	resp, err := client.Get("https://site.test") //nolint:noctx
 	if assert.NoError(t, err) {
 		t.Cleanup(func() { resp.Body.Close() })
 		out, err := io.ReadAll(resp.Body) //nolint:govet
