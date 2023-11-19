@@ -50,11 +50,13 @@ func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ waf.Params) {
 }
 
 func main() {
+	// We use Kong to populate App struct with config (based on CLI arguments or a config file).
 	var app App
 	cli.Run(&app, kong.Vars{
 		"defaultProxyTo":  "http://localhost:3000",
 		"defaultTLSCache": "letsencrypt",
 	}, func(_ *kong.Context) errors.E {
+		// Routes can come from a single source of truth, e.g., a file.
 		var routesConfig struct {
 			Routes []waf.Route `json:"routes"`
 		}
@@ -107,6 +109,7 @@ func main() {
 			},
 		}
 
+		// Construct the main handler for the service using the router.
 		handler, errE := service.RouteWith(service, &waf.Router{}) //nolint:exhaustruct
 		if errE != nil {
 			return errE
@@ -116,6 +119,7 @@ func main() {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 
+		// It returns only on error or if the server is gracefully shut down using ctrl-c.
 		return app.Server.Run(ctx, handler)
 	})
 }
