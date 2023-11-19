@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -198,6 +197,8 @@ func TestServer(t *testing.T) {
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
+		// We bind the server to any localhost port.
+		Addr: "localhost:0",
 	}
 	sites, errE = server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
@@ -207,9 +208,6 @@ func TestServer(t *testing.T) {
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
-
-	// We bind the server to any localhost port.
-	server.server.Addr = "localhost:0"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -223,6 +221,10 @@ func TestServer(t *testing.T) {
 		}))
 	})
 
+	// We wait for the server to start.
+	assert.NotEmpty(t, server.ListenAddr())
+
+	// For "server starting" to be logged.
 	time.Sleep(time.Second)
 
 	cancel()
@@ -235,10 +237,9 @@ func TestServer(t *testing.T) {
 	pipeR.Close()
 	assert.NoError(t, err)
 
-	// Server does not really start on :8080, but that is OK.
 	assert.Equal(
 		t,
-		`{"level":"info","listenAddr":"localhost:0","domains":["example.com","localhost"],"message":"server starting"}`+"\n"+
+		`{"level":"info","listenAddr":"`+server.ListenAddr()+`","domains":["example.com","localhost"],"message":"server starting"}`+"\n"+
 			`{"level":"info","message":"server stopping"}`+"\n",
 		string(out),
 	)
@@ -364,7 +365,7 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
 		},
 		// Pebble uses this port by default for the TLS-ALPN-01 challenge.
-		ListenAddr: ":5001",
+		Addr: ":5001",
 	}
 	sites, errE := server.Init(nil)
 	assert.NoError(t, errE, "% -+#.1v", errE)
@@ -373,13 +374,6 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	}, sites)
 
 	assert.Equal(t, "", server.InDevelopment())
-
-	// We extract the address on which the server listens.
-	var listenAddr atomic.Value
-	server.server.BaseContext = func(l net.Listener) context.Context {
-		listenAddr.Store(l.Addr().String())
-		return context.Background()
-	}
 
 	getCertificate := server.server.TLSConfig.GetCertificate
 	server.server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -399,16 +393,15 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 		}))
 	})
 
-	time.Sleep(time.Second)
-
-	require.NotEmpty(t, listenAddr.Load())
-	t.Logf("listenAddr: %s", listenAddr.Load())
+	// We wait for the server to start.
+	require.NotEmpty(t, server.ListenAddr())
+	t.Logf("ListenAddress: %s", server.ListenAddr())
 
 	transport := cleanhttp.DefaultTransport()
 	transport.ForceAttemptHTTP2 = true
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if addr == "site.test:443" {
-			addr = listenAddr.Load().(string) //nolint:errcheck,forcetypeassert
+			addr = server.ListenAddr()
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}

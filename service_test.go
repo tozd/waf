@@ -2514,7 +2514,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}
 {"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
 {"level":"debug","path":"/api","time":"","message":"added file to static files"}
-{"level":"info","listenAddr":":5001","domains":["site.test"],"time":"","message":"server starting"}
+{"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"Home","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":""}
 {"level":"info","method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"StaticFile","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}

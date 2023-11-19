@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
+	"gitlab.com/tozd/go/x"
 	"gitlab.com/tozd/identifier"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -94,7 +95,7 @@ type Server[SiteT hasSite] struct {
 	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
 
 	// Used primarily for testing.
-	ListenAddr string `json:"-" kong:"-" yaml:"-"`
+	Addr string `json:"-" kong:"-" yaml:"-"`
 
 	server *http.Server
 
@@ -102,6 +103,8 @@ type Server[SiteT hasSite] struct {
 	managers []*certificateManager
 
 	domains []string
+
+	listenAddr *x.SyncVar[string]
 }
 
 // Init determines the set of sites based on TLS configuration and sites provided,
@@ -113,8 +116,8 @@ type Server[SiteT hasSite] struct {
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	listenAddr := defaultListenAddr
-	if s.ListenAddr != "" {
-		listenAddr = s.ListenAddr
+	if s.Addr != "" {
+		listenAddr = s.Addr
 	}
 
 	// TODO: How to shutdown websocket connections?
@@ -154,8 +157,14 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		TLSNextProto:      nil,
 		ConnState:         nil,
 		ErrorLog:          log.New(s.Logger, "", 0),
-		BaseContext:       nil,
-		ConnContext:       s.connContext,
+		BaseContext: func(l net.Listener) context.Context {
+			errE := s.listenAddr.Store(l.Addr().String())
+			if errE != nil {
+				panic(errE)
+			}
+			return context.Background()
+		},
+		ConnContext: s.connContext,
 	}
 
 	domains := []string{}
@@ -397,6 +406,8 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	sort.Strings(domains)
 	s.domains = domains
 
+	s.listenAddr = x.NewSyncVar[string]()
+
 	return sites, nil
 }
 
@@ -436,7 +447,24 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 	g, errCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		s.Logger.Info().Str("listenAddr", s.server.Addr).Strs("domains", s.domains).Msg("server starting")
+		c, cancel := context.WithCancel(errCtx)
+		go func() {
+			addr, err := s.listenAddr.LoadContext(c)
+			if err != nil {
+				// Context is cancelled, we just return.
+				return
+			}
+
+			s.Logger.Info().Str("listenAddr", addr).Strs("domains", s.domains).Msg("server starting")
+		}()
+
+		// If ListenAndServeTLS returns we return from this goroutine and cancel
+		// the context which in turn gets the goroutine above to exit.
+		defer cancel()
+
+		// We make sure we store something to unblock everyone waiting on the address.
+		// This might return an error if the value is already stored, but we ignore it.
+		defer s.listenAddr.Store("") //nolint:errcheck
 
 		err := s.server.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -468,4 +496,13 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 
 func (s *Server[SiteT]) connContext(ctx context.Context, _ net.Conn) context.Context {
 	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
+}
+
+// ListenAddr returns the address on which the server is listening.
+//
+// Available only after the server runs. It blocks until the server runs
+// if called before. If server fails to start before the address is obtained,
+// it unblocks and returns an empty string.
+func (s *Server[SiteT]) ListenAddr() string {
+	return s.listenAddr.Load()
 }
