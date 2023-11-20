@@ -296,9 +296,6 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 
 	c := alice.New()
 
-	// TODO: Skip installing middleware for canonical log line logger if it is disabled.
-	//       See: https://github.com/rs/zerolog/pull/617
-
 	// We first create a canonical log line logger as context logger.
 	c = c.Append(hlog.NewHandler(s.CanonicalLogger))
 	// Then we set the canonical log line logger under its own context key as well.
@@ -307,52 +304,61 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(func(next http.Handler) http.Handler {
 		return servertiming.Middleware(next, nil)
 	})
-	c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
-		level := zerolog.InfoLevel
-		if code >= http.StatusBadRequest {
-			level = zerolog.WarnLevel
-		}
-		if code >= http.StatusInternalServerError {
-			level = zerolog.ErrorLevel
-		}
-		timing := servertiming.FromContext(req.Context())
-		metrics := zerolog.Dict()
-		seenMetrics := mapset.NewThreadUnsafeSet[string]()
-		for _, metric := range timing.Metrics {
-			// We log only really measured durations and not just initialized
-			// (it is impossible to both start and end the measurement with 0 duration).
-			if metric != nil && metric.Duration > 0 {
-				metrics.Dur(metric.Name, metric.Duration)
-				if !seenMetrics.Add(metric.Name) {
-					s.Logger.Warn().Str("metric", metric.Name).Msg("duplicate metric")
+
+	// Is logger enabled at all (not zerolog.Nop or zero zerolog struct)?
+	// See: https://github.com/rs/zerolog/pull/617
+	if l := s.CanonicalLogger.Sample(nil); l.Info().Enabled() { //nolint:zerologlint
+		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
+			level := zerolog.InfoLevel
+			if code >= http.StatusBadRequest {
+				level = zerolog.WarnLevel
+			}
+			if code >= http.StatusInternalServerError {
+				level = zerolog.ErrorLevel
+			}
+			timing := servertiming.FromContext(req.Context())
+			metrics := zerolog.Dict()
+			seenMetrics := mapset.NewThreadUnsafeSet[string]()
+			for _, metric := range timing.Metrics {
+				// We log only really measured durations and not just initialized
+				// (it is impossible to both start and end the measurement with 0 duration).
+				if metric != nil && metric.Duration > 0 {
+					metrics.Dur(metric.Name, metric.Duration)
+					if !seenMetrics.Add(metric.Name) {
+						s.Logger.Warn().Str("metric", metric.Name).Msg("duplicate metric")
+					}
 				}
 			}
-		}
-		// Full duration is added to the response as a trailer in accessHandler for HTTP2,
-		// but it is not added to timing.Metrics. So we add it here to the log.
-		metrics.Dur("t", duration)
-		l := hlog.FromRequest(req).WithLevel(level)
-		if code != 0 {
-			l = l.Int("code", code)
-		}
-		l.Int64("responseBody", responseBody).
-			Int64("requestBody", requestBody).
-			Dict("metrics", metrics).
-			Send()
-	}))
-	c = c.Append(logMetadata(s.MetadataHeaderPrefix))
-	c = c.Append(websocketHandler("ws"))
-	c = c.Append(hlog.MethodHandler("method"))
-	c = c.Append(urlHandler("path"))
-	c = c.Append(hlog.RemoteIPHandler("client"))
-	c = c.Append(hlog.UserAgentHandler("agent"))
-	c = c.Append(hlog.RefererHandler("referer"))
-	c = c.Append(connectionIDHandler("connection"))
-	c = c.Append(requestIDHandler("request", "Request-Id"))
-	c = c.Append(hlog.HTTPVersionHandler("proto"))
-	c = c.Append(hlog.HostHandler("host", true))
-	c = c.Append(hlog.EtagHandler("etag"))
-	c = c.Append(hlog.ResponseHeaderHandler("encoding", "Content-Encoding"))
+			// Full duration is added to the response as a trailer in accessHandler for HTTP2,
+			// but it is not added to timing.Metrics. So we add it here to the log.
+			metrics.Dur("t", duration)
+			l := hlog.FromRequest(req).WithLevel(level)
+			if code != 0 {
+				l = l.Int("code", code)
+			}
+			l.Int64("responseBody", responseBody).
+				Int64("requestBody", requestBody).
+				Dict("metrics", metrics).
+				Send()
+		}))
+		c = c.Append(logMetadata(s.MetadataHeaderPrefix))
+		c = c.Append(websocketHandler("ws"))
+		c = c.Append(hlog.MethodHandler("method"))
+		c = c.Append(urlHandler("path"))
+		c = c.Append(hlog.RemoteIPHandler("client"))
+		c = c.Append(hlog.UserAgentHandler("agent"))
+		c = c.Append(hlog.RefererHandler("referer"))
+		c = c.Append(connectionIDHandler("connection"))
+		c = c.Append(requestIDHandler("request", "Request-Id"))
+		c = c.Append(hlog.HTTPVersionHandler("proto"))
+		c = c.Append(hlog.HostHandler("host", true))
+		c = c.Append(hlog.EtagHandler("etag"))
+		c = c.Append(hlog.ResponseHeaderHandler("encoding", "Content-Encoding"))
+	} else {
+		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {}))
+		c = c.Append(requestIDHandler("", "Request-Id"))
+	}
+
 	c = c.Append(addNosniffHeader)
 	// parseForm should be towards the end because it can fail or redirect
 	// and we want other fields to be logged. It also logs query string and
@@ -722,11 +728,14 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	}
 	w.Header().Add(s.MetadataHeaderPrefix+metadataHeader, b.String())
 
-	logMetadata := req.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
-	for key, value := range metadata {
-		// We overwrite any existing key. This is the same behavior RFC 8941 specifies
-		// for duplicate keys in its dictionaries. The last one wins.
-		logMetadata[key] = value
+	logMetadata, ok := req.Context().Value(metadataContextKey).(map[string]interface{})
+	// metadataContextKey might not exist if provided logger is disabled.
+	if ok {
+		for key, value := range metadata {
+			// We overwrite any existing key. This is the same behavior RFC 8941 specifies
+			// for duplicate keys in its dictionaries. The last one wins.
+			logMetadata[key] = value
+		}
 	}
 
 	return b.Bytes(), nil

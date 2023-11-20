@@ -2304,47 +2304,60 @@ func TestService(t *testing.T) {
 		for _, http2 := range []bool{false, true} {
 			http2 := http2
 
-			t.Run(fmt.Sprintf("case=%d/http2=%t", k, http2), func(t *testing.T) {
-				t.Parallel()
+			for _, logEnabled := range []bool{false, true} {
+				logEnabled := logEnabled
 
-				pipeR, pipeW, err := os.Pipe()
-				t.Cleanup(func() {
-					// We might double close but we do not care.
-					pipeR.Close()
-					pipeW.Close()
-				})
-				require.NoError(t, err)
+				t.Run(fmt.Sprintf("case=%d/http2=%t/log=%t", k, http2, logEnabled), func(t *testing.T) {
+					t.Parallel()
 
-				_, ts := newService(t, zerolog.New(pipeW).Level(zerolog.InfoLevel), http2, tt.Development)
+					pipeR, pipeW, err := os.Pipe()
+					t.Cleanup(func() {
+						// We might double close but we do not care.
+						pipeR.Close()
+						pipeW.Close()
+					})
+					require.NoError(t, err)
 
-				// Close pipeW after serving.
-				h := ts.Config.Handler
-				ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					defer pipeW.Close()
-					h.ServeHTTP(w, r)
-				})
-
-				resp, err := ts.Client().Do(tt.Request())
-				if assert.NoError(t, err) {
-					t.Cleanup(func() { resp.Body.Close() })
-					out, err := io.ReadAll(resp.Body)
-					assert.NoError(t, err)
-					log, err := io.ReadAll(pipeR)
-					pipeR.Close()
-					assert.NoError(t, err)
-					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
-					assert.Equal(t, tt.ExpectedBody, out)
-					assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
-					assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header))
-					if http2 {
-						assert.Equal(t, 2, resp.ProtoMajor)
-						assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))
-					} else {
-						assert.Equal(t, 1, resp.ProtoMajor)
-						assert.Equal(t, http.Header(nil), resp.Trailer)
+					l := zerolog.New(pipeW).Level(zerolog.InfoLevel)
+					if !logEnabled {
+						l = zerolog.Nop()
 					}
-				}
-			})
+
+					_, ts := newService(t, l, http2, tt.Development)
+
+					// Close pipeW after serving.
+					h := ts.Config.Handler
+					ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						defer pipeW.Close()
+						h.ServeHTTP(w, r)
+					})
+
+					resp, err := ts.Client().Do(tt.Request())
+					if assert.NoError(t, err) {
+						t.Cleanup(func() { resp.Body.Close() })
+						out, err := io.ReadAll(resp.Body)
+						assert.NoError(t, err)
+
+						if logEnabled {
+							log, err := io.ReadAll(pipeR)
+							pipeR.Close()
+							assert.NoError(t, err)
+							assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
+						}
+
+						assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
+						assert.Equal(t, tt.ExpectedBody, out)
+						assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header))
+						if http2 {
+							assert.Equal(t, 2, resp.ProtoMajor)
+							assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))
+						} else {
+							assert.Equal(t, 1, resp.ProtoMajor)
+							assert.Equal(t, http.Header(nil), resp.Trailer)
+						}
+					}
+				})
+			}
 		}
 	}
 }
