@@ -155,6 +155,16 @@ router.apiResolve = apiRouter.resolve.bind(apiRouter);
 You can then use `router.resolve` to resolve non-API routes and `router.apiResolve`
 to resolve API routes.
 
+## Why API paths have `/api` prefix and do not use content negotiation?
+
+Content negotiated responses do not cache well.
+[Browsers cache by path](https://bugs.chromium.org/p/chromium/issues/detail?id=1380505)
+and ignore `Accept` header. This means that if your frontend requests both `text/html` and
+`application/json` at same path only one of them will be cached and then if you then
+repeat both requests, the request for non-cached content type might arrive first, invalidating
+even the cached one. Browsers at least do not serve wrong content because Etag header
+depends on the content itself so browsers detect cache mismatch.
+
 ## Related projects
 
 There are many great projects doing similar things.
