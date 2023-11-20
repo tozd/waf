@@ -30,11 +30,7 @@ func Error(w http.ResponseWriter, _ *http.Request, code int) {
 //
 // Note, Waf service always stores the request identifier in the request context.
 func RequestID(ctx context.Context) (identifier.Identifier, bool) {
-	v := ctx.Value(requestIDContextKey)
-	if v == nil {
-		return identifier.Identifier{}, false
-	}
-	i, ok := v.(identifier.Identifier)
+	i, ok := ctx.Value(requestIDContextKey).(identifier.Identifier)
 	return i, ok
 }
 
@@ -56,11 +52,7 @@ func MustRequestID(ctx context.Context) identifier.Identifier {
 // Note, Waf service always stores the site (based on host header in the request)
 // in the request context.
 func GetSite[SiteT hasSite](ctx context.Context) (SiteT, bool) { //nolint:ireturn
-	v := ctx.Value(siteContextKey)
-	if v == nil {
-		return *new(SiteT), false
-	}
-	s, ok := v.(SiteT)
+	s, ok := ctx.Value(siteContextKey).(SiteT)
 	return s, ok
 }
 
