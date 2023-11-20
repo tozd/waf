@@ -202,6 +202,42 @@ func TestRouterHandle(t *testing.T) {
 			expectedError: "",
 		},
 		{
+			description: "Adding one API route, but different paths",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/users/:id/posts",
+					api:       true,
+				},
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/users/posts",
+					api:       true,
+				},
+			},
+			expectedError: "route with different paths",
+		},
+		{
+			description: "Adding one non-API route, but different paths",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/users/:id/posts",
+					api:       false,
+				},
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/users/posts",
+					api:       false,
+				},
+			},
+			expectedError: "route with different paths",
+		},
+		{
 			description: "Adding one route with both API and non-API, but different paths",
 			routes: []testRoute{
 				{
@@ -213,7 +249,7 @@ func TestRouterHandle(t *testing.T) {
 				{
 					routeName: "UsersPosts",
 					method:    http.MethodPost,
-					path:      "/api/users/:id/posts", // Router is adding /api prefix, we should not.
+					path:      "/users/posts",
 					api:       true,
 				},
 			},
@@ -235,7 +271,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "route with different paths",
+			expectedError: "path with different routes",
 		},
 		{
 			description: "Adding two routes with same path (API and non-API)",
@@ -253,7 +289,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       true,
 				},
 			},
-			expectedError: "route with different paths",
+			expectedError: "path with different routes",
 		},
 		{
 			description: "Adding duplicate non-API routes",
@@ -351,6 +387,54 @@ func TestRouterHandle(t *testing.T) {
 			},
 			expectedError: "name cannot be empty",
 		},
+		{
+			description: "Adding API route with /api path",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodPost,
+					path:      "/api/users/:id/posts",
+					api:       true,
+				},
+			},
+			expectedError: "path cannot start with /api",
+		},
+		{
+			description: "Adding API /api route",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodPost,
+					path:      "/api",
+					api:       true,
+				},
+			},
+			expectedError: "path cannot start with /api",
+		},
+		{
+			description: "Adding non-API route with /api path",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/api/users/:id/posts",
+					api:       false,
+				},
+			},
+			expectedError: "path cannot start with /api",
+		},
+		{
+			description: "Adding non-API /api route",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/api",
+					api:       false,
+				},
+			},
+			expectedError: "path cannot start with /api",
+		},
 	}
 
 	for _, tt := range tests {
@@ -378,7 +462,7 @@ func TestRouterHandle(t *testing.T) {
 	}
 }
 
-func TestRouterPath(t *testing.T) {
+func TestRouterReverse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -488,7 +572,7 @@ func TestRouterPath(t *testing.T) {
 			qs:            url.Values{},
 			inputAPI:      true,
 			encodeQuery:   nil,
-			expectedPath:  "/api/",
+			expectedPath:  "/api",
 			expectedError: "",
 		},
 		{
@@ -598,29 +682,33 @@ func TestRouterErrorHandlers(t *testing.T) {
 	})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
-	assert.Equal(t, http.StatusOK, w.Code)
+	tests := []struct {
+		method string
+		path   string
+		status int
+	}{
+		{http.MethodGet, "/", http.StatusOK},
+		{http.MethodGet, "/api", http.StatusOK},
+		{http.MethodGet, "/api/", 480},
+		{http.MethodGet, "/foobar", 480},
+		{http.MethodGet, "/api/foobar", 480},
+		{http.MethodPost, "/api/foobar", 480},
+		{http.MethodPost, "/api", 490},
+		{http.MethodPost, "/api/", 480},
+		{http.MethodPost, "/", 490},
+	}
 
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/", nil))
-	assert.Equal(t, http.StatusOK, w.Code)
+	for k, tt := range tests {
+		tt := tt
 
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/foobar", nil))
-	assert.Equal(t, 480, w.Code)
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
+			t.Parallel()
 
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/foobar", nil))
-	assert.Equal(t, 480, w.Code)
-
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/", nil))
-	assert.Equal(t, 490, w.Code)
-
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/", nil))
-	assert.Equal(t, 490, w.Code)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(tt.method, tt.path, nil))
+			assert.Equal(t, tt.status, w.Code)
+		})
+	}
 }
 
 func TestRouterServeHTTP(t *testing.T) {
@@ -645,6 +733,78 @@ func TestRouterServeHTTP(t *testing.T) {
 			api:                  false,
 			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/notfound", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound non-API handler test",
+			method:               http.MethodGet,
+			path:                 "/",
+			api:                  false,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/api", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound non-API handler test with /",
+			method:               http.MethodGet,
+			path:                 "/",
+			api:                  false,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/api/", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound API handler test",
+			method:               http.MethodGet,
+			path:                 "/",
+			api:                  true,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound API handler test with /",
+			method:               http.MethodGet,
+			path:                 "/",
+			api:                  true,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/api/", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound API handler test",
+			method:               http.MethodGet,
+			path:                 "/posts",
+			api:                  true,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/api/posts/abcd", nil),
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "NotFound API handler test with /",
+			method:               http.MethodGet,
+			path:                 "/posts",
+			api:                  true,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodGet, "/api/posts/", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
 			expectedAllowHeader:  "",
@@ -720,8 +880,8 @@ func TestRouterServeHTTP(t *testing.T) {
 			api:                  false,
 			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
 			request:              httptest.NewRequest(http.MethodPost, "/api/users/123/posts", nil),
-			expectedStatus:       http.StatusMethodNotAllowed,
-			expectedResponseBody: "Method Not Allowed\n",
+			expectedStatus:       http.StatusNotFound,
+			expectedResponseBody: "Not Found\n",
 			expectedAllowHeader:  "",
 			expectPanic:          "",
 		},

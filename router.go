@@ -182,6 +182,12 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 		errors.Details(err)["route"] = name
 		return err
 	}
+	if strings.HasPrefix(path, "/api/") || path == "/api" {
+		err := errors.New("path cannot start with /api")
+		errors.Details(err)["path"] = path
+		errors.Details(err)["route"] = name
+		return err
+	}
 	ro, ok := r.routes[name]
 	if !ok {
 		segments, err := parsePath(path)
@@ -243,7 +249,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 		}
 
 		if rr.Path == path {
-			err := errors.New("route with different paths")
+			err := errors.New("path with different routes")
 			errors.Details(err)["route1"] = name
 			errors.Details(err)["route2"] = rr.Name
 			errors.Details(err)["path"] = path
@@ -309,7 +315,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 
 	api := false
-	if strings.HasPrefix(path, "/api/") {
+	if path == "/api" {
+		api = true
+		path = "/"
+	} else if path == "/api/" {
+		if r.NotFound != nil {
+			r.NotFound(w, req)
+		} else {
+			Error(w, req, http.StatusNotFound)
+		}
+		return
+	} else if strings.HasPrefix(path, "/api/") {
 		api = true
 		path = strings.TrimPrefix(path, "/api")
 	}
@@ -324,6 +340,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		var handler Handler
 		if api {
+			if len(matcher.Route.APIHandlers) == 0 {
+				// We exit search early.
+				break
+			}
 			var ok bool
 			handler, ok = matcher.Route.APIHandlers[req.Method]
 			if !ok {
@@ -425,14 +445,9 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		return "", err
 	}
 
-	if api {
-		if res.String() == "/api" {
-			res.WriteString("/")
-		}
-	} else {
-		if res.Len() == 0 {
-			res.WriteString("/")
-		}
+	// For API routes we already wrote "/api" which is what we want when there are no segments.
+	if res.Len() == 0 {
+		res.WriteString("/")
 	}
 
 	if len(qs) > 0 {

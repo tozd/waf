@@ -140,7 +140,7 @@ const apiRouter = createRouter({
   routes: routes
     .filter((route) => route.api)
     .map((route) => ({
-      path: `/api${route.path}`,
+      path: route.path == "/" ? "/api" : `/api${route.path}`,
       name: route.name,
       component: () => null,
       props: true,

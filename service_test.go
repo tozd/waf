@@ -465,7 +465,7 @@ func TestServiceReverse(t *testing.T) {
 
 	p, errE = service.ReverseAPI("Home", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
 	assert.NoError(t, errE, "% -+#.1v", errE)
-	assert.Equal(t, `/api/?a=b&a=c&x=y`, p)
+	assert.Equal(t, `/api?a=b&a=c&x=y`, p)
 
 	_, errE = service.Reverse("Home", Params{"x": "y"}, nil)
 	assert.ErrorContains(t, errE, "extra parameters")
@@ -1280,13 +1280,13 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "https://example.com/api/", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/api", nil)
 			},
 			"",
 			http.StatusOK,
 			[]byte(`{"domain":"example.com","title":"test","description":"test site","version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
+				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -2186,13 +2186,13 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "https://example.com/api/", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/api", nil)
 			},
 			proxy.URL,
 			http.StatusOK,
 			[]byte(`{"domain":"example.com","title":"test","description":"test site","version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
+				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
@@ -2358,7 +2358,7 @@ func TestRoutesConfiguration(t *testing.T) {
 	err := json.Unmarshal(routesConfiguration, &config)
 	assert.NoError(t, err)
 	assert.Equal(t, []Route{
-		{Name: "Home", Path: "/", API: false, Get: true},
+		{Name: "Home", Path: "/", API: true, Get: true},
 	}, config.Routes)
 
 	_ = &Service[*Site]{
@@ -2512,12 +2512,20 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			}
 
 			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}
+{"level":"debug","handler":"HomeGet","route":"Home","path":"/","time":"","message":"route registration: API handler found"}
+{"level":"debug","handler":"HomePost","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomePut","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomePatch","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeDelete","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeConnect","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeOptions","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
+{"level":"debug","handler":"HomeTrace","route":"Home","path":"/","time":"","message":"route registration: API handler not found"}
 {"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
-{"level":"debug","path":"/api","time":"","message":"added file to static files"}
+{"level":"debug","path":"/index.json","time":"","message":"added file to static files"}
 {"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"Home","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":""}
-{"level":"info","method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"StaticFile","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}
+{"level":"info","method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"HomeGet","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}
 {"level":"info","time":"","message":"server stopping"}
 `, logCleanup(t, true, output.String()))
 		})
