@@ -69,9 +69,22 @@ Vite compiles frontend files and serves them. It also watches for changes in fro
 recompiles them, and hot-reloads the frontend as necessary. Node 16 or newer is required.
 
 After installing dependencies and running `vite serve`, Vite listens on `http://localhost:3000`.
-Pass that to [Service's Development](https://pkg.go.dev/gitlab.com/tozd/waf#Service).
+Pass that to [Service's Development](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field.
 Open [https://localhost:8080/](https://localhost:8080/) in your browser, which will connect
 you to the backend which then proxies unknown requests (non-API requests) to Vite, the frontend.
+
+If you want your handler to proxy to Vite during development, you can do something like:
+
+```go
+func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ Params) {
+  if s.Development != "" {
+    s.Proxy(w, req)
+    return
+  }
+
+  // ... your handler ...
+}
+```
 
 ### Vue Router integration
 
@@ -91,7 +104,7 @@ use both in your Go code and Vue Router as a single source of truth for routes:
 }
 ```
 
-To populate [Service's Routes](https://pkg.go.dev/gitlab.com/tozd/waf#Service):
+To populate [Service's Routes](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field:
 
 ```go
 import _ "embed"
