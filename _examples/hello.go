@@ -27,9 +27,10 @@ var routesConfiguration []byte
 var files embed.FS
 
 type App struct {
-	Config          cli.ConfigFlag `help:"Load configuration from a JSON or YAML file." name:"config"  placeholder:"PATH" short:"c" yaml:"-"`
 	z.LoggingConfig `yaml:",inline"`
-	Server          waf.Server[*Site] `embed:""                                            yaml:",inline"`
+
+	Config cli.ConfigFlag    `         help:"Load configuration from a JSON or YAML file." name:"config" placeholder:"PATH" short:"c" yaml:"-"`
+	Server waf.Server[*Site] `embed:""                                                                                                yaml:",inline"`
 }
 
 // We extend Site with a title.
