@@ -14,10 +14,15 @@ test-ci: test
 	go tool cover -html=coverage.txt -o coverage.html
 
 lint:
-	golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix . _examples
+	golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix
+	find _examples -name '*.go' -exec golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix {} ';'
 
 lint-ci:
-	golangci-lint run --timeout 4m --out-format colored-line-number,code-climate:codeclimate.json . _examples
+	golangci-lint run --timeout 4m --out-format colored-line-number,code-climate:codeclimate.json
+	find _examples -name '*.go' -exec golangci-lint run --timeout 4m --out-format colored-line-number,code-climate:{}_codeclimate.json {} ';'
+	jq -s 'add' codeclimate.json _examples/*_codeclimate.json > /tmp/codeclimate.json
+	mv /tmp/codeclimate.json codeclimate.json
+	rm -f _examples/*_codeclimate.json
 
 fmt:
 	go mod tidy
@@ -28,7 +33,7 @@ fmt-ci: fmt
 	git diff --exit-code --color=always
 
 clean:
-	rm -rf coverage.* codeclimate.json tests.xml coverage
+	rm -rf coverage.* codeclimate.json _examples/*_codeclimate.json tests.xml coverage
 
 release:
 	npx --yes --package 'release-it@15.4.2' --package '@release-it/keep-a-changelog@3.1.0' -- release-it
