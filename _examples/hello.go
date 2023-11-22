@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog"
@@ -120,8 +121,8 @@ func main() {
 			return errE
 		}
 
-		// We stop the server on ctrl-c.
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		// We stop the server gracefully on ctrl-c and TERM signal.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
 		// It returns only on error or if the server is gracefully shut down using ctrl-c.
