@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2023-11-22
+
 ### Fixed
 
 - Change default port to (documented) 8080.
@@ -27,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.1.1...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.1.2...main
+[0.1.2]: https://gitlab.com/tozd/waf/-/compare/v0.1.1...v0.1.2
 [0.1.1]: https://gitlab.com/tozd/waf/-/compare/v0.1.0...v0.1.1
 [0.1.0]: https://gitlab.com/tozd/waf/-/tags/v0.1.0
 
