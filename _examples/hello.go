@@ -61,7 +61,7 @@ func main() {
 		"defaultProxyTo":  "http://localhost:3000",
 		"defaultTLSCache": "letsencrypt",
 	}, func(_ *kong.Context) errors.E {
-		// Routes can come from a single source of truth, e.g., a file.
+		// Routes come from a single source of truth, e.g., a file.
 		var routesConfig struct {
 			Routes []waf.Route `json:"routes"`
 		}
