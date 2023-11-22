@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Change default port to (documented) 8080.
+
 ## [0.1.1] - 2023-11-22
 
 ### Added

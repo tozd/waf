@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	defaultListenAddr = ":5001"
+	defaultListenAddr = ":8080"
 	readHeaderTimeout = 10 * time.Second
 	idleTimeout       = 10 * time.Minute
 )
