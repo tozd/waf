@@ -68,7 +68,7 @@ During development you might want to use [Vite](https://vitejs.dev/).
 Vite compiles frontend files and serves them. It also watches for changes in frontend files,
 recompiles them, and hot-reloads the frontend as necessary. Node 16 or newer is required.
 
-After installing dependencies and running `vite serve`, Vite listens on `http://localhost:3000`.
+After installing dependencies and running `vite serve`, Vite listens on `http://localhost:5173`.
 Pass that to [Service's Development](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field.
 Open [https://localhost:8080/](https://localhost:8080/) in your browser, which will connect
 you to the backend which then proxies unknown requests (non-API requests) to Vite, the frontend.

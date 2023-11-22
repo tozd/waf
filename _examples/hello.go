@@ -59,7 +59,7 @@ func main() {
 	// We use Kong to populate App struct with config (based on CLI arguments or a config file).
 	var app App
 	cli.Run(&app, kong.Vars{
-		"defaultProxyTo":  "http://localhost:3000",
+		"defaultProxyTo":  "http://localhost:5173",
 		"defaultTLSCache": "letsencrypt",
 	}, func(_ *kong.Context) errors.E {
 		// Routes come from a single source of truth, e.g., a file.

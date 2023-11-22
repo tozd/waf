@@ -30,7 +30,7 @@ func TestKong(t *testing.T) {
 			buf,
 		),
 		kong.Vars{
-			"defaultProxyTo":  "http://localhost:3000",
+			"defaultProxyTo":  "http://localhost:5173",
 			"defaultTLSCache": "letsencrypt",
 			"defaultTitle":    "test",
 		},
@@ -46,7 +46,7 @@ Flags:
   -h, --help            Show context-sensitive help.
   -d, --development     Run in development mode and proxy unknown requests.
   -P, --proxy-to=URL    Base URL to proxy to in development mode. Default:
-                        http://localhost:3000.
+                        http://localhost:5173.
 
 File certificate:
   -k, --tls.cert=PATH    Default certificate for TLS, when not using Let's

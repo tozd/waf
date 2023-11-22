@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Skip installing middleware for canonical log line logger if the logger is disabled.
 
+### Fixed
+
+- Vite port changed from 3000 to 5173.
+
 ## [0.1.0] - 2023-11-20
 
 ### Added
