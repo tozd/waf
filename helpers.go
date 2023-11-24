@@ -189,8 +189,14 @@ func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
 
-// TemporaryRedirect redirects the client to a new URL with the 307 (temporary redirect) HTTP code which makes
-// the client redo the request with the same method and body.
-func (s *Service[SiteT]) TemporaryRedirect(w http.ResponseWriter, req *http.Request, location string) {
+// TemporaryRedirectSameMethod redirects the client to a new URL with the 307 (temporary redirect) HTTP code which makes
+// the client redo the request to a new location with the same method and body.
+func (s *Service[SiteT]) TemporaryRedirectSameMethod(w http.ResponseWriter, req *http.Request, location string) {
 	http.Redirect(w, req, location, http.StatusTemporaryRedirect)
+}
+
+// TemporaryRedirectGetMethod redirects the client to a new URL with the 303 (see other) HTTP code which makes
+// the client do the request to a new location with the GET method.
+func (s *Service[SiteT]) TemporaryRedirectGetMethod(w http.ResponseWriter, req *http.Request, location string) {
+	http.Redirect(w, req, location, http.StatusSeeOther)
 }

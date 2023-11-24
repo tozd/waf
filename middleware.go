@@ -302,7 +302,7 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 				}
 				if qs != req.URL.RawQuery {
 					req.URL.RawQuery = qs
-					s.TemporaryRedirect(w, req, req.URL.String())
+					s.TemporaryRedirectSameMethod(w, req, req.URL.String())
 					return
 				}
 			}
@@ -331,7 +331,7 @@ func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
 		path := cleanPath(req.URL.Path)
 		if path != req.URL.Path {
 			req.URL.Path = path
-			s.TemporaryRedirect(w, req, req.URL.String())
+			s.TemporaryRedirectSameMethod(w, req, req.URL.String())
 			return
 		}
 

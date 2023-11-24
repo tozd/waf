@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add helper `TemporaryRedirectGetMethod`.
+
+### Changed
+
+- Rename helper `TemporaryRedirect` to `TemporaryRedirectSameMethod`.
+
 ## [0.1.2] - 2023-11-22
 
 ### Fixed
