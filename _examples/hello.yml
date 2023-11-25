@@ -4,6 +4,7 @@ logging:
   main:
     level: debug
 tls:
-  domain: site.test
   email: user@example.com
   cache: /tmp/letsencrypt
+domain:
+  - site.test

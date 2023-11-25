@@ -37,9 +37,6 @@ type TLS struct {
 	// Default certificate's private key, when not using Let's Encrypt.
 	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
 
-	// Domain name to request for Let's Encrypt's certificate when sites are not configured.
-	Domain string `group:"Let's Encrypt:" help:"Domain name to request for Let's Encrypt's certificate when sites are not configured." placeholder:"STRING" short:"D" yaml:"domain"`
-
 	// Contact e-mail to use with Let's Encrypt.
 	Email string `group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." short:"E" yaml:"email"`
 
@@ -62,9 +59,6 @@ func (t *TLS) Validate() error {
 		}
 	}
 
-	if t.Domain != "" && t.Email == "" {
-		return errors.New("contact e-mail is required for Let's Encrypt's certificate")
-	}
 	if t.Email != "" && t.Cache == "" {
 		return errors.New("cache directory is required for Let's Encrypt's certificate")
 	}
@@ -111,7 +105,8 @@ type Server[SiteT hasSite] struct {
 // returning possibly updated and expanded set of sites.
 //
 // If sites parameter is empty, sites are determined from domain names found in TLS
-// certificates.
+// certificates. If sites are provided and TLS certificates are not, their domains
+// are used to obtain the necessary certificate from Let's Encrypt.
 //
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
@@ -271,20 +266,6 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				return nil, nil //nolint:nilnil
 			}
 		}
-	} else if s.TLS.Domain != "" && s.TLS.Email != "" && s.TLS.Cache != "" {
-		letsEncryptDomainsList = append(letsEncryptDomainsList, s.TLS.Domain)
-
-		st, site := newSiteT[SiteT]()
-		*site = Site{
-			Domain:      s.TLS.Domain,
-			CertFile:    "",
-			KeyFile:     "",
-			staticFiles: nil,
-		}
-		sites = map[string]SiteT{
-			s.TLS.Domain: st,
-		}
-		domains = append(domains, site.Domain)
 	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 		manager := &certificateManager{
 			CertFile:    s.TLS.CertFile,

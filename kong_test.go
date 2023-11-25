@@ -55,11 +55,9 @@ File certificate:
                          Encrypt.
 
 Let's Encrypt:
-  -D, --tls.domain=STRING    Domain name to request for Let's Encrypt's
-                             certificate when sites are not configured.
-  -E, --tls.email=STRING     Contact e-mail to use with Let's Encrypt.
-  -C, --tls.cache=PATH       Let's Encrypt's cache directory. Default:
-                             letsencrypt.
+  -E, --tls.email=STRING    Contact e-mail to use with Let's Encrypt.
+  -C, --tls.cache=PATH      Let's Encrypt's cache directory. Default:
+                            letsencrypt.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

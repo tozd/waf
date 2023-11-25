@@ -358,7 +358,6 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
 		TLS: TLS{
-			Domain:               "site.test",
 			Email:                "user@example.com",
 			Cache:                tempDir,
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
@@ -367,7 +366,9 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 		// Pebble uses this port by default for the TLS-ALPN-01 challenge.
 		Addr: ":5001",
 	}
-	sites, errE := server.Init(nil)
+	sites, errE := server.Init(map[string]*Site{
+		"site.test": {Domain: "site.test"},
+	})
 	assert.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"site.test": {Domain: "site.test"},

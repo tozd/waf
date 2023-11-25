@@ -32,6 +32,8 @@ type App struct {
 
 	Config cli.ConfigFlag    `         help:"Load configuration from a JSON or YAML file." name:"config" placeholder:"PATH" short:"c" yaml:"-"`
 	Server waf.Server[*Site] `embed:""                                                                                                yaml:",inline"`
+
+	Domains []string `name:"domain" help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." placeholder:"STRING" short:"D" yaml:"domain"`
 }
 
 // We extend Site with a title.
@@ -80,8 +82,20 @@ func main() {
 			app.Server.Addr = ":5001"
 		}
 
-		// Sites are automatically constructed based on the certificate or domain name for Let's Encrypt.
-		sites, errE := app.Server.Init(nil)
+		sites := map[string]*Site{}
+		// If domains are provided, we create sites based on those domains.
+		for _, domain := range app.Domains {
+			sites[domain] = &Site{
+				Site: waf.Site{
+					Domain:   domain,
+					CertFile: "",
+					KeyFile:  "",
+				},
+				Title: "", // We will set title later for all sites.
+			}
+		}
+		// If domains are not provided, sites are automatically constructed based on the certificate.
+		sites, errE := app.Server.Init(sites)
 		if errE != nil {
 			return errE
 		}
