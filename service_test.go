@@ -263,6 +263,14 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 					BuildTimestamp: "2023-11-03T00:51:07Z",
 				},
 			},
+			Middleware: []func(http.Handler) http.Handler{
+				func(next http.Handler) http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						w.Header().Add("Extra", "1234")
+						next.ServeHTTP(w, req)
+					})
+				},
+			},
 			SiteContextPath:      "/index.json",
 			MetadataHeaderPrefix: "Test-",
 			Development:          development,
@@ -572,6 +580,7 @@ func TestService(t *testing.T) {
 			[]byte(`<!DOCTYPE html><html><head><title>test</title></head><body>test site</body></html>`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Home","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"82"},
@@ -595,6 +604,7 @@ func TestService(t *testing.T) {
 			[]byte("Method Not Allowed\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"POST","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"MethodNotAllowed","code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Allow":                  {"GET, HEAD"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
@@ -618,6 +628,7 @@ func TestService(t *testing.T) {
 			[]byte(`test data`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","referer":"https://example.com/","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"9"},
@@ -641,6 +652,7 @@ func TestService(t *testing.T) {
 			[]byte("Method Not Allowed\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"POST","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"MethodNotAllowed","code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Allow":                  {"GET, HEAD"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
@@ -662,6 +674,7 @@ func TestService(t *testing.T) {
 			[]byte(`test image`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/assets/image.png","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"ImmutableFile","etag":"EYcyfG0PCwsZszqyEaVJAjqppB81nG0Kgn172Z-NWZQ","code":200,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"public,max-age=31536000,immutable,stale-while-revalidate=86400"},
 				"Content-Length":         {"10"},
@@ -685,6 +698,7 @@ func TestService(t *testing.T) {
 			compressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -711,6 +725,7 @@ func TestService(t *testing.T) {
 			compressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -737,6 +752,7 @@ func TestService(t *testing.T) {
 			compressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -763,6 +779,7 @@ func TestService(t *testing.T) {
 			compressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"w1AgRzrtG0ZCzXJsrXJ7Y__ygkrWjO3X_7c8fL2JBHk","code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -789,6 +806,7 @@ func TestService(t *testing.T) {
 			compressibleDataGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/compressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":"gNjs0DVDKzajatdVAcvGk2jBlyyj_v_ier840Jzmwig","code":200,"responseBody":68,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"68"},
@@ -816,6 +834,7 @@ func TestService(t *testing.T) {
 			nonCompressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/noncompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + nonCompressibleDataEtag + `,"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -842,6 +861,7 @@ func TestService(t *testing.T) {
 			[]byte(`test data`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","code":200,"responseBody":9,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"9"},
@@ -865,6 +885,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -890,6 +911,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -917,6 +939,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {semiCompressibleDataEtag},
@@ -936,6 +959,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataGzipEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {semiCompressibleDataGzipEtag},
@@ -954,6 +978,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -981,6 +1006,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1008,6 +1034,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19901"},
@@ -1035,6 +1062,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -1064,6 +1092,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {semiCompressibleDataEtag},
@@ -1084,6 +1113,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataGzipEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {semiCompressibleDataGzipEtag},
@@ -1103,6 +1133,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1131,6 +1162,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1159,6 +1191,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1187,6 +1220,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1215,6 +1249,7 @@ func TestService(t *testing.T) {
 			semiCompressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","etag":` + semiCompressibleDataEtag + `,"code":200,"responseBody":32768,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -1242,6 +1277,7 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"StaticFile","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -1267,6 +1303,7 @@ func TestService(t *testing.T) {
 			[]byte("Not Found\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/missing","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"NotFound","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1288,6 +1325,7 @@ func TestService(t *testing.T) {
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
 				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"142"},
@@ -1312,6 +1350,7 @@ func TestService(t *testing.T) {
 			[]byte("Not Found\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/NotFound","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1332,6 +1371,7 @@ func TestService(t *testing.T) {
 			[]byte("Not Found\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/NotFoundWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"test","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"10"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1352,6 +1392,7 @@ func TestService(t *testing.T) {
 			[]byte("Method Not Allowed\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/MethodNotAllowed","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","code":405,"responseBody":19,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Allow":                  {"DELETE, GET"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
@@ -1373,6 +1414,7 @@ func TestService(t *testing.T) {
 			[]byte("Internal Server Error\n"),
 			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/InternalServerError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1393,6 +1435,7 @@ func TestService(t *testing.T) {
 			[]byte("Internal Server Error\n"),
 			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/InternalServerErrorWithError","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"test","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1413,6 +1456,7 @@ func TestService(t *testing.T) {
 			[]byte("Request Timeout\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/Canceled","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","context":"canceled","code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"16"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1433,6 +1477,7 @@ func TestService(t *testing.T) {
 			[]byte("Request Timeout\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/DeadlineExceeded","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","context":"deadline exceeded","code":408,"responseBody":16,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"16"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1453,6 +1498,7 @@ func TestService(t *testing.T) {
 			[]byte("Internal Server Error\n"),
 			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","error":"Proxy called while not in development","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1473,6 +1519,7 @@ func TestService(t *testing.T) {
 			[]byte("Bad Request\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/something","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Helper","code":400,"responseBody":12,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1493,6 +1540,7 @@ func TestService(t *testing.T) {
 			[]byte("Internal Server Error\n"),
 			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/panic","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"PanicGet","panic":true,"error":"test","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"22"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
@@ -1533,6 +1581,7 @@ func TestService(t *testing.T) {
 			[]byte(`{"data":123}`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
@@ -1561,6 +1610,7 @@ func TestService(t *testing.T) {
 			[]byte(`{"data":123}`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
@@ -1608,6 +1658,7 @@ func TestService(t *testing.T) {
 			[]byte(`data=abcde&foo=1`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"POST","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"JSONPost","code":202,"responseBody":16,"requestBody":10,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"16"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -1629,6 +1680,7 @@ func TestService(t *testing.T) {
 			[]byte("Method Not Allowed\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"PATCH","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"MethodNotAllowed","code":405,"responseBody":19,"requestBody":10,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Allow":                  {"GET, HEAD, POST"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19"},
@@ -1650,6 +1702,7 @@ func TestService(t *testing.T) {
 			largeJSON,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"65544"},
@@ -1676,6 +1729,7 @@ func TestService(t *testing.T) {
 			largeJSON,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"65544"},
@@ -1701,6 +1755,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -1729,6 +1784,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {largeJSONEtag},
@@ -1748,6 +1804,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONGzipEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {largeJSONGzipEtag},
@@ -1766,6 +1823,7 @@ func TestService(t *testing.T) {
 			largeJSON[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1793,6 +1851,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1821,6 +1880,7 @@ func TestService(t *testing.T) {
 			largeJSON[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"19901"},
@@ -1848,6 +1908,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -1878,6 +1939,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {largeJSONEtag},
@@ -1898,6 +1960,7 @@ func TestService(t *testing.T) {
 			[]byte{},
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONGzipEtag + `,"code":304,"responseBody":0,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Cache-Control": {"no-cache"},
 				"Date":          {""},
 				"Etag":          {largeJSONGzipEtag},
@@ -1917,6 +1980,7 @@ func TestService(t *testing.T) {
 			largeJSON[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1945,6 +2009,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -1974,6 +2039,7 @@ func TestService(t *testing.T) {
 			largeJSON[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -2002,6 +2068,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip[100:201],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":206,"responseBody":101,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"101"},
@@ -2031,6 +2098,7 @@ func TestService(t *testing.T) {
 			largeJSON,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","etag":` + largeJSONEtag + `,"code":200,"responseBody":65544,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"65544"},
@@ -2058,6 +2126,7 @@ func TestService(t *testing.T) {
 			largeJSONGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"LargeGet","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":         {"1234"},
 				"Accept-Ranges": {"bytes"},
 				"Cache-Control": {"no-cache"},
 				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
@@ -2087,6 +2156,7 @@ func TestService(t *testing.T) {
 			nonCompressibleData,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/noncompressible","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"NonCompressibleJSONGet","etag":` + nonCompressibleDataEtag + `,"code":200,"responseBody":32768,"requestBody":0,"metrics":{"c":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"32768"},
@@ -2111,6 +2181,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: \ndata: \n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Home","proxied":"","code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2133,6 +2204,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: \ndata: \n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","referer":"https://example.com/","connection":"","request":"","proto":"2.0","host":"example.com","message":"Proxy","proxied":"","code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2153,6 +2225,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: \ndata: \n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/assets/image.png","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Proxy","proxied":"","code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2173,6 +2246,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: \ndata: \n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/missing","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Proxy","proxied":"","code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2194,6 +2268,7 @@ func TestService(t *testing.T) {
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
 				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"HomeGet","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"142"},
@@ -2238,6 +2313,7 @@ func TestService(t *testing.T) {
 			[]byte(`{"data":123}`),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"JSONGet","etag":"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE","metadata":{"foobar":42},"code":200,"responseBody":12,"requestBody":0,"metrics":{"j":,"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
 				"Content-Length":         {"12"},
@@ -2263,6 +2339,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: \ndata: \n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"PATCH","path":"/api/json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Proxy","proxied":"","code":200,"responseBody":24,"requestBody":0,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"24"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2285,6 +2362,7 @@ func TestService(t *testing.T) {
 			[]byte("test\npost data: data=abcde\ndata: data=abcde&foo=1\n"),
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"POST","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","query":{"foo":["1"]},"message":"Proxy","proxied":"","code":200,"responseBody":50,"requestBody":10,"metrics":{"t":}}` + "\n",
 			http.Header{
+				"Extra":                  {"1234"},
 				"Content-Length":         {"50"},
 				"Content-Type":           {"text/plain; charset=utf-8"},
 				"Date":                   {""},
@@ -2347,7 +2425,9 @@ func TestService(t *testing.T) {
 
 						assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
 						assert.Equal(t, tt.ExpectedBody, out)
-						assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header))
+						if !assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header)) {
+							t.Log("here")
+						}
 						if http2 {
 							assert.Equal(t, 2, resp.ProtoMajor)
 							assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))

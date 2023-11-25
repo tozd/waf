@@ -190,6 +190,9 @@ type Service[SiteT hasSite] struct {
 	// This should generally be set to sites returned from Server.Init method.
 	Sites map[string]SiteT
 
+	// Middleware is a chain of additional middleware to append before the router.
+	Middleware []func(http.Handler) http.Handler
+
 	// SiteContextPath is the path at which site context (JSON of site struct)
 	// should be added to static files.
 	SiteContextPath string
@@ -379,6 +382,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		c = c.Append(hlog.NewHandler(s.Logger))
 	}
 	c = c.Append(requestIDHandler("request", ""))
+
+	for _, m := range s.Middleware {
+		c = c.Append(m)
+	}
 
 	return c.Then(s.router), nil
 }
