@@ -402,3 +402,30 @@ func addNosniffHeader(next http.Handler) http.Handler {
 		}), req)
 	})
 }
+
+// RedirectToMainSite is a middleware which redirects all requests to the site with mainDomain
+// if they are made for another site on non-main domain.
+func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// We can use MustGetSite because this middleware is used after validateSite middleware.
+			site := MustGetSite[*Site](req.Context())
+			if site.Domain != mainDomain {
+				req.URL.Scheme = "https"
+				_, port, err := net.SplitHostPort(req.Host)
+				if err != nil {
+					s.BadRequestWithError(w, req, errors.WithStack(err))
+					return
+				}
+				if port != "" {
+					req.URL.Host = net.JoinHostPort(mainDomain, port)
+				} else {
+					req.URL.Host = mainDomain
+				}
+				s.TemporaryRedirectSameMethod(w, req, req.URL.String())
+				return
+			}
+			next.ServeHTTP(w, req)
+		})
+	}
+}

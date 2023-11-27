@@ -576,3 +576,53 @@ func TestAddNosniffHeader(t *testing.T) {
 	assert.Equal(t, http.StatusNotModified, res.StatusCode)
 	assert.Equal(t, "", res.Header.Get("X-Content-Type-Options"))
 }
+
+func TestRedirectToMainSite(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{
+		Sites: map[string]*Site{
+			"example.com": {
+				Domain: "example.com",
+			},
+			"www.example.com": {
+				Domain: "www.example.com",
+			},
+		},
+	}
+	h := s.validateSite(s.RedirectToMainSite("example.com")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	tests := []struct {
+		Target           string
+		Host             string
+		ExpectedStatus   int
+		ExpectedLocation string
+	}{
+		{"/foo?test=123", "example.com", http.StatusOK, ""},
+		{"/foo?test=123", "www.example.com", http.StatusTemporaryRedirect, "https://example.com/foo?test=123"},
+		{"/foo?test=123", "example.com:8080", http.StatusOK, ""},
+		{"/foo?test=123", "www.example.com:8080", http.StatusTemporaryRedirect, "https://example.com:8080/foo?test=123"},
+		{"/foo?test=123", "other.example.com", http.StatusNotFound, ""},
+	}
+
+	for k, tt := range tests {
+		tt := tt
+
+		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
+			t.Parallel()
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, tt.Target, nil)
+			r.Host = tt.Host
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close()
+			})
+			assert.Equal(t, tt.ExpectedStatus, res.StatusCode)
+			assert.Equal(t, tt.ExpectedLocation, res.Header.Get("Location"))
+		})
+	}
+}
