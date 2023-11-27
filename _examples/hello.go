@@ -27,13 +27,14 @@ var routesConfiguration []byte
 //go:embed files
 var files embed.FS
 
+//nolint:lll
 type App struct {
 	z.LoggingConfig `yaml:",inline"`
 
 	Config cli.ConfigFlag    `         help:"Load configuration from a JSON or YAML file." name:"config" placeholder:"PATH" short:"c" yaml:"-"`
 	Server waf.Server[*Site] `embed:""                                                                                                yaml:",inline"`
 
-	Domains []string `name:"domain" help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." placeholder:"STRING" short:"D" yaml:"domain"`
+	Domains []string `help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." name:"domain" placeholder:"STRING" short:"D" yaml:"domain"`
 }
 
 // We extend Site with a title.
