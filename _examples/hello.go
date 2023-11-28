@@ -34,7 +34,7 @@ type App struct {
 	Config cli.ConfigFlag    `         help:"Load configuration from a JSON or YAML file." name:"config" placeholder:"PATH" short:"c" yaml:"-"`
 	Server waf.Server[*Site] `embed:""                                                                                                yaml:",inline"`
 
-	Domains []string `help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." name:"domain" placeholder:"STRING" short:"D" yaml:"domain"`
+	Domains []string `help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." name:"domain" placeholder:"STRING" short:"D" yaml:"domains"`
 }
 
 // We extend Site with a title.

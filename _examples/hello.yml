@@ -6,5 +6,5 @@ logging:
 tls:
   email: user@example.com
   cache: /tmp/letsencrypt
-domain:
+domains:
   - site.test
