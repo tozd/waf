@@ -413,7 +413,9 @@ func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Ha
 			if site.Domain != mainDomain {
 				req.URL.Scheme = "https"
 				_, port, err := net.SplitHostPort(req.Host)
-				if err != nil {
+				if err != nil && !strings.Contains(err.Error(), "missing port in address") {
+					// This probably cannot be reached because validateSite short-circuits bad
+					// host values (which probably do not match any site) with an 404.
 					s.BadRequestWithError(w, req, errors.WithStack(err))
 					return
 				}
