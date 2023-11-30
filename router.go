@@ -13,11 +13,11 @@ import (
 
 var errNotFound = errors.Base("not found")
 
-type errMethodNotAllowed struct {
+type MethodNotAllowedError struct {
 	Allow []string
 }
 
-func (_ *errMethodNotAllowed) Error() string {
+func (*MethodNotAllowedError) Error() string {
 	return "method not allowed"
 }
 
@@ -323,7 +323,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	_, handler, params, errE := r.get(req)
-	var e *errMethodNotAllowed
+	var e *MethodNotAllowedError
 	if errors.Is(errE, errNotFound) {
 		if r.NotFound != nil {
 			r.NotFound(w, req)
@@ -387,7 +387,7 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 				}
 				sort.Strings(allow)
 
-				return matcher.Route, nil, params, errors.WithStack(&errMethodNotAllowed{
+				return matcher.Route, nil, params, errors.WithStack(&MethodNotAllowedError{
 					Allow: allow,
 				})
 			}
@@ -397,7 +397,7 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 				break
 			}
 			if req.Method != http.MethodGet && req.Method != http.MethodHead {
-				return matcher.Route, nil, params, errors.WithStack(&errMethodNotAllowed{
+				return matcher.Route, nil, params, errors.WithStack(&MethodNotAllowedError{
 					Allow: []string{"GET", "HEAD"},
 				})
 			}
