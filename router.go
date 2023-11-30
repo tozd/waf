@@ -11,6 +11,16 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
+var errNotFound = errors.Base("not found")
+
+type errMethodNotAllowed struct {
+	Allow []string
+}
+
+func (_ *errMethodNotAllowed) Error() string {
+	return "method not allowed"
+}
+
 type pathSegment struct {
 	Value     string
 	Parameter bool
@@ -312,6 +322,35 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer r.recv(w, req)
 	}
 
+	_, handler, params, errE := r.get(req)
+	var e *errMethodNotAllowed
+	if errors.Is(errE, errNotFound) {
+		if r.NotFound != nil {
+			r.NotFound(w, req)
+		} else {
+			Error(w, req, http.StatusNotFound)
+		}
+		return
+	} else if errors.As(errE, &e) {
+		if r.MethodNotAllowed != nil {
+			r.MethodNotAllowed(w, req, params, e.Allow)
+		} else {
+			w.Header().Add("Allow", strings.Join(e.Allow, ", "))
+			Error(w, req, http.StatusMethodNotAllowed)
+		}
+		return
+	} else if errE != nil {
+		// This should not happen.
+		panic(errE)
+	}
+
+	handler(w, req, params)
+}
+
+// TODO: Make Router.Get which returns a public struct with handler, params, and some (all?) information from route.
+//       Also make sentinel errors public. Keep private Router.get to not have to allocate a new struct every time.
+
+func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 	path := req.URL.Path
 
 	api := false
@@ -319,12 +358,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		api = true
 		path = "/"
 	} else if path == "/api/" {
-		if r.NotFound != nil {
-			r.NotFound(w, req)
-		} else {
-			Error(w, req, http.StatusNotFound)
-		}
-		return
+		return nil, nil, nil, errors.WithStack(errNotFound)
 	} else if strings.HasPrefix(path, "/api/") {
 		api = true
 		path = strings.TrimPrefix(path, "/api")
@@ -353,13 +387,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 				sort.Strings(allow)
 
-				if r.MethodNotAllowed != nil {
-					r.MethodNotAllowed(w, req, params, allow)
-				} else {
-					w.Header().Add("Allow", strings.Join(allow, ", "))
-					Error(w, req, http.StatusMethodNotAllowed)
-				}
-				return
+				return matcher.Route, nil, params, errors.WithStack(&errMethodNotAllowed{
+					Allow: allow,
+				})
 			}
 		} else {
 			if matcher.Route.GetHandler == nil {
@@ -367,27 +397,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				break
 			}
 			if req.Method != http.MethodGet && req.Method != http.MethodHead {
-				allow := []string{"GET", "HEAD"}
-				if r.MethodNotAllowed != nil {
-					r.MethodNotAllowed(w, req, params, allow)
-				} else {
-					w.Header().Add("Allow", strings.Join(allow, ", "))
-					Error(w, req, http.StatusMethodNotAllowed)
-				}
-				return
+				return matcher.Route, nil, params, errors.WithStack(&errMethodNotAllowed{
+					Allow: []string{"GET", "HEAD"},
+				})
 			}
 			handler = matcher.Route.GetHandler
 		}
 
-		handler(w, req, params)
-		return
+		return matcher.Route, handler, params, nil
 	}
 
-	if r.NotFound != nil {
-		r.NotFound(w, req)
-	} else {
-		Error(w, req, http.StatusNotFound)
-	}
+	return nil, nil, nil, errors.WithStack(errNotFound)
 }
 
 func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (string, errors.E) {
