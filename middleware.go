@@ -348,7 +348,8 @@ func (s *Service[SiteT]) validateSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		siteT, err := s.site(req)
 		if err != nil {
-			s.NotFoundWithError(w, req, err)
+			s.WithError(req.Context(), err)
+			s.NotFound(w, req)
 			return
 		}
 

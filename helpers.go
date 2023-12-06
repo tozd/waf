@@ -80,20 +80,6 @@ func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusNotFound)
 }
 
-// NotFoundWithError replies to the request with the 404 (not found) HTTP code and the corresponding
-// error message. Error err is logged to the canonical log line.
-//
-// It does not otherwise end the request; the caller should ensure no further
-// writes are done to w.
-func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := canonicalLogger(req.Context())
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
-
-	s.NotFound(w, req)
-}
-
 // MethodNotAllowed replies to the request with the 405 (method not allowed) HTTP code and the corresponding
 // error message. It adds Allow response header based on the list of allowed methods
 // in allow.
@@ -117,13 +103,26 @@ func (s *Service[SiteT]) BadRequest(w http.ResponseWriter, req *http.Request) {
 // BadRequestWithError replies to the request with the 400 (bad request) HTTP code and the corresponding
 // error message. Error err is logged to the canonical log line.
 //
+// As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it instead replies
+// with the 408 (request timeout) HTTP code, the corresponding error message, and logs to the canonical log line
+// that the context has been canceled or that deadline exceeded, respectively.
+//
 // It does not otherwise end the request; the caller should ensure no further
 // writes are done to w.
 func (s *Service[SiteT]) BadRequestWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := canonicalLogger(req.Context())
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
+	s.WithError(req.Context(), err)
+
+	if errors.Is(err, context.Canceled) {
+		// Rationale: the client canceled the request and stopped reading the response, so in
+		// a way we are not prepared to wait indefinitely for the client to read the response.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		// Rationale: the client was reading the response too slowly, and we were
+		// not prepared to wait for so long.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	}
 
 	s.BadRequest(w, req)
 }
@@ -147,32 +146,44 @@ func (s *Service[SiteT]) InternalServerError(w http.ResponseWriter, req *http.Re
 // It does not otherwise end the request; the caller should ensure no further
 // writes are done to w.
 func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
-	logger := canonicalLogger(req.Context())
+	s.WithError(req.Context(), err)
 
-	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
 	if errors.Is(err, context.Canceled) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "canceled")
-		})
 		// Rationale: the client canceled the request and stopped reading the response, so in
 		// a way we are not prepared to wait indefinitely for the client to read the response.
 		Error(w, req, http.StatusRequestTimeout)
 		return
 	} else if errors.Is(err, context.DeadlineExceeded) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "deadline exceeded")
-		})
 		// Rationale: the client was reading the response too slowly, and we were
 		// not prepared to wait for so long.
 		Error(w, req, http.StatusRequestTimeout)
 		return
 	}
 
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Err(err)
-	})
-
 	s.InternalServerError(w, req)
+}
+
+// WithError logs err to the canonical log line.
+//
+// As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it logs to the
+// canonical log line that the context has been canceled or that deadline exceeded, respectively.
+func (s *Service[SiteT]) WithError(ctx context.Context, err errors.E) {
+	logger := canonicalLogger(ctx)
+
+	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
+	if errors.Is(err, context.Canceled) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "canceled")
+		})
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "deadline exceeded")
+		})
+	} else {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Err(err)
+		})
+	}
 }
 
 // Proxy proxies request to the development backend (e.g., Vite).
