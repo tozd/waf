@@ -41,7 +41,7 @@ func TestServer(t *testing.T) {
 		},
 	}
 	_, errE := server.Init(nil)
-	assert.ErrorContains(t, errE, "certificate is not valid for any domain")
+	assert.EqualError(t, errE, "certificate is not valid for any domain")
 
 	err = createTempCertificateFiles(certPath, keyPath, []string{"example.com", "localhost"})
 	require.NoError(t, err)
@@ -50,11 +50,11 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{}
 	errE = server.Run(ctx, nil)
-	assert.ErrorContains(t, errE, "server not configured")
+	assert.EqualError(t, errE, "server not configured")
 
 	server = &Server[*Site]{}
 	_, errE = server.Init(nil)
-	assert.ErrorContains(t, errE, "missing file or Let's Encrypt's certificate configuration")
+	assert.EqualError(t, errE, "missing file or Let's Encrypt's certificate configuration")
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -128,7 +128,7 @@ func TestServer(t *testing.T) {
 	_, errE = server.Init(map[string]*Site{
 		"example.com": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.ErrorContains(t, errE, "domain does not match site's domain")
+	assert.EqualError(t, errE, "domain does not match site's domain")
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -136,7 +136,7 @@ func TestServer(t *testing.T) {
 	_, errE = server.Init(map[string]*Site{
 		"": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.ErrorContains(t, errE, "domain does not match site's domain")
+	assert.EqualError(t, errE, "domain does not match site's domain")
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -144,7 +144,7 @@ func TestServer(t *testing.T) {
 	_, errE = server.Init(map[string]*Site{
 		"example.com": {Domain: "", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.ErrorContains(t, errE, "site's domain is required")
+	assert.EqualError(t, errE, "site's domain is required")
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -152,7 +152,7 @@ func TestServer(t *testing.T) {
 	_, errE = server.Init(map[string]*Site{
 		"something.com": {Domain: "something.com", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.ErrorContains(t, errE, "certificate is not valid for domain")
+	assert.EqualError(t, errE, "certificate is not valid for domain")
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -181,7 +181,7 @@ func TestServer(t *testing.T) {
 	_, errE = server.Init(map[string]*Site{
 		"something.com": {Domain: "something.com"},
 	})
-	assert.ErrorContains(t, errE, "certificate is not valid for domain")
+	assert.EqualError(t, errE, "certificate is not valid for domain")
 
 	pipeR, pipeW, err := os.Pipe()
 	t.Cleanup(func() {

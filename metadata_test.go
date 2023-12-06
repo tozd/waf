@@ -48,7 +48,7 @@ func TestEncodeMetadataKey(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataKey(tt.key, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.key, out.String())
 			}
@@ -100,7 +100,7 @@ func TestEncodeMetadataSignedInteger(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataSignedInteger(tt.value, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}
@@ -140,7 +140,7 @@ func TestEncodeMetadataUnsignedInteger(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataUnsignedInteger(tt.value, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}
@@ -204,7 +204,7 @@ func TestEncodeMetadataDecimal(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataDecimal(tt.value, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}
@@ -300,7 +300,7 @@ func TestEncodeMetadataItem(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataItem(tt.value, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}
@@ -340,7 +340,7 @@ func TestEncodeMetadataInnerList(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadataInnerList(tt.value, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}
@@ -386,7 +386,7 @@ func TestEncodeMetadata(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := encodeMetadata(tt.metadata, out)
 			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
+				assert.EqualError(t, err, tt.err)
 			} else {
 				assert.Equal(t, tt.expected, out.String())
 			}

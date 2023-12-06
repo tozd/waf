@@ -83,7 +83,7 @@ func TestCertificateManager(t *testing.T) {
 	require.NoError(t, err)
 
 	errE := (&certificateManager{}).Start()
-	assert.ErrorContains(t, errE, "manager not configured")
+	assert.EqualError(t, errE, "manager not configured")
 
 	certManager := certificateManager{
 		CertFile: certPath,

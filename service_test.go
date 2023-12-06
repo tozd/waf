@@ -366,7 +366,7 @@ func TestRouteWith(t *testing.T) {
 	_, errE := s.RouteWith(s, router)
 	require.NoError(t, errE, "% -+#.1v", errE)
 	_, errE = s.RouteWith(s, router)
-	assert.ErrorContains(t, errE, "RouteWith called more than once")
+	assert.EqualError(t, errE, "RouteWith called more than once")
 }
 
 func TestServiceConfigureRoutes(t *testing.T) {
@@ -452,7 +452,7 @@ func TestServiceConfigureRoutes(t *testing.T) {
 
 			errE := s.configureRoutes(s)
 			if tt.Err != "" {
-				assert.ErrorContains(t, errE, tt.Err)
+				assert.EqualError(t, errE, tt.Err)
 			} else {
 				assert.NoError(t, errE, "% -+#.1v", errE)
 			}
@@ -476,16 +476,16 @@ func TestServiceReverse(t *testing.T) {
 	assert.Equal(t, `/api?a=b&a=c&x=y`, p)
 
 	_, errE = service.Reverse("Home", Params{"x": "y"}, nil)
-	assert.ErrorContains(t, errE, "extra parameters")
+	assert.EqualError(t, errE, "extra parameters")
 
 	_, errE = service.Reverse("Helper", nil, nil)
-	assert.ErrorContains(t, errE, "parameter is missing")
+	assert.EqualError(t, errE, "parameter is missing")
 
 	_, errE = service.Reverse("JSON", nil, nil)
-	assert.ErrorContains(t, errE, "route has no GET handler")
+	assert.EqualError(t, errE, "route has no GET handler")
 
 	_, errE = service.Reverse("something", nil, nil)
-	assert.ErrorContains(t, errE, "route does not exist")
+	assert.EqualError(t, errE, "route does not exist")
 
 	assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","message":"route registration: handler found"}
 {"level":"debug","handler":"HomeGet","route":"Home","path":"/","message":"route registration: API handler found"}

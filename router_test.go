@@ -98,7 +98,7 @@ func TestParsePath(t *testing.T) {
 			segments, errE := parsePath(tt.inputPath)
 			assert.Equal(t, tt.expectedResult, segments)
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, errE, tt.expectedError)
+				assert.EqualError(t, errE, tt.expectedError)
 			} else {
 				assert.NoError(t, errE, "% -+#.1v", errE)
 			}
@@ -151,7 +151,7 @@ func TestCompileRegexp(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.Nil(t, re)
 				assert.Nil(t, paramMapFunc)
-				assert.ErrorContains(t, errE, tt.expectedError)
+				assert.EqualError(t, errE, tt.expectedError)
 			} else {
 				assert.NoError(t, errE, "% -+#.1v", errE)
 				if assert.NotNil(t, re) {
@@ -349,7 +349,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "parsing path failed",
+			expectedError: `parsing path failed: path does not start with "/"`,
 		},
 		{
 			description: "Adding a handler with an invalid path (empty path)",
@@ -361,7 +361,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "parsing path failed",
+			expectedError: `parsing path failed: path does not start with "/"`,
 		},
 		{
 			description: "Adding a handler with duplicate params in path",
@@ -451,7 +451,7 @@ func TestRouterHandle(t *testing.T) {
 			}
 
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, errE, tt.expectedError)
+				assert.EqualError(t, errE, tt.expectedError)
 			} else {
 				assert.NoError(t, errE, "% -+#.1v", errE)
 				for _, route := range tt.routes {
@@ -636,7 +636,7 @@ func TestRouterReverse(t *testing.T) {
 			path, errE := r.reverse("PathName", tt.params, tt.qs, tt.inputAPI)
 
 			if tt.expectedError != "" {
-				assert.ErrorContains(t, errE, tt.expectedError)
+				assert.EqualError(t, errE, tt.expectedError)
 			} else {
 				assert.NoError(t, errE, "% -+#.1v", errE)
 				assert.Equal(t, tt.expectedPath, path)
@@ -654,10 +654,10 @@ func TestRouterMissing(t *testing.T) {
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	_, errE = r.reverse("PathNameMissing", nil, nil, false)
-	assert.ErrorContains(t, errE, "route does not exist")
+	assert.EqualError(t, errE, "route does not exist")
 
 	errE = r.Handle("HandlerMissing", http.MethodGet, "/missing", false, nil)
-	assert.ErrorContains(t, errE, "handler cannot be nil")
+	assert.EqualError(t, errE, "handler cannot be nil")
 }
 
 func TestRouterErrorHandlers(t *testing.T) {
