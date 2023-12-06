@@ -748,16 +748,16 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	return b.Bytes(), nil
 }
 
-// WriteJSON replies to the request by writing data as JSON.
-//
+// PrepareJSON prepares the JSON response to the request. It populates
+// response headers and encodes data as JSON.
 // Optional metadata is added as the response header.
 //
 // Besides other types, data can be of type []byte and [json.RawMessage] in which
-// case it is expected that it already contains a well-formed JSON and is written
+// case it is expected that it already contains a well-formed JSON and is returned
 // as-is.
 //
-// It does not otherwise end the request; the caller should ensure no further writes are done to w.
-func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {
+// If there is an error, PrepareJSON responds to the request and returns nil.
+func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) []byte {
 	ctx := req.Context()
 	timing := servertiming.FromContext(ctx)
 
@@ -774,7 +774,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 
 		if err != nil {
 			s.InternalServerErrorWithError(w, req, errors.WithStack(err))
-			return
+			return nil
 		}
 
 		encoded = e
@@ -796,7 +796,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 
 		if errE != nil {
 			s.InternalServerErrorWithError(w, req, errE)
-			return
+			return nil
 		}
 
 		// len(encoded) cannot be 0 because 0 <= minCompressionSize
@@ -816,7 +816,7 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 	md, errE := s.AddMetadata(w, req, metadata)
 	if errE != nil {
 		s.InternalServerErrorWithError(w, req, errE)
-		return
+		return nil
 	}
 
 	etag := computeEtag(encoded, md)
@@ -834,6 +834,24 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 	}
 	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("Etag", etag)
+
+	return encoded
+}
+
+// WriteJSON replies to the request by writing data as JSON.
+//
+// Optional metadata is added as the response header.
+//
+// Besides other types, data can be of type []byte and [json.RawMessage] in which
+// case it is expected that it already contains a well-formed JSON and is written
+// as-is.
+//
+// It does not otherwise end the request; the caller should ensure no further writes are done to w.
+func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {
+	encoded := s.PrepareJSON(w, req, data, metadata)
+	if encoded == nil {
+		return
+	}
 
 	// See: https://github.com/golang/go/issues/50905
 	// See: https://github.com/golang/go/pull/50903
