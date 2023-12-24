@@ -2566,7 +2566,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 				}, headerCleanup(t, resp.Header))
 			}
 
-			resp, err = client.Get("https://site.test/api") //nolint:noctx
+			resp, err = client.Get("https://site.test/context.json") //nolint:noctx
 			if assert.NoError(t, err) {
 				t.Cleanup(func() { resp.Body.Close() })
 				out, err := io.ReadAll(resp.Body) //nolint:govet
@@ -2619,7 +2619,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 {"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"Home","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":""}
-{"level":"info","method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"HomeGet","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}
+{"level":"info","method":"GET","path":"/context.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","message":"StaticFile","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":""}
 {"level":"info","time":"","message":"server stopping"}
 `, logCleanup(t, true, output.String()))
 		})

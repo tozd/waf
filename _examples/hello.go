@@ -54,10 +54,6 @@ func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ waf.Params) {
 	s.ServeStaticFile(w, req, "/index.html")
 }
 
-func (s *Service) HomeGet(w http.ResponseWriter, req *http.Request, _ waf.Params) {
-	s.ServeStaticFile(w, req, "/index.json")
-}
-
 func main() {
 	// We use Kong to populate App struct with config (based on CLI arguments or a config file).
 	var app App
@@ -120,12 +116,12 @@ func main() {
 				StaticFiles:     f.(fs.ReadFileFS),
 				Routes:          routesConfig.Routes,
 				Sites:           sites,
-				SiteContextPath: "/index.json",
+				SiteContextPath: "/context.json",
 				Development:     app.Server.InDevelopment(),
 				SkipServingFile: func(path string) bool {
-					// We want files to be served by Home route at / and /api and not be
-					// available at index.html and index.json (as well).
-					return path == "/index.html" || path == "/index.json"
+					// We want the file to be served by Home route at / and not be
+					// available at index.html (as well).
+					return path == "/index.html"
 				},
 			},
 		}
