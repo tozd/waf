@@ -176,7 +176,7 @@ type Service[SiteT hasSite] struct {
 	// The first function is called when the request is handled and allows
 	// any cleanup necessary. The second function is called on panic.
 	// If WithContext is not set, Logger is used instead.
-	WithContext func(context.Context) (context.Context, func(), func())
+	WithContext func(context.Context) (context.Context, func(), func()) `exhaustruct:"optional"`
 
 	// StaticFiles to be served by the service. All paths are anchored at / when served.
 	// HTML files (those with ".html" extension) are rendered using html/template
@@ -191,31 +191,31 @@ type Service[SiteT hasSite] struct {
 	Sites map[string]SiteT
 
 	// Middleware is a chain of additional middleware to append before the router.
-	Middleware []func(http.Handler) http.Handler
+	Middleware []func(http.Handler) http.Handler `exhaustruct:"optional"`
 
 	// SiteContextPath is the path at which site context (JSON of site struct)
 	// should be added to static files.
-	SiteContextPath string
+	SiteContextPath string `exhaustruct:"optional"`
 
 	// MetadataHeaderPrefix is an optional prefix to the Metadata response header.
-	MetadataHeaderPrefix string
+	MetadataHeaderPrefix string `exhaustruct:"optional"`
 
 	// Development is a base URL to proxy to during development, if set.
 	// This should generally be set to result of Server.InDevelopment method.
 	// If set, StaticFiles are not served by the service so that they can be proxied instead.
-	Development string
+	Development string `exhaustruct:"optional"`
 
 	// IsImmutableFile should return true if the static file is immutable and
 	// should have such caching headers. Static files are those which do not change
 	// during a runtime of the program. Immutable files are those which are never changed.
-	IsImmutableFile func(path string) bool
+	IsImmutableFile func(path string) bool `exhaustruct:"optional"`
 
 	// SkipServingFile should return true if the static file should not be automatically
 	// registered with the router to be served. It can still be served using ServeStaticFile.
-	SkipServingFile func(path string) bool
+	SkipServingFile func(path string) bool `exhaustruct:"optional"`
 
-	router       *Router
-	reverseProxy *httputil.ReverseProxy
+	router       *Router                `exhaustruct:"optional"`
+	reverseProxy *httputil.ReverseProxy `exhaustruct:"optional"`
 }
 
 // RouteWith registers static files and handlers with the router based on Routes and service [Handler]
