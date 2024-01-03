@@ -109,7 +109,7 @@ func main() {
 		}
 
 		service := &Service{ //nolint:forcetypeassert
-			waf.Service[*Site]{ 
+			waf.Service[*Site]{
 				Logger:          app.Logger,
 				CanonicalLogger: app.Logger,
 				WithContext:     app.WithContext,
