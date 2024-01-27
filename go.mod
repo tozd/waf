@@ -23,7 +23,10 @@ require (
 
 require github.com/alecthomas/kong v0.8.1
 
-require gitlab.com/tozd/go/cli v0.2.2
+require (
+	github.com/rs/cors v1.10.1
+	gitlab.com/tozd/go/cli v0.2.2
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -31,7 +34,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
-	github.com/rs/cors v1.10.1 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/tools v0.15.0 // indirect
