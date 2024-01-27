@@ -950,6 +950,32 @@ func TestRouterServeHTTP(t *testing.T) {
 			expectedAllowHeader:  "",
 			expectPanic:          "panic error",
 		},
+		{
+			description: "OPTIONS non-API handler",
+			method:      http.MethodOptions,
+			path:        "/",
+			api:         false,
+			handler: func(w http.ResponseWriter, req *http.Request, params Params) {
+				w.WriteHeader(345)
+			},
+			request:              httptest.NewRequest(http.MethodOptions, "/", nil),
+			expectedStatus:       345,
+			expectedResponseBody: "",
+			expectedAllowHeader:  "",
+			expectPanic:          "",
+		},
+		{
+			description:          "MethodNotAllowed OPTIONS handler test",
+			method:               http.MethodOptions,
+			path:                 "/users/:id/posts",
+			api:                  false,
+			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
+			expectedStatus:       http.StatusMethodNotAllowed,
+			expectedResponseBody: "Method Not Allowed\n",
+			expectedAllowHeader:  "OPTIONS",
+			expectPanic:          "",
+		},
 	}
 
 	for _, tt := range tests {
