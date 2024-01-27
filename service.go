@@ -23,6 +23,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/justinas/alice"
+	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	servertiming "github.com/tozd/go-server-timing"
@@ -30,6 +31,23 @@ import (
 	"gitlab.com/tozd/go/x"
 	z "gitlab.com/tozd/go/zerolog"
 )
+
+// TODO: Use cors.Options directly once it has JSON struct tags.
+//       See: https://github.com/rs/cors/pull/164
+
+// CorsOptions is a subset of cors.Options.
+//
+// See description of fields in cors.Options.
+type CorsOptions struct {
+	AllowedOrigins       []string `json:"allowedOrigins,omitempty"`
+	AllowedMethods       []string `json:"allowedMethods,omitempty"`
+	AllowedHeaders       []string `json:"allowedHeaders,omitempty"`
+	ExposedHeaders       []string `json:"exposedHeaders,omitempty"`
+	MaxAge               int      `json:"maxAge,omitempty"`
+	AllowCredentials     bool     `json:"allowCredentials,omitempty"`
+	AllowPrivateNetwork  bool     `json:"allowPrivateNetwork,omitempty"`
+	OptionsSuccessStatus int      `json:"optionsSuccessStatus,omitempty"`
+}
 
 // Route is a high-level route definition which is used by a service
 // to register handlers with the router. It can also be used by Vue Router
@@ -47,6 +65,12 @@ type Route struct {
 
 	// Does this route have a non-API handler.
 	Get bool `json:"get,omitempty"`
+
+	// Enable CORS on API handlers?
+	APICors *CorsOptions `json:"apiCors,omitempty"`
+
+	// Enable CORS on non-API handler?
+	GetCors *CorsOptions `json:"getCors,omitempty"`
 }
 
 type staticFile struct {
@@ -155,6 +179,58 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 	st := reflect.New(typ).Interface().(SiteT) //nolint:forcetypeassert,errcheck
 	site := st.GetSite()
 	return st, site
+}
+
+func newCors(options *CorsOptions) *cors.Cors {
+	if options == nil {
+		return nil
+	}
+
+	return cors.New(cors.Options{ //nolint:exhaustruct
+		AllowedOrigins:       options.AllowedOrigins,
+		AllowedMethods:       options.AllowedMethods,
+		AllowedHeaders:       options.AllowedHeaders,
+		ExposedHeaders:       options.ExposedHeaders,
+		MaxAge:               options.MaxAge,
+		AllowCredentials:     options.AllowCredentials,
+		AllowPrivateNetwork:  options.AllowPrivateNetwork,
+		OptionsSuccessStatus: options.OptionsSuccessStatus,
+		// We always passthrough and call w.WriteHeader ourselves,
+		// unless there is API OPTIONS handler which we then call instead.
+		OptionsPassthrough: true,
+	})
+}
+
+func wrapGetCors(options *CorsOptions, h func(http.ResponseWriter, *http.Request, Params)) (
+	func(http.ResponseWriter, *http.Request, Params),
+	func(http.ResponseWriter, *http.Request, Params),
+) {
+	c := newCors(options)
+	optionsSuccessStatus := options.OptionsSuccessStatus
+	if optionsSuccessStatus == 0 {
+		optionsSuccessStatus = http.StatusNoContent
+	}
+	return func(w http.ResponseWriter, r *http.Request, params Params) {
+			// Non-OPTIONS request.
+			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				h(w, r, params)
+			})).ServeHTTP(w, r)
+		}, func(w http.ResponseWriter, r *http.Request, params Params) {
+			// OPTIONS request.
+			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// We do nothing after OPTIONS request has been handled,
+				// even if it was not a CORS OPTIONS request.
+				w.WriteHeader(optionsSuccessStatus)
+			})).ServeHTTP(w, r)
+		}
+}
+
+func wrapCors(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) func(http.ResponseWriter, *http.Request, Params) {
+	return func(w http.ResponseWriter, r *http.Request, params Params) {
+		c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h(w, r, params)
+		})).ServeHTTP(w, r)
+	}
 }
 
 // Service defines the application logic for your service.
@@ -422,6 +498,18 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 				return errE
 			}
+			if route.GetCors != nil {
+				var optionsH func(http.ResponseWriter, *http.Request, Params)
+				h, optionsH = wrapGetCors(route.GetCors, h)
+				optionsH = logHandlerName(handlerName, optionsH)
+				errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, false, optionsH)
+				if errE != nil {
+					errors.Details(errE)["handler"] = handlerName
+					errors.Details(errE)["route"] = route.Name
+					errors.Details(errE)["path"] = route.Path
+					return errE
+				}
+			}
 			h = logHandlerName(handlerName, h)
 			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
 			if errE != nil {
@@ -431,8 +519,10 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				return errE
 			}
 		}
-		if route.API {
+		if route.API { //nolint:nestif
+			c := newCors(route.APICors)
 			foundAnyAPIHandler := false
+			foundOptionsHandler := false
 			// MethodHead is handled by MethodGet handled.
 			for _, method := range []string{
 				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
@@ -455,6 +545,12 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					errors.Details(errE)["path"] = route.Path
 					errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 					return errE
+				}
+				if c != nil {
+					h = wrapCors(c, h)
+					if method == http.MethodOptions {
+						foundOptionsHandler = true
+					}
 				}
 				h = logHandlerName(handlerName, h)
 				errE := s.router.Handle(route.Name, method, route.Path, true, h)
@@ -479,6 +575,28 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				errors.Details(errE)["route"] = route.Name
 				errors.Details(errE)["path"] = route.Path
 				return errE
+			}
+			if c != nil && !foundOptionsHandler {
+				handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(http.MethodOptions))) //nolint:staticcheck
+				optionsSuccessStatus := route.APICors.OptionsSuccessStatus
+				if optionsSuccessStatus == 0 {
+					optionsSuccessStatus = http.StatusNoContent
+				}
+				h := func(w http.ResponseWriter, r *http.Request, params Params) {
+					c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						// We do nothing after OPTIONS request has been handled,
+						// even if it was not a CORS OPTIONS request.
+						w.WriteHeader(optionsSuccessStatus)
+					})).ServeHTTP(w, r)
+				}
+				h = logHandlerName(handlerName, h)
+				errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, true, h)
+				if errE != nil {
+					errors.Details(errE)["handler"] = handlerName
+					errors.Details(errE)["route"] = route.Name
+					errors.Details(errE)["path"] = route.Path
+					return errE
+				}
 			}
 		}
 	}

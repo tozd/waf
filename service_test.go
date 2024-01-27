@@ -483,7 +483,7 @@ func TestServiceReverse(t *testing.T) {
 	assert.EqualError(t, errE, "parameter is missing")
 
 	_, errE = service.Reverse("JSON", nil, nil)
-	assert.EqualError(t, errE, "route has no GET handler")
+	assert.EqualError(t, errE, "route has no GET or OPTIONS handler")
 
 	_, errE = service.Reverse("something", nil, nil)
 	assert.EqualError(t, errE, "route does not exist")

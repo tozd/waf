@@ -107,11 +107,12 @@ type matcher struct {
 }
 
 type route struct {
-	Name       string
-	Path       string
-	Segments   []pathSegment
-	Parameters mapset.Set[string]
-	GetHandler Handler
+	Name           string
+	Path           string
+	Segments       []pathSegment
+	Parameters     mapset.Set[string]
+	GetHandler     Handler
+	OptionsHandler Handler
 	// A map between methods and API handlers.
 	APIHandlers map[string]Handler
 }
@@ -227,12 +228,13 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			}
 		}
 		ro = &route{
-			Name:        name,
-			Path:        path,
-			Segments:    segments,
-			Parameters:  parameters,
-			GetHandler:  nil,
-			APIHandlers: make(map[string]Handler),
+			Name:           name,
+			Path:           path,
+			Segments:       segments,
+			Parameters:     parameters,
+			GetHandler:     nil,
+			OptionsHandler: nil,
+			APIHandlers:    make(map[string]Handler),
 		}
 		if r.routes == nil {
 			r.routes = make(map[string]*route)
@@ -279,21 +281,30 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 
 		ro.APIHandlers[method] = handler
 	} else {
-		if method != http.MethodGet {
-			err := errors.New("non-API handler must use GET HTTP method")
+		if method == http.MethodGet {
+			if ro.GetHandler != nil {
+				err := errors.New("non-API GET handler already exists")
+				errors.Details(err)["route"] = name
+				errors.Details(err)["path"] = path
+				return err
+			}
+
+			ro.GetHandler = handler
+		} else if method == http.MethodOptions {
+			if ro.OptionsHandler != nil {
+				err := errors.New("non-API OPTIONS handler already exists")
+				errors.Details(err)["route"] = name
+				errors.Details(err)["path"] = path
+				return err
+			}
+
+			ro.OptionsHandler = handler
+		} else {
+			err := errors.New("non-API handler must use GET or OPTIONS HTTP method")
 			errors.Details(err)["route"] = name
 			errors.Details(err)["path"] = path
 			return err
 		}
-
-		if ro.GetHandler != nil {
-			err := errors.New("non-API handler already exists")
-			errors.Details(err)["route"] = name
-			errors.Details(err)["path"] = path
-			return err
-		}
-
-		ro.GetHandler = handler
 	}
 
 	return nil
@@ -392,16 +403,28 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 				})
 			}
 		} else {
-			if matcher.Route.GetHandler == nil {
+			if matcher.Route.GetHandler == nil && matcher.Route.OptionsHandler == nil {
 				// We exit search early.
 				break
 			}
-			if req.Method != http.MethodGet && req.Method != http.MethodHead {
+			if (req.Method == http.MethodGet || req.Method == http.MethodHead) && matcher.Route.GetHandler != nil {
+				handler = matcher.Route.GetHandler
+			} else if req.Method == http.MethodOptions && matcher.Route.OptionsHandler != nil {
+				handler = matcher.Route.OptionsHandler
+			} else {
+				allow := []string{}
+				if matcher.Route.GetHandler != nil {
+					allow = append(allow, "GET", "HEAD")
+				}
+				if matcher.Route.OptionsHandler != nil {
+					allow = append(allow, "OPTIONS")
+				}
+				sort.Strings(allow)
+
 				return matcher.Route, nil, params, errors.WithStack(&MethodNotAllowedError{
-					Allow: []string{"GET", "HEAD"},
+					Allow: allow,
 				})
 			}
-			handler = matcher.Route.GetHandler
 		}
 
 		return matcher.Route, handler, params, nil
@@ -422,8 +445,8 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		errors.Details(err)["route"] = name
 		return "", err
 	}
-	if !api && ro.GetHandler == nil {
-		err := errors.New("route has no GET handler")
+	if !api && (ro.GetHandler == nil && ro.OptionsHandler == nil) {
+		err := errors.New("route has no GET or OPTIONS handler")
 		errors.Details(err)["route"] = name
 		return "", err
 	}

@@ -292,7 +292,7 @@ func TestRouterHandle(t *testing.T) {
 			expectedError: "path with different routes",
 		},
 		{
-			description: "Adding duplicate non-API routes",
+			description: "Adding duplicate non-API GET routes",
 			routes: []testRoute{
 				{
 					routeName: "UsersPosts",
@@ -307,7 +307,43 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "non-API handler already exists",
+			expectedError: "non-API GET handler already exists",
+		},
+		{
+			description: "Adding duplicate non-API OPTIONS routes",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodOptions,
+					path:      "/users/:id/posts",
+					api:       false,
+				},
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodOptions,
+					path:      "/users/:id/posts",
+					api:       false,
+				},
+			},
+			expectedError: "non-API OPTIONS handler already exists",
+		},
+		{
+			description: "Allow non-API GET and OPTIONS routes",
+			routes: []testRoute{
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodGet,
+					path:      "/users/:id/posts",
+					api:       false,
+				},
+				{
+					routeName: "UsersPosts",
+					method:    http.MethodOptions,
+					path:      "/users/:id/posts",
+					api:       false,
+				},
+			},
+			expectedError: "",
 		},
 		{
 			description: "Adding duplicate API routes",
@@ -328,7 +364,7 @@ func TestRouterHandle(t *testing.T) {
 			expectedError: "API handler already exists",
 		},
 		{
-			description: "Adding non-API non-GET handler",
+			description: "Adding non-API non-GET/OPTIONS handler",
 			routes: []testRoute{
 				{
 					routeName: "UsersPosts",
@@ -337,7 +373,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "non-API handler must use GET HTTP method",
+			expectedError: "non-API handler must use GET or OPTIONS HTTP method",
 		},
 		{
 			description: "Adding a handler with an invalid path",
@@ -595,7 +631,7 @@ func TestRouterReverse(t *testing.T) {
 			inputAPI:      false,
 			encodeQuery:   nil,
 			expectedPath:  "",
-			expectedError: "route has no GET handler",
+			expectedError: "route has no GET or OPTIONS handler",
 		},
 		{
 			description: "Path with custom query string",
