@@ -233,6 +233,22 @@ func wrapCors(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) 
 	}
 }
 
+func methodsSubset(options *CorsOptions, methodsWithHandlers []string) errors.E {
+	allowedMethods := mapset.NewThreadUnsafeSet[string]()
+	allowedMethods.Append(options.AllowedMethods...)
+
+	methods := mapset.NewThreadUnsafeSet[string]()
+	methods.Append(methodsWithHandlers...)
+
+	extraMethods := allowedMethods.Difference(methods)
+	if extraMethods.Cardinality() > 0 {
+		errE := errors.New("CORS allowed methods contains methods without handlers")
+		errors.Details(errE)["extra"] = extraMethods.ToSlice()
+		return errE
+	}
+	return nil
+}
+
 // Service defines the application logic for your service.
 //
 // You should embed the Service struct inside your service struct on which
@@ -499,10 +515,17 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				return errE
 			}
 			if route.GetCors != nil {
+				errE := methodsSubset(route.GetCors, []string{"GET", "HEAD"})
+				if errE != nil {
+					errors.Details(errE)["handler"] = handlerName
+					errors.Details(errE)["route"] = route.Name
+					errors.Details(errE)["path"] = route.Path
+					return errE
+				}
 				var optionsH func(http.ResponseWriter, *http.Request, Params)
 				h, optionsH = wrapGetCors(route.GetCors, h)
 				optionsH = logHandlerName(handlerName, optionsH)
-				errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, false, optionsH)
+				errE = s.router.Handle(route.Name, http.MethodOptions, route.Path, false, optionsH)
 				if errE != nil {
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["route"] = route.Name
@@ -511,6 +534,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				}
 			}
 			h = logHandlerName(handlerName, h)
+			// HEAD method is already handled by the router for non-API requests.
 			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
 			if errE != nil {
 				errors.Details(errE)["handler"] = handlerName
@@ -523,6 +547,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			c := newCors(route.APICors)
 			foundAnyAPIHandler := false
 			foundOptionsHandler := false
+			foundMethods := []string{}
 			// MethodHead is handled by MethodGet handled.
 			for _, method := range []string{
 				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
@@ -560,6 +585,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					errors.Details(errE)["path"] = route.Path
 					return errE
 				}
+				foundMethods = append(foundMethods, method)
 				if method == http.MethodGet {
 					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
 					if errE != nil {
@@ -568,6 +594,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 						errors.Details(errE)["path"] = route.Path
 						return errE
 					}
+					foundMethods = append(foundMethods, http.MethodHead)
 				}
 			}
 			if !foundAnyAPIHandler {
@@ -576,23 +603,31 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				errors.Details(errE)["path"] = route.Path
 				return errE
 			}
-			if c != nil && !foundOptionsHandler {
-				handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(http.MethodOptions))) //nolint:staticcheck
-				optionsSuccessStatus := route.APICors.OptionsSuccessStatus
-				if optionsSuccessStatus == 0 {
-					optionsSuccessStatus = http.StatusNoContent
+			if c != nil {
+				if !foundOptionsHandler {
+					handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(http.MethodOptions))) //nolint:staticcheck
+					optionsSuccessStatus := route.APICors.OptionsSuccessStatus
+					if optionsSuccessStatus == 0 {
+						optionsSuccessStatus = http.StatusNoContent
+					}
+					h := func(w http.ResponseWriter, r *http.Request, params Params) {
+						c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							// We do nothing after OPTIONS request has been handled,
+							// even if it was not a CORS OPTIONS request.
+							w.WriteHeader(optionsSuccessStatus)
+						})).ServeHTTP(w, r)
+					}
+					h = logHandlerName(handlerName, h)
+					errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, true, h)
+					if errE != nil {
+						errors.Details(errE)["handler"] = handlerName
+						errors.Details(errE)["route"] = route.Name
+						errors.Details(errE)["path"] = route.Path
+						return errE
+					}
 				}
-				h := func(w http.ResponseWriter, r *http.Request, params Params) {
-					c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						// We do nothing after OPTIONS request has been handled,
-						// even if it was not a CORS OPTIONS request.
-						w.WriteHeader(optionsSuccessStatus)
-					})).ServeHTTP(w, r)
-				}
-				h = logHandlerName(handlerName, h)
-				errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, true, h)
+				errE := methodsSubset(route.APICors, foundMethods)
 				if errE != nil {
-					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["route"] = route.Name
 					errors.Details(errE)["path"] = route.Path
 					return errE
