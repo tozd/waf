@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `APICors` and `GetCors` on `Route` struct enable CORS handling.
 
+### Fixed
+
+- Race condition with disabled logger.
+  [#643](https://github.com/rs/zerolog/issues/643)
+
 ## [0.6.0] - 2023-12-07
 
 ### Added
