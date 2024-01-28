@@ -23,9 +23,9 @@ Features:
 - Supports [server timing](https://www.w3.org/TR/server-timing/) measurements and response header.
 - Supports structured metadata in a response header encoded based on
   [RFC 8941](https://www.rfc-editor.org/rfc/rfc8941).
-- Supports web sockets.
+- Supports [web sockets](https://en.wikipedia.org/wiki/WebSocket).
 - Can serve multiple sites/configurations.
-- Supports CORS handling per route.
+- Supports [CORS](https://en.wikipedia.org/wiki/Cross-origin_resource_sharing) handling per route.
 
 ## Installation
 
