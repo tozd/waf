@@ -209,7 +209,7 @@ func (s *testService) CORSPatch(w http.ResponseWriter, req *http.Request, _ Para
 	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
 }
 
-func (s *testService) CORSOptions(w http.ResponseWriter, req *http.Request, _ Params) {
+func (s *testService) CORSOptions(w http.ResponseWriter, _ *http.Request, _ Params) {
 	w.WriteHeader(214)
 }
 
