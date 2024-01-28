@@ -192,6 +192,27 @@ func (s *testService) NonCompressibleJSONGet(w http.ResponseWriter, req *http.Re
 
 func (s *testService) InvalidHandlerTypeGet() {}
 
+func (s *testService) CORS(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
+}
+
+func (s *testService) CORSGet(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
+}
+
+func (s *testService) CORSPost(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
+}
+
+func (s *testService) CORSPatch(w http.ResponseWriter, req *http.Request, _ Params) {
+	// This one does not have CORS on purpose.
+	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
+}
+
+func (s *testService) CORSOptions(w http.ResponseWriter, req *http.Request, _ Params) {
+	w.WriteHeader(214)
+}
+
 func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
 	t.Helper()
 
@@ -250,6 +271,32 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 					Path: "/noncompressible",
 					API:  true,
 					Get:  false,
+				},
+				{
+					Name: "CORS",
+					Path: "/cors",
+					API:  true,
+					Get:  true,
+					APICors: &CorsOptions{
+						AllowedOrigins:       []string{"https://other.example.com"},
+						AllowedMethods:       []string{"GET", "POST"}, // HEAD should be added.
+						AllowedHeaders:       []string{"FooBar", "foo-zoo"},
+						ExposedHeaders:       []string{"BarFoo", "zooFoo"},
+						MaxAge:               54,
+						AllowCredentials:     false,
+						AllowPrivateNetwork:  true,
+						OptionsSuccessStatus: 212, // Should not be returned because we have CORSOptions handler.
+					},
+					GetCors: &CorsOptions{
+						AllowedOrigins:       []string{"*"},
+						AllowedMethods:       []string{}, // GET and HEAD should be added automatically.
+						AllowedHeaders:       []string{},
+						ExposedHeaders:       []string{},
+						MaxAge:               55,
+						AllowCredentials:     true,
+						AllowPrivateNetwork:  false,
+						OptionsSuccessStatus: 213,
+					},
 				},
 			},
 			Sites: map[string]*testSite{
@@ -530,6 +577,15 @@ func TestServiceReverse(t *testing.T) {
 {"level":"debug","handler":"NonCompressibleJSONConnect","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
 {"level":"debug","handler":"NonCompressibleJSONOptions","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
 {"level":"debug","handler":"NonCompressibleJSONTrace","route":"NonCompressibleJSON","path":"/noncompressible","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORS","route":"CORS","path":"/cors","message":"route registration: handler found"}
+{"level":"debug","handler":"CORSGet","route":"CORS","path":"/cors","message":"route registration: API handler found"}
+{"level":"debug","handler":"CORSPost","route":"CORS","path":"/cors","message":"route registration: API handler found"}
+{"level":"debug","handler":"CORSPut","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSPatch","route":"CORS","path":"/cors","message":"route registration: API handler found"}
+{"level":"debug","handler":"CORSDelete","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSConnect","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSOptions","route":"CORS","path":"/cors","message":"route registration: API handler found"}
+{"level":"debug","handler":"CORSTrace","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
 {"level":"debug","path":"/assets/image.png","message":"added file to static files"}
 {"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for static file"}
 {"level":"debug","path":"/compressible.foobar","message":"added file to static files"}
@@ -2369,6 +2425,421 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Request-Id":             {""},
 				"Test-Header":            {"foobar"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/", nil)
+				// Origin on non-CORS handler should not have any effect on the response.
+				req.Header.Add("Origin", "https://other.example.com")
+				return req
+			},
+			"",
+			http.StatusOK,
+			[]byte(`<!DOCTYPE html><html><head><title>test</title></head><body>test site</body></html>`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"Home","etag":"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8","code":200,"responseBody":82,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"82"},
+				"Content-Type":           {"text/html; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"tN1X-esKHJy3BUQrWNN0YaiNCkUYVp_5YmywXfn0Kx8"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/cors", nil)
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","etag":"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o","code":200,"responseBody":2,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"2"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin", "Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				return req
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","etag":"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o","code":200,"responseBody":2,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                            {"1234"},
+				"Accept-Ranges":                    {"bytes"},
+				"Cache-Control":                    {"no-cache"},
+				"Content-Length":                   {"2"},
+				"Content-Type":                     {"application/json"},
+				"Date":                             {""},
+				"Etag":                             {`"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o"`},
+				"Request-Id":                       {""},
+				"Vary":                             {"Origin", "Accept-Encoding"},
+				"X-Content-Type-Options":           {"nosniff"},
+				"Access-Control-Allow-Credentials": {"true"},
+				"Access-Control-Allow-Origin":      {"*"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodOptions, "https://example.com/cors", nil)
+			},
+			"",
+			213,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","code":213,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"0"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "GET")
+				return req
+			},
+			"",
+			213,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","code":213,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                            {"1234"},
+				"Content-Length":                   {"0"},
+				"Date":                             {""},
+				"Request-Id":                       {""},
+				"Vary":                             {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options":           {"nosniff"},
+				"Access-Control-Allow-Credentials": {"true"},
+				"Access-Control-Allow-Origin":      {"*"},
+				"Access-Control-Max-Age":           {"55"},
+				"Access-Control-Allow-Methods":     {"GET"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "HEAD")
+				return req
+			},
+			"",
+			213,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","code":213,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                            {"1234"},
+				"Content-Length":                   {"0"},
+				"Date":                             {""},
+				"Request-Id":                       {""},
+				"Vary":                             {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options":           {"nosniff"},
+				"Access-Control-Allow-Credentials": {"true"},
+				"Access-Control-Allow-Origin":      {"*"},
+				"Access-Control-Max-Age":           {"55"},
+				"Access-Control-Allow-Methods":     {"HEAD"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "POST")
+				return req
+			},
+			"",
+			213,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORS","code":213,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"0"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/api/cors", nil)
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSGet","etag":"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o","code":200,"responseBody":2,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"2"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin", "Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				return req
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSGet","etag":"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o","code":200,"responseBody":2,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                         {"1234"},
+				"Accept-Ranges":                 {"bytes"},
+				"Cache-Control":                 {"no-cache"},
+				"Content-Length":                {"2"},
+				"Content-Type":                  {"application/json"},
+				"Date":                          {""},
+				"Etag":                          {`"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o"`},
+				"Request-Id":                    {""},
+				"Vary":                          {"Origin", "Accept-Encoding"},
+				"X-Content-Type-Options":        {"nosniff"},
+				"Access-Control-Allow-Origin":   {"https://other.example.com"},
+				"Access-Control-Expose-Headers": {"Barfoo, Zoofoo"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://another.example.com")
+				return req
+			},
+			"",
+			http.StatusOK,
+			[]byte(`{}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSGet","etag":"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o","code":200,"responseBody":2,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"2"},
+				"Content-Type":           {"application/json"},
+				"Date":                   {""},
+				"Etag":                   {`"RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin", "Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"0"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "GET")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                                {"1234"},
+				"Content-Length":                       {"0"},
+				"Date":                                 {""},
+				"Request-Id":                           {""},
+				"Vary":                                 {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
+				"X-Content-Type-Options":               {"nosniff"},
+				"Access-Control-Allow-Origin":          {"https://other.example.com"},
+				"Access-Control-Max-Age":               {"54"},
+				"Access-Control-Allow-Methods":         {"GET"},
+				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Private-Network": {"true"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "HEAD")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                                {"1234"},
+				"Content-Length":                       {"0"},
+				"Date":                                 {""},
+				"Request-Id":                           {""},
+				"Vary":                                 {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
+				"X-Content-Type-Options":               {"nosniff"},
+				"Access-Control-Allow-Origin":          {"https://other.example.com"},
+				"Access-Control-Max-Age":               {"54"},
+				"Access-Control-Allow-Methods":         {"HEAD"},
+				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Private-Network": {"true"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "POST")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                                {"1234"},
+				"Content-Length":                       {"0"},
+				"Date":                                 {""},
+				"Request-Id":                           {""},
+				"Vary":                                 {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
+				"X-Content-Type-Options":               {"nosniff"},
+				"Access-Control-Allow-Origin":          {"https://other.example.com"},
+				"Access-Control-Max-Age":               {"54"},
+				"Access-Control-Allow-Methods":         {"POST"},
+				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Private-Network": {"true"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "PATCH")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"0"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/cors", nil)
+				req.Header.Add("Origin", "https://another.example.com")
+				req.Header.Add("Access-Control-Request-Method", "GET")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			214,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/cors","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSOptions","code":214,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"0"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
