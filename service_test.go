@@ -502,6 +502,58 @@ func TestServiceConfigureRoutes(t *testing.T) {
 			},
 			`invalid API handler type`,
 		},
+		{
+			[]Route{
+				{
+					Name:    "CORS",
+					Path:    "/cors",
+					API:     true,
+					Get:     false,
+					GetCors: &CorsOptions{},
+				},
+			},
+			`GET CORS configured but "get" is not true`,
+		},
+		{
+			[]Route{
+				{
+					Name:    "CORS",
+					Path:    "/cors",
+					API:     false,
+					Get:     true,
+					APICors: &CorsOptions{},
+				},
+			},
+			`API CORS configured but "api" is not true`,
+		},
+		{
+			[]Route{
+				{
+					Name: "CORS",
+					Path: "/cors",
+					API:  false,
+					Get:  true,
+					GetCors: &CorsOptions{
+						AllowedMethods: []string{http.MethodPatch},
+					},
+				},
+			},
+			`CORS allowed methods contain methods without handlers`,
+		},
+		{
+			[]Route{
+				{
+					Name: "CORS",
+					Path: "/cors",
+					API:  true,
+					Get:  false,
+					APICors: &CorsOptions{
+						AllowedMethods: []string{http.MethodGet, http.MethodDelete},
+					},
+				},
+			},
+			`CORS allowed methods contain methods without handlers`,
+		},
 	}
 
 	for k, tt := range tests {
