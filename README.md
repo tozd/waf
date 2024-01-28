@@ -25,6 +25,7 @@ Features:
   [RFC 8941](https://www.rfc-editor.org/rfc/rfc8941).
 - Supports web sockets.
 - Can serve multiple sites/configurations.
+- Supports CORS handling per route.
 
 ## Installation
 
