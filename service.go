@@ -1077,6 +1077,9 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	var ok bool
 	var f staticFile
 
+	// Always set Vary as our error responses also depend on Accept-Encoding.
+	w.Header().Add("Vary", "Accept-Encoding")
+
 	// TODO: When searching for a suitable compression, we should also search by etag from If-None-Match.
 	//       If-None-Match might have an etag for a compression which is not picked here. This is probably rare though.
 	compressions := slices.Clone(allCompressions)
@@ -1140,7 +1143,6 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	} else {
 		w.Header().Set("Cache-Control", "no-cache")
 	}
-	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("Etag", f.Etag)
 
 	// See: https://github.com/golang/go/issues/50905
