@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -51,24 +50,28 @@ type CorsOptions struct {
 }
 
 func (c *CorsOptions) GetAllowedMethods() []string {
+	if len(c.AllowedMethods) == 0 {
+		// We allow only GET and HEAD by default.
+		// This is different from the cors package which also has POST.
+		return []string{http.MethodGet, http.MethodHead}
+	}
+
 	allowedMethods := []string{}
 	hasGet := false
 	hasHead := false
 	for _, method := range c.AllowedMethods {
-		method := strings.ToUpper(method)
+		method = strings.ToUpper(method)
 		allowedMethods = append(allowedMethods, method)
-		if method == "GET" {
+		if method == http.MethodGet {
 			hasGet = true
-		} else if method == "HEAD" {
+		} else if method == http.MethodHead {
 			hasHead = true
 		}
 	}
 
 	if hasGet && !hasHead {
-		allowedMethods = append(allowedMethods, "HEAD")
+		allowedMethods = append(allowedMethods, http.MethodHead)
 	}
-
-	sort.Strings(allowedMethods)
 
 	return allowedMethods
 }
@@ -266,7 +269,7 @@ func methodsSubset(options *CorsOptions, methodsWithHandlers []string) errors.E 
 
 	extraMethods := allowedMethods.Difference(methods)
 	if extraMethods.Cardinality() > 0 {
-		errE := errors.New("CORS allowed methods contains methods without handlers")
+		errE := errors.New("CORS allowed methods contain methods without handlers")
 		errors.Details(errE)["extra"] = extraMethods.ToSlice()
 		return errE
 	}
@@ -539,7 +542,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				return errE
 			}
 			if route.GetCors != nil {
-				errE := methodsSubset(route.GetCors, []string{"GET", "HEAD"})
+				errE := methodsSubset(route.GetCors, []string{http.MethodGet, http.MethodHead})
 				if errE != nil {
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["route"] = route.Name
