@@ -519,6 +519,18 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			errors.Details(errE)["path"] = route.Path
 			return errE
 		}
+		if !route.Get && route.GetCors != nil {
+			errE := errors.New(`GET CORS configured but "get" is not true`)
+			errors.Details(errE)["route"] = route.Name
+			errors.Details(errE)["path"] = route.Path
+			return errE
+		}
+		if !route.API && route.APICors != nil {
+			errE := errors.New(`API CORS configured but "api" is not true`)
+			errors.Details(errE)["route"] = route.Name
+			errors.Details(errE)["path"] = route.Path
+			return errE
+		}
 
 		if route.Get {
 			handlerName := route.Name

@@ -213,6 +213,10 @@ func (s *testService) CORSOptions(w http.ResponseWriter, req *http.Request, _ Pa
 	w.WriteHeader(214)
 }
 
+func (s *testService) CORSNoOptionsPatch(w http.ResponseWriter, req *http.Request, _ Params) {
+	s.WriteJSON(w, req, json.RawMessage(`{}`), nil)
+}
+
 func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
 	t.Helper()
 
@@ -296,6 +300,21 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 						AllowCredentials:     true,
 						AllowPrivateNetwork:  false,
 						OptionsSuccessStatus: 213,
+					},
+				},
+				{
+					Name: "CORSNoOptions",
+					Path: "/corsNoOptions",
+					API:  true,
+					Get:  false,
+					APICors: &CorsOptions{
+						AllowedOrigins:       []string{"https://other.example.com"},
+						AllowedMethods:       []string{"PATCH"},
+						AllowedHeaders:       []string{"FooBar"},
+						MaxAge:               56,
+						AllowCredentials:     true,
+						AllowPrivateNetwork:  false,
+						OptionsSuccessStatus: 0,
 					},
 				},
 			},
@@ -586,6 +605,14 @@ func TestServiceReverse(t *testing.T) {
 {"level":"debug","handler":"CORSConnect","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
 {"level":"debug","handler":"CORSOptions","route":"CORS","path":"/cors","message":"route registration: API handler found"}
 {"level":"debug","handler":"CORSTrace","route":"CORS","path":"/cors","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsGet","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsPost","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsPut","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsPatch","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler found"}
+{"level":"debug","handler":"CORSNoOptionsDelete","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsConnect","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsOptions","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
+{"level":"debug","handler":"CORSNoOptionsTrace","route":"CORSNoOptions","path":"/corsNoOptions","message":"route registration: API handler not found"}
 {"level":"debug","path":"/assets/image.png","message":"added file to static files"}
 {"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for static file"}
 {"level":"debug","path":"/compressible.foobar","message":"added file to static files"}
@@ -2841,6 +2868,85 @@ func TestService(t *testing.T) {
 				"Request-Id":             {""},
 				"Vary":                   {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network"},
 				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/corsNoOptions", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "PATCH")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				return req
+			},
+			"",
+			http.StatusNoContent,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/corsNoOptions","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSNoOptionsOptions","code":204,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/corsNoOptions", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "PATCH")
+				req.Header.Add("Access-Control-Request-Private-Network", "true")
+				req.Header.Add("Access-Control-Request-Headers", "FooBar")
+				return req
+			},
+			"",
+			http.StatusNoContent,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/corsNoOptions","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSNoOptionsOptions","code":204,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                            {"1234"},
+				"Date":                             {""},
+				"Request-Id":                       {""},
+				"Vary":                             {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options":           {"nosniff"},
+				"Access-Control-Allow-Origin":      {"https://other.example.com"},
+				"Access-Control-Max-Age":           {"56"},
+				"Access-Control-Allow-Methods":     {"PATCH"},
+				"Access-Control-Allow-Headers":     {"Foobar"},
+				"Access-Control-Allow-Credentials": {"true"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodOptions, "https://example.com/api/corsNoOptions", nil)
+				req.Header.Add("Origin", "https://other.example.com")
+				req.Header.Add("Access-Control-Request-Method", "PATCH")
+				return req
+			},
+			"",
+			http.StatusNoContent,
+			[]byte(``),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"OPTIONS","path":"/api/corsNoOptions","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","message":"CORSNoOptionsOptions","code":204,"responseBody":0,"requestBody":0,"metrics":{"t":}}` + "\n",
+			http.Header{
+				"Extra":                            {"1234"},
+				"Date":                             {""},
+				"Request-Id":                       {""},
+				"Vary":                             {"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"},
+				"X-Content-Type-Options":           {"nosniff"},
+				"Access-Control-Allow-Origin":      {"https://other.example.com"},
+				"Access-Control-Max-Age":           {"56"},
+				"Access-Control-Allow-Methods":     {"PATCH"},
+				"Access-Control-Allow-Credentials": {"true"},
 			},
 			http.Header{
 				"Server-Timing": {"t;dur="},
