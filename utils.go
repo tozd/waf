@@ -57,12 +57,10 @@ var siteContextKey = &contextKey{"site"} //nolint:gochecknoglobals
 // metadataContextKey accumulates metadata for the HTTP response.
 var metadataContextKey = &contextKey{"metadata"} //nolint:gochecknoglobals
 
-var disabledLogger *zerolog.Logger //nolint:gochecknoglobals
-
-func init() { //nolint:gochecknoinits
-	l := zerolog.Nop()
-	disabledLogger = &l
-}
+// We have to use the same disabledLogger that is used in zerolog.Ctx because
+// it is checked in logger.UpdateContext.
+// See: https://github.com/rs/zerolog/issues/643
+var disabledLogger = zerolog.Ctx(context.Background()) //nolint:gochecknoglobals
 
 // canonicalLoggerContextKey provides a canonical log line logger for each HTTP request.
 var canonicalLoggerContextKey = &contextKey{"canonical-logger"} //nolint:gochecknoglobals
