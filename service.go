@@ -1139,7 +1139,7 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 		w.Header().Set("Content-Length", strconv.Itoa(len(f.Data)))
 	}
 	if immutable {
-		w.Header().Set("Cache-Control", "public,max-age=31536000,immutable,stale-while-revalidate=86400")
+		w.Header().Set("Cache-Control", "max-age=31536000,immutable,stale-while-revalidate=86400")
 	} else {
 		w.Header().Set("Cache-Control", "no-cache")
 	}

@@ -677,7 +677,7 @@ func TestService(t *testing.T) {
 			http.Header{
 				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
-				"Cache-Control":          {"public,max-age=31536000,immutable,stale-while-revalidate=86400"},
+				"Cache-Control":          {"max-age=31536000,immutable,stale-while-revalidate=86400"},
 				"Content-Length":         {"10"},
 				"Content-Type":           {"image/png"},
 				"Date":                   {""},
