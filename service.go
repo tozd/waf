@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,29 @@ type CorsOptions struct {
 	AllowCredentials     bool     `json:"allowCredentials,omitempty"`
 	AllowPrivateNetwork  bool     `json:"allowPrivateNetwork,omitempty"`
 	OptionsSuccessStatus int      `json:"optionsSuccessStatus,omitempty"`
+}
+
+func (c *CorsOptions) GetAllowedMethods() []string {
+	allowedMethods := []string{}
+	hasGet := false
+	hasHead := false
+	for _, method := range c.AllowedMethods {
+		method := strings.ToUpper(method)
+		allowedMethods = append(allowedMethods, method)
+		if method == "GET" {
+			hasGet = true
+		} else if method == "HEAD" {
+			hasHead = true
+		}
+	}
+
+	if hasGet && !hasHead {
+		allowedMethods = append(allowedMethods, "HEAD")
+	}
+
+	sort.Strings(allowedMethods)
+
+	return allowedMethods
 }
 
 // Route is a high-level route definition which is used by a service
@@ -188,7 +212,7 @@ func newCors(options *CorsOptions) *cors.Cors {
 
 	return cors.New(cors.Options{ //nolint:exhaustruct
 		AllowedOrigins:       options.AllowedOrigins,
-		AllowedMethods:       options.AllowedMethods,
+		AllowedMethods:       options.GetAllowedMethods(),
 		AllowedHeaders:       options.AllowedHeaders,
 		ExposedHeaders:       options.ExposedHeaders,
 		MaxAge:               options.MaxAge,
@@ -235,7 +259,7 @@ func wrapCors(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) 
 
 func methodsSubset(options *CorsOptions, methodsWithHandlers []string) errors.E {
 	allowedMethods := mapset.NewThreadUnsafeSet[string]()
-	allowedMethods.Append(options.AllowedMethods...)
+	allowedMethods.Append(options.GetAllowedMethods()...)
 
 	methods := mapset.NewThreadUnsafeSet[string]()
 	methods.Append(methodsWithHandlers...)
