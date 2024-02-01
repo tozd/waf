@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -483,7 +484,9 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		}
 		extraParameters := paramsSet.Difference(ro.Parameters)
 		err := errors.New("extra parameters")
-		errors.Details(err)["extra"] = extraParameters.ToSlice()
+		extra := extraParameters.ToSlice()
+		slices.Sort(extra)
+		errors.Details(err)["extra"] = extra
 		errors.Details(err)["route"] = name
 		return "", err
 	}

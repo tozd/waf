@@ -270,7 +270,9 @@ func methodsSubset(options *CorsOptions, methodsWithHandlers []string) errors.E 
 	extraMethods := allowedMethods.Difference(methods)
 	if extraMethods.Cardinality() > 0 {
 		errE := errors.New("CORS allowed methods contain methods without handlers")
-		errors.Details(errE)["extra"] = extraMethods.ToSlice()
+		extra := extraMethods.ToSlice()
+		slices.Sort(extra)
+		errors.Details(errE)["extra"] = extra
 		return errE
 	}
 	return nil
