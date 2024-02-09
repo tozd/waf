@@ -32,12 +32,11 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-// TODO: Use cors.Options directly once it has JSON struct tags.
-//       See: https://github.com/rs/cors/pull/164
-
 // CorsOptions is a subset of cors.Options.
 //
 // See description of fields in cors.Options.
+//
+// See: https://github.com/rs/cors/pull/164
 type CorsOptions struct {
 	AllowedOrigins       []string `json:"allowedOrigins,omitempty"`
 	AllowedMethods       []string `json:"allowedMethods,omitempty"`
