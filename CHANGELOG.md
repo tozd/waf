@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Router.Get` resolves path and method to a route descriptor `ResolvedRoute`,
+  or returns `MethodNotAllowedError` or `ErrNotFound` errors.
+
 ## [0.7.0] - 2024-01-28
 
 ### Added

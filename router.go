@@ -12,7 +12,7 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
-var errNotFound = errors.Base("not found")
+var ErrNotFound = errors.Base("not found")
 
 type MethodNotAllowedError struct {
 	Allow []string
@@ -116,6 +116,12 @@ type route struct {
 	OptionsHandler Handler
 	// A map between methods and API handlers.
 	APIHandlers map[string]Handler
+}
+
+type ResolvedRoute struct {
+	Name    string
+	Handler Handler
+	Params  Params
 }
 
 // Params are parsed from the request URL path based on the
@@ -334,9 +340,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer r.recv(w, req)
 	}
 
-	_, handler, params, errE := r.get(req)
+	_, handler, params, errE := r.get(req.URL.Path, req.Method)
 	var e *MethodNotAllowedError
-	if errors.Is(errE, errNotFound) {
+	if errors.Is(errE, ErrNotFound) {
 		if r.NotFound != nil {
 			r.NotFound(w, req)
 		} else {
@@ -362,15 +368,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // TODO: Make Router.Get which returns a public struct with handler, params, and some (all?) information from route.
 //       Also make sentinel errors public. Keep private Router.get to not have to allocate a new struct every time.
 
-func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
-	path := req.URL.Path
-
+func (r *Router) get(path, method string) (*route, Handler, Params, errors.E) {
 	api := false
 	if path == "/api" {
 		api = true
 		path = "/"
 	} else if path == "/api/" {
-		return nil, nil, nil, errors.WithStack(errNotFound)
+		return nil, nil, nil, errors.WithStack(ErrNotFound)
 	} else if strings.HasPrefix(path, "/api/") {
 		api = true
 		path = strings.TrimPrefix(path, "/api")
@@ -391,7 +395,7 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 				break
 			}
 			var ok bool
-			handler, ok = matcher.Route.APIHandlers[req.Method]
+			handler, ok = matcher.Route.APIHandlers[method]
 			if !ok {
 				allow := []string{}
 				for method := range matcher.Route.APIHandlers {
@@ -408,9 +412,9 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 				// We exit search early.
 				break
 			}
-			if (req.Method == http.MethodGet || req.Method == http.MethodHead) && matcher.Route.GetHandler != nil {
+			if (method == http.MethodGet || method == http.MethodHead) && matcher.Route.GetHandler != nil {
 				handler = matcher.Route.GetHandler
-			} else if req.Method == http.MethodOptions && matcher.Route.OptionsHandler != nil {
+			} else if method == http.MethodOptions && matcher.Route.OptionsHandler != nil {
 				handler = matcher.Route.OptionsHandler
 			} else {
 				allow := []string{}
@@ -431,7 +435,22 @@ func (r *Router) get(req *http.Request) (*route, Handler, Params, errors.E) {
 		return matcher.Route, handler, params, nil
 	}
 
-	return nil, nil, nil, errors.WithStack(errNotFound)
+	return nil, nil, nil, errors.WithStack(ErrNotFound)
+}
+
+// Get resolves path and method to a route, or returns MethodNotAllowedError
+// or ErrNotFound errors.
+func (r *Router) Get(path, method string) (ResolvedRoute, errors.E) {
+	route, handler, params, errE := r.get(path, method)
+	if errE != nil {
+		return ResolvedRoute{}, errE //nolint:exhaustruct
+	}
+
+	return ResolvedRoute{
+		Name:    route.Name,
+		Handler: handler,
+		Params:  params,
+	}, nil
 }
 
 func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (string, errors.E) {

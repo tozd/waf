@@ -1007,3 +1007,28 @@ func TestRouterServeHTTP(t *testing.T) {
 		})
 	}
 }
+
+func TestRouterGet(t *testing.T) {
+	t.Parallel()
+
+	hRan := false
+	h := func(w http.ResponseWriter, req *http.Request, params Params) {
+		hRan = true
+	}
+	r := &Router{}
+	errE := r.Handle("PathName", http.MethodGet, "/foobar/:x", false, h)
+	require.NoError(t, errE, "% -+#.1v", errE)
+	_, errE = r.Get("/foobar/123", http.MethodPost)
+	var e *MethodNotAllowedError
+	assert.ErrorAs(t, errE, &e)
+	assert.Equal(t, []string{http.MethodGet, http.MethodHead}, e.Allow)
+	_, errE = r.Get("/none", http.MethodGet)
+	assert.ErrorIs(t, errE, ErrNotFound)
+	route, errE := r.Get("/foobar/123", http.MethodGet)
+	assert.NoError(t, errE, "% -+#.1v", errE)
+	assert.Equal(t, "PathName", route.Name)
+	assert.Equal(t, Params{"x": "123"}, route.Params)
+	require.NotNil(t, route.Handler)
+	route.Handler(nil, nil, nil)
+	assert.True(t, hRan)
+}
