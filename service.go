@@ -1073,6 +1073,11 @@ func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (
 	return s.router.ReverseAPI(name, params, qs)
 }
 
+// GetRoute calls router's Get.
+func (s *Service[SiteT]) GetRoute(name, method string) (ResolvedRoute, errors.E) {
+	return s.router.Get(name, method)
+}
+
 // TODO: Use Vite's manifest.json to send preload headers.
 
 // ServeStaticFile replies to the request by serving the file at path from service's static files.
