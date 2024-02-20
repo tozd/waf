@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Set `Server.Addr` to the default value when not set.
+
 ## [0.9.0] - 2024-02-16
 
 ### Added

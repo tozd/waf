@@ -110,9 +110,8 @@ type Server[SiteT hasSite] struct {
 //
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
-	listenAddr := defaultListenAddr
-	if s.Addr != "" {
-		listenAddr = s.Addr
+	if s.Addr == "" {
+		s.Addr = defaultListenAddr
 	}
 
 	// TODO: How to shutdown websocket connections?
@@ -123,7 +122,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	//       See: https://github.com/golang/go/issues/21389
 	//       See: https://github.com/golang/go/issues/59602
 	server := &http.Server{
-		Addr:                         listenAddr,
+		Addr:                         s.Addr,
 		Handler:                      nil,
 		DisableGeneralOptionsHandler: false,
 		TLSConfig: &tls.Config{ //nolint:exhaustruct
