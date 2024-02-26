@@ -238,7 +238,7 @@ type counterReadCloser struct {
 func (c *counterReadCloser) Read(p []byte) (int, error) {
 	n, err := c.rc.Read(p)
 	atomic.AddInt64(c.read, int64(n))
-	if err == io.EOF { 
+	if err == io.EOF {
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
 	}
@@ -271,7 +271,7 @@ func (c *counterReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
 func (c *counterReadCloserWriterTo) Read(p []byte) (int, error) {
 	n, err := c.rc.Read(p)
 	atomic.AddInt64(c.read, int64(n))
-	if err == io.EOF { 
+	if err == io.EOF {
 		// See: https://github.com/golang/go/issues/39155
 		return n, io.EOF
 	}
