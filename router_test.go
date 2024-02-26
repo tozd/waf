@@ -700,10 +700,10 @@ func TestRouterErrorHandlers(t *testing.T) {
 	t.Parallel()
 
 	r := &Router{
-		NotFound: func(w http.ResponseWriter, req *http.Request) {
+		NotFound: func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(480)
 		},
-		MethodNotAllowed: func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
+		MethodNotAllowed: func(w http.ResponseWriter, _ *http.Request, _ Params, _ []string) {
 			w.WriteHeader(490)
 		},
 	}
@@ -767,7 +767,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/notfound", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -779,7 +779,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/api", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -791,7 +791,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/api/", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -803,7 +803,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -815,7 +815,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/api/", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -827,7 +827,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/posts",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/api/posts/abcd", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -839,7 +839,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/posts",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/api/posts/", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -851,7 +851,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/users/:id/posts",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
@@ -863,7 +863,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodPost,
 			path:                 "/users/:id/posts",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodPatch, "/api/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
@@ -875,7 +875,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodPost,
 			path:                 "/users/:id/posts",
 			api:                  true,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodGet, "/users/123/posts", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -887,7 +887,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:      http.MethodGet,
 			path:        "/users/:id/posts",
 			api:         false,
-			handler: func(w http.ResponseWriter, req *http.Request, params Params) {
+			handler: func(w http.ResponseWriter, _ *http.Request, _ Params) {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("Handler for route"))
 			},
@@ -902,7 +902,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/users/:id/posts",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
@@ -914,7 +914,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodGet,
 			path:                 "/users/:id/posts",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodPost, "/api/users/123/posts", nil),
 			expectedStatus:       http.StatusNotFound,
 			expectedResponseBody: "Not Found\n",
@@ -926,7 +926,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:      http.MethodPost,
 			path:        "/users/:id/posts",
 			api:         true,
-			handler: func(w http.ResponseWriter, req *http.Request, params Params) {
+			handler: func(w http.ResponseWriter, _ *http.Request, _ Params) {
 				w.WriteHeader(http.StatusCreated)
 				_, _ = w.Write([]byte("Handler for route"))
 			},
@@ -941,7 +941,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:      http.MethodPost,
 			path:        "/users/:id/posts",
 			api:         true,
-			handler: func(w http.ResponseWriter, req *http.Request, params Params) {
+			handler: func(_ http.ResponseWriter, _ *http.Request, _ Params) {
 				panic(errors.New("panic error"))
 			},
 			request:              httptest.NewRequest(http.MethodPost, "/api/users/123/posts", nil),
@@ -955,7 +955,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:      http.MethodOptions,
 			path:        "/",
 			api:         false,
-			handler: func(w http.ResponseWriter, req *http.Request, params Params) {
+			handler: func(w http.ResponseWriter, _ *http.Request, _ Params) {
 				w.WriteHeader(345)
 			},
 			request:              httptest.NewRequest(http.MethodOptions, "/", nil),
@@ -969,7 +969,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			method:               http.MethodOptions,
 			path:                 "/users/:id/posts",
 			api:                  false,
-			handler:              func(w http.ResponseWriter, req *http.Request, params Params) {},
+			handler:              func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
@@ -987,7 +987,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			var panicked interface{}
 
 			r := &Router{
-				Panic: func(w http.ResponseWriter, req *http.Request, err interface{}) {
+				Panic: func(w http.ResponseWriter, _ *http.Request, err interface{}) {
 					panicked = err
 					w.WriteHeader(http.StatusInternalServerError)
 				},
@@ -1012,7 +1012,7 @@ func TestRouterGet(t *testing.T) {
 	t.Parallel()
 
 	hRan := false
-	h := func(w http.ResponseWriter, req *http.Request, params Params) {
+	h := func(_ http.ResponseWriter, _ *http.Request, _ Params) {
 		hRan = true
 	}
 	r := &Router{}

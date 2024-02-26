@@ -241,9 +241,9 @@ func wrapGetCors(options *CorsOptions, h func(http.ResponseWriter, *http.Request
 			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				h(w, r, params)
 			})).ServeHTTP(w, r)
-		}, func(w http.ResponseWriter, r *http.Request, params Params) {
+		}, func(w http.ResponseWriter, r *http.Request, _ Params) {
 			// OPTIONS request.
-			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				// We do nothing after OPTIONS request has been handled,
 				// even if it was not a CORS OPTIONS request.
 				w.WriteHeader(optionsSuccessStatus)
@@ -455,7 +455,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			// Full duration is added to the response as a trailer in accessHandler for HTTP2,
 			// but it is not added to timing.Metrics. So we add it here to the log.
 			metrics.Dur("t", duration)
-			l := hlog.FromRequest(req).WithLevel(level)
+			l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
 			if code != 0 {
 				l = l.Int("code", code)
 			}
@@ -478,7 +478,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		c = c.Append(hlog.EtagHandler("etag"))
 		c = c.Append(hlog.ResponseHeaderHandler("encoding", "Content-Encoding"))
 	} else {
-		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {}))
+		c = c.Append(accessHandler(func(_ *http.Request, _ int, _, _ int64, _ time.Duration) {}))
 		c = c.Append(requestIDHandler("", "Request-Id"))
 	}
 
@@ -650,8 +650,8 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					if optionsSuccessStatus == 0 {
 						optionsSuccessStatus = http.StatusNoContent
 					}
-					h := func(w http.ResponseWriter, r *http.Request, params Params) {
-						c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					h := func(w http.ResponseWriter, r *http.Request, _ Params) {
+						c.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 							// We do nothing after OPTIONS request has been handled,
 							// even if it was not a CORS OPTIONS request.
 							w.WriteHeader(optionsSuccessStatus)

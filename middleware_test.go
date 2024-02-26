@@ -30,7 +30,7 @@ func TestConnectionIDHandler(t *testing.T) {
 	r := &http.Request{}
 	s := Server[*Site]{}
 	r = r.WithContext(s.connContext(context.Background(), nil))
-	h := connectionIDHandler("connection")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := connectionIDHandler("connection")(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
 	}))
@@ -72,7 +72,7 @@ func TestURLHandler(t *testing.T) {
 	r := &http.Request{
 		URL: &url.URL{Path: "/path", RawQuery: "foo=bar"},
 	}
-	h := urlHandler("url")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := urlHandler("url")(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
 	}))
@@ -97,7 +97,7 @@ func TestAccessHandler(t *testing.T) {
 			`{"code":200,"responseBody":0,"requestBody":4}`,
 		},
 		{
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			}),
 			`{"code":0,"responseBody":0,"requestBody":4}`,
@@ -409,7 +409,7 @@ func TestParseFormRedirect(t *testing.T) {
 	}
 	r := httptest.NewRequest(http.MethodPost, "/example?key2=value2&key1=value1", nil)
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	h = setCanonicalLogger(h)
@@ -429,7 +429,7 @@ func TestValidatePath(t *testing.T) {
 	s := Service[*Site]{
 		router: new(Router),
 	}
-	h := s.validatePath(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := s.validatePath(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	h = setCanonicalLogger(h)
@@ -533,7 +533,7 @@ func TestSetCanonicalLogger(t *testing.T) {
 	out1 := &bytes.Buffer{}
 	out2 := &bytes.Buffer{}
 	r := &http.Request{}
-	h := setCanonicalLogger(hlog.NewHandler(zerolog.New(out2))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := setCanonicalLogger(hlog.NewHandler(zerolog.New(out2))(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		l := hlog.FromRequest(r)
 		l.Log().Msg("test1")
 		l = canonicalLogger(r.Context())
@@ -548,7 +548,7 @@ func TestSetCanonicalLogger(t *testing.T) {
 func TestAddNosniffHeader(t *testing.T) {
 	t.Parallel()
 
-	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -562,7 +562,7 @@ func TestAddNosniffHeader(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
 
-	h = addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h = addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 	}))
 
@@ -590,7 +590,7 @@ func TestRedirectToMainSite(t *testing.T) {
 			},
 		},
 	}
-	h := s.validateSite(s.RedirectToMainSite("example.com")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := s.validateSite(s.RedirectToMainSite("example.com")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
 

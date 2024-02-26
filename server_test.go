@@ -215,7 +215,7 @@ func TestServer(t *testing.T) {
 	g := errgroup.Group{}
 
 	g.Go(func() error {
-		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte("test"))
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -389,7 +389,7 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	g := errgroup.Group{}
 
 	g.Go(func() error {
-		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return server.Run(ctx, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte("test"))
 			w.WriteHeader(http.StatusOK)
 		}))
