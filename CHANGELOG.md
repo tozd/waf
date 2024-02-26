@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2024-02-26
+
 ### Fixed
 
 - Expose HTTP server for use in tests.
@@ -108,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.9.1...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.9.2...main
+[0.9.2]: https://gitlab.com/tozd/waf/-/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitlab.com/tozd/waf/-/compare/v0.9.0...v0.9.1
 [0.9.0]: https://gitlab.com/tozd/waf/-/compare/v0.8.0...v0.9.0
 [0.8.0]: https://gitlab.com/tozd/waf/-/compare/v0.7.0...v0.8.0
