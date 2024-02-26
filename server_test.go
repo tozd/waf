@@ -284,14 +284,14 @@ func TestServerConnection(t *testing.T) {
 	ts.EnableHTTP2 = true
 	t.Cleanup(ts.Close)
 
-	ts.Config = server.server
+	ts.Config = server.HTTPServer
 	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := r.Context().Value(connectionIDContextKey).(identifier.Identifier)
 		assert.True(t, ok)
 		_, _ = w.Write([]byte("test"))
 		w.WriteHeader(http.StatusOK)
 	})
-	ts.TLS = server.server.TLSConfig.Clone()
+	ts.TLS = server.HTTPServer.TLSConfig.Clone()
 	// We have to call GetCertificate ourselves.
 	// See: https://github.com/golang/go/issues/63812
 	cert, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
@@ -311,12 +311,13 @@ func TestServerConnection(t *testing.T) {
 	assert.NoError(t, err, "% -+#.1v", err)
 	assert.NotNil(t, c)
 
-	// This does not start server.server's managers, but that is OK for this test.
+	// This does not start server.HTTPServer's managers, but that is OK for this test.
 	ts.StartTLS()
 
 	// Our certificate is for localhost domain and not 127.0.0.1 IP.
-	url := strings.ReplaceAll(ts.URL, "127.0.0.1", "localhost")
-	resp, err := ts.Client().Get(url) //nolint:noctx
+	ts.URL = strings.ReplaceAll(ts.URL, "127.0.0.1", "localhost")
+
+	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
 	if assert.NoError(t, err) {
 		t.Cleanup(func() { resp.Body.Close() })
 		out, err := io.ReadAll(resp.Body)
@@ -376,8 +377,8 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 
 	assert.Equal(t, "", server.InDevelopment())
 
-	getCertificate := server.server.TLSConfig.GetCertificate
-	server.server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	getCertificate := server.HTTPServer.TLSConfig.GetCertificate
+	server.HTTPServer.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 		t.Logf("clientHelloInfo: %+v", hello)
 		return getCertificate(hello)
 	}

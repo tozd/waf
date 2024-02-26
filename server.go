@@ -88,10 +88,11 @@ type Server[SiteT hasSite] struct {
 	// TLS configuration.
 	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
 
-	// Used primarily for testing.
+	// Used primarily for use in tests.
 	Addr string `json:"-" kong:"-" yaml:"-"`
 
-	server *http.Server
+	// Exposed primarily for use in tests.
+	HTTPServer *http.Server `json:"-" kong:"-" yaml:"-"`
 
 	// Autocert managers do not have to be stopped, but certificate managers do.
 	managers []*certificateManager
@@ -381,7 +382,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		panic(errors.New("not possible"))
 	}
 
-	s.server = server
+	s.HTTPServer = server
 
 	sort.Strings(domains)
 	s.domains = domains
@@ -406,13 +407,13 @@ func (s *Server[SiteT]) InDevelopment() string {
 // It returns only on error or if the server is gracefully shut down
 // when the context is canceled.
 func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E {
-	if s.server == nil {
+	if s.HTTPServer == nil {
 		return errors.New("server not configured")
 	}
-	if s.server.Handler != nil {
+	if s.HTTPServer.Handler != nil {
 		return errors.New("run already called")
 	}
-	s.server.Handler = handler
+	s.HTTPServer.Handler = handler
 
 	for _, manager := range s.managers {
 		err := manager.Start()
@@ -446,7 +447,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 		// This might return an error if the value is already stored, but we ignore it.
 		defer s.listenAddr.Store("") //nolint:errcheck
 
-		err := s.server.ListenAndServeTLS("", "")
+		err := s.HTTPServer.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return errors.WithStack(err)
 		}
@@ -468,7 +469,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 
 		// We wait indefinitely for the server to shut down cleanly.
 		// The whole process will be killed anyway if we wait too long.
-		return errors.WithStack(s.server.Shutdown(context.Background())) //nolint:contextcheck
+		return errors.WithStack(s.HTTPServer.Shutdown(context.Background())) //nolint:contextcheck
 	})
 
 	return errors.WithStack(g.Wait())
