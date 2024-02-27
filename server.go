@@ -88,7 +88,7 @@ type Server[SiteT hasSite] struct {
 	// TLS configuration.
 	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
 
-	// Used primarily for use in tests.
+	// Exposed primarily for use in tests.
 	Addr string `json:"-" kong:"-" yaml:"-"`
 
 	// Exposed primarily for use in tests.
