@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/andybalholm/brotli"
@@ -75,10 +76,18 @@ func canonicalLogger(ctx context.Context) *zerolog.Logger {
 	return disabledLogger
 }
 
-func negotiateContentEncoding(req *http.Request, offers []string) string {
+func negotiateContentEncoding(w http.ResponseWriter, req *http.Request, offers []string) string {
 	if offers == nil {
 		offers = allCompressions
 	}
+
+	// We use this header so responses might depend on it.
+	if !slices.Contains(w.Header().Values("Vary"), "Accept-Encoding") {
+		// This function might have been called multiple times, but
+		// we want to add this header with this value only once.
+		w.Header().Add("Vary", "Accept-Encoding")
+	}
+
 	return gddo.NegotiateContentEncoding(req, offers)
 }
 

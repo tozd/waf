@@ -973,7 +973,7 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 		encoded = e
 	}
 
-	contentEncoding := negotiateContentEncoding(req, nil)
+	contentEncoding := negotiateContentEncoding(w, req, nil)
 	if contentEncoding == "" {
 		// If the client does not accept any compression we support (even no compression),
 		// we ignore that and just do not compress.
@@ -1025,7 +1025,6 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 	if len(w.Header().Values("Cache-Control")) == 0 {
 		w.Header().Set("Cache-Control", "no-cache")
 	}
-	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("Etag", etag)
 
 	return encoded
@@ -1098,14 +1097,11 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	var ok bool
 	var f staticFile
 
-	// Always set Vary as our error responses also depend on Accept-Encoding.
-	w.Header().Add("Vary", "Accept-Encoding")
-
 	// TODO: When searching for a suitable compression, we should also search by etag from If-None-Match.
 	//       If-None-Match might have an etag for a compression which is not picked here. This is probably rare though.
 	compressions := slices.Clone(allCompressions)
 	for {
-		contentEncoding = negotiateContentEncoding(req, compressions)
+		contentEncoding = negotiateContentEncoding(w, req, compressions)
 		if contentEncoding == "" {
 			// If the client does not accept any compression we support (even no compression),
 			// we ignore that and just do not compress.
