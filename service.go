@@ -402,7 +402,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		} else {
 			m := s.router.MethodNotAllowed
 			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
-				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed" 
+				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed"
 				m(w, req, params, allow)
 			}
 		}
