@@ -396,19 +396,13 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		}
 		if s.router.MethodNotAllowed == nil {
 			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
-				logger := canonicalLogger(req.Context())
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
-				})
+				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed"
 				s.MethodNotAllowed(w, req, allow)
 			}
 		} else {
 			m := s.router.MethodNotAllowed
 			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
-				logger := canonicalLogger(req.Context())
-				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str(zerolog.MessageFieldName, "MethodNotAllowed")
-				})
+				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed"
 				m(w, req, params, allow)
 			}
 		}
@@ -432,6 +426,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	// See: https://github.com/rs/zerolog/pull/617
 	if l := s.CanonicalLogger.Sample(nil); l.Info().Enabled() { //nolint:zerologlint
 		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
+			ctx := req.Context()
 			level := zerolog.InfoLevel
 			if code >= http.StatusBadRequest {
 				level = zerolog.WarnLevel
@@ -439,7 +434,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			if code >= http.StatusInternalServerError {
 				level = zerolog.ErrorLevel
 			}
-			timing := servertiming.FromContext(req.Context())
+			timing := servertiming.FromContext(ctx)
 			metrics := zerolog.Dict()
 			seenMetrics := mapset.NewThreadUnsafeSet[string]()
 			for _, metric := range timing.Metrics {
@@ -455,14 +450,19 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			// Full duration is added to the response as a trailer in accessHandler for HTTP2,
 			// but it is not added to timing.Metrics. So we add it here to the log.
 			metrics.Dur("t", duration)
-			l := hlog.FromRequest(req).WithLevel(level) //nolint:zerologlint
+			l := zerolog.Ctx(ctx).WithLevel(level) //nolint:zerologlint
 			if code != 0 {
 				l = l.Int("code", code)
 			}
-			l.Int64("responseBody", responseBody).
+			l = l.Int64("responseBody", responseBody).
 				Int64("requestBody", requestBody).
-				Dict("metrics", metrics).
-				Send()
+				Dict("metrics", metrics)
+			message := canonicalLoggerMessage(ctx)
+			if *message != "" {
+				l.Msg(*message)
+			} else {
+				l.Send()
+			}
 		}))
 		c = c.Append(logMetadata(s.MetadataHeaderPrefix))
 		c = c.Append(websocketHandler("ws"))

@@ -66,6 +66,9 @@ var disabledLogger = zerolog.Ctx(context.Background()) //nolint:gochecknoglobals
 // canonicalLoggerContextKey provides a canonical log line logger for each HTTP request.
 var canonicalLoggerContextKey = &contextKey{"canonical-logger"} //nolint:gochecknoglobals
 
+// canonicalLoggerMessageContextKey provides access to the message for the canonical log line.
+var canonicalLoggerMessageContextKey = &contextKey{"canonical-logger-message"} //nolint:gochecknoglobals
+
 // canonicalLogger is similar to zerolog.Ctx, but uses canonicalLoggerContextKey context key.
 func canonicalLogger(ctx context.Context) *zerolog.Logger {
 	if l, ok := ctx.Value(canonicalLoggerContextKey).(*zerolog.Logger); ok {
@@ -74,6 +77,13 @@ func canonicalLogger(ctx context.Context) *zerolog.Logger {
 		return l
 	}
 	return disabledLogger
+}
+
+func canonicalLoggerMessage(ctx context.Context) *string {
+	if message, ok := ctx.Value(canonicalLoggerMessageContextKey).(*string); ok && message != nil {
+		return message
+	}
+	panic(errors.New("canonical logger message not found in context"))
 }
 
 func negotiateContentEncoding(w http.ResponseWriter, req *http.Request, offers []string) string {
@@ -168,10 +178,7 @@ func logHandlerName(name string, h Handler) Handler {
 	}
 
 	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		logger := canonicalLogger(req.Context())
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(zerolog.MessageFieldName, name)
-		})
+		*canonicalLoggerMessage(req.Context()) = name
 		h(w, req, params)
 	}
 }
@@ -182,10 +189,7 @@ func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request))
 	}
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := canonicalLogger(req.Context())
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(zerolog.MessageFieldName, name)
-		})
+		*canonicalLoggerMessage(req.Context()) = name
 		h(w, req)
 	}
 }

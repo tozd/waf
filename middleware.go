@@ -244,6 +244,10 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// We set the message to the name of the middleware so that
+			// it is logged in the case of an error.
+			*canonicalLoggerMessage(req.Context()) = "ParseForm"
+
 			// TODO: Add limits on max time, max idle time, min speed, and max data for
 			//       reading the whole body when parsing form. If a limit is reached, context
 			//       should be canceled.
@@ -320,6 +324,10 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 // canonical URL.
 func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// We set the message to the name of the middleware so that
+		// it is logged in the case of an error.
+		*canonicalLoggerMessage(req.Context()) = "ValidatePath"
+
 		// Check URL path for non-printable characters.
 		// Copied from https://github.com/hashicorp/go-cleanhttp/blob/master/handlers.go.
 		idx := strings.IndexFunc(req.URL.Path, func(c rune) bool {
@@ -346,6 +354,10 @@ func (s *Service[SiteT]) validatePath(next http.Handler) http.Handler {
 // set in context.
 func (s *Service[SiteT]) validateSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// We set the message to the name of the middleware so that
+		// it is logged in the case of an error.
+		*canonicalLoggerMessage(req.Context()) = "ValidateSite"
+
 		siteT, err := s.site(req)
 		if err != nil {
 			s.WithError(req.Context(), err)
@@ -361,11 +373,14 @@ func (s *Service[SiteT]) validateSite(next http.Handler) http.Handler {
 }
 
 // setCanonicalLogger sets context logger under canonical logger context key as well.
+// It also adds message for the canonical log line to the context.
 func setCanonicalLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		l := zerolog.Ctx(ctx)
 		ctx = context.WithValue(ctx, canonicalLoggerContextKey, l)
+		var message string
+		ctx = context.WithValue(ctx, canonicalLoggerMessageContextKey, &message)
 		req = req.WithContext(ctx)
 		next.ServeHTTP(w, req)
 	})
@@ -412,6 +427,10 @@ func addNosniffHeader(next http.Handler) http.Handler {
 func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// We set the message to the name of the middleware so that
+			// it is logged in the case of an error.
+			*canonicalLoggerMessage(req.Context()) = "RedirectToMainSite"
+
 			// We can use MustGetSite because this middleware is used after validateSite middleware.
 			site := MustGetSite[*Site](req.Context())
 			if site.Domain != mainDomain {

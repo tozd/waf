@@ -490,14 +490,14 @@ func TestValidateSite(t *testing.T) {
 			},
 		},
 	}
-	h := s.validateSite(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := setCanonicalLogger(s.validateSite(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := GetSite[*Site](r.Context())
 		if ok {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 		}
-	}))
+	})))
 
 	tests := []struct {
 		Site           string
@@ -590,9 +590,9 @@ func TestRedirectToMainSite(t *testing.T) {
 			},
 		},
 	}
-	h := s.validateSite(s.RedirectToMainSite("example.com")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	h := setCanonicalLogger(s.validateSite(s.RedirectToMainSite("example.com")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})))
+	}))))
 
 	tests := []struct {
 		Target           string

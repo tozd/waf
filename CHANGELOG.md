@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Middleware logs its name as a canonical log line message if they fully handle the request.
+
 ## [0.9.2] - 2024-02-26
 
 ### Fixed
