@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2024-03-04
+
 ### Fixed
 
 - Simplify path traversal for static files.
@@ -120,7 +122,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.10.0...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.10.1...main
+[0.10.1]: https://gitlab.com/tozd/waf/-/compare/v0.10.0...v0.10.1
 [0.10.0]: https://gitlab.com/tozd/waf/-/compare/v0.9.2...v0.10.0
 [0.9.2]: https://gitlab.com/tozd/waf/-/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitlab.com/tozd/waf/-/compare/v0.9.0...v0.9.1
