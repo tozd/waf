@@ -702,36 +702,32 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 			return nil
 		}
 
-		path = strings.TrimPrefix(path, ".")
+		pathWithSlash := "/" + path
 
 		data, err := s.StaticFiles.ReadFile(path)
 		if err != nil {
 			errE := errors.WithStack(err)
-			errors.Details(errE)["path"] = path
+			errors.Details(errE)["path"] = pathWithSlash
 			return errE
-		}
-
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
 		}
 
 		mediaType := mime.TypeByExtension(filepath.Ext(path))
 		if mediaType == "" {
-			s.Logger.Debug().Str("path", path).Msg("unable to determine content type for static file")
+			s.Logger.Debug().Str("path", pathWithSlash).Msg("unable to determine content type for static file")
 			mediaType = "application/octet-stream"
 		}
 
 		// Each site might render HTML files differently.
-		if strings.HasSuffix(path, ".html") {
+		if strings.HasSuffix(pathWithSlash, ".html") {
 			for _, siteT := range s.Sites {
 				site := siteT.GetSite()
 
-				htmlData, errE := s.render(path, data, siteT)
+				htmlData, errE := s.render(pathWithSlash, data, siteT)
 				if errE != nil {
 					return errE
 				}
 
-				errE = site.addStaticFile(path, mediaType, htmlData)
+				errE = site.addStaticFile(pathWithSlash, mediaType, htmlData)
 				if errE != nil {
 					return errE
 				}
@@ -749,7 +745,7 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 			for _, compression := range compressions {
 				d, errE := compress(compression, data)
 				if errE != nil {
-					errors.Details(errE)["path"] = path
+					errors.Details(errE)["path"] = pathWithSlash
 					return errE
 				}
 
@@ -765,7 +761,7 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 				for _, siteT := range s.Sites {
 					site := siteT.GetSite()
 
-					site.staticFiles[compression][path] = staticFile{
+					site.staticFiles[compression][pathWithSlash] = staticFile{
 						Data:      d,
 						Etag:      etag,
 						MediaType: mediaType,
@@ -774,7 +770,7 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 			}
 		}
 
-		s.Logger.Debug().Str("path", path).Msg("added file to static files")
+		s.Logger.Debug().Str("path", pathWithSlash).Msg("added file to static files")
 
 		return nil
 	})
