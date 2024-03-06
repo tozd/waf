@@ -243,79 +243,82 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 				{
 					Name: "Home",
 					Path: "/",
-					API:  true,
-					Get:  true,
+					API:  &RouteOptions{},
+					Get:  &RouteOptions{},
 				},
 				{
 					Name: "Helper",
 					Path: "/helper/:name",
-					API:  false,
-					Get:  true,
+					API:  nil,
+					Get:  &RouteOptions{},
 				},
 				{
 					Name: "Panic",
 					Path: "/panic",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 				{
 					Name: "JSON",
 					Path: "/json",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 				{
 					Name: "Large",
 					Path: "/large",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 				{
 					Name: "NonCompressibleJSON",
 					Path: "/noncompressible",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 				{
 					Name: "CORS",
 					Path: "/cors",
-					API:  true,
-					Get:  true,
-					APICors: &CorsOptions{
-						AllowedOrigins:       []string{"https://other.example.com"},
-						AllowedMethods:       []string{"GET", "POST"}, // HEAD should be added.
-						AllowedHeaders:       []string{"FooBar", "foo-zoo"},
-						ExposedHeaders:       []string{"BarFoo", "zooFoo"},
-						MaxAge:               54,
-						AllowCredentials:     false,
-						AllowPrivateNetwork:  true,
-						OptionsSuccessStatus: 212, // Should not be returned because we have CORSOptions handler.
+					API: &RouteOptions{
+						CORS: &CORSOptions{
+							AllowedOrigins:       []string{"https://other.example.com"},
+							AllowedMethods:       []string{"GET", "POST"}, // HEAD should be added.
+							AllowedHeaders:       []string{"FooBar", "foo-zoo"},
+							ExposedHeaders:       []string{"BarFoo", "zooFoo"},
+							MaxAge:               54,
+							AllowCredentials:     false,
+							AllowPrivateNetwork:  true,
+							OptionsSuccessStatus: 212, // Should not be returned because we have CORSOptions handler.
+						},
 					},
-					GetCors: &CorsOptions{
-						AllowedOrigins:       []string{"*"},
-						AllowedMethods:       []string{}, // GET and HEAD should be added automatically.
-						AllowedHeaders:       []string{},
-						ExposedHeaders:       []string{},
-						MaxAge:               55,
-						AllowCredentials:     true,
-						AllowPrivateNetwork:  false,
-						OptionsSuccessStatus: 213,
+					Get: &RouteOptions{
+						CORS: &CORSOptions{
+							AllowedOrigins:       []string{"*"},
+							AllowedMethods:       []string{}, // GET and HEAD should be added automatically.
+							AllowedHeaders:       []string{},
+							ExposedHeaders:       []string{},
+							MaxAge:               55,
+							AllowCredentials:     true,
+							AllowPrivateNetwork:  false,
+							OptionsSuccessStatus: 213,
+						},
 					},
 				},
 				{
 					Name: "CORSNoOptions",
 					Path: "/corsNoOptions",
-					API:  true,
-					Get:  false,
-					APICors: &CorsOptions{
-						AllowedOrigins:       []string{"https://other.example.com"},
-						AllowedMethods:       []string{"PATCH"},
-						AllowedHeaders:       []string{"FooBar"},
-						MaxAge:               56,
-						AllowCredentials:     true,
-						AllowPrivateNetwork:  false,
-						OptionsSuccessStatus: 0,
+					API: &RouteOptions{
+						CORS: &CORSOptions{
+							AllowedOrigins:       []string{"https://other.example.com"},
+							AllowedMethods:       []string{"PATCH"},
+							AllowedHeaders:       []string{"FooBar"},
+							MaxAge:               56,
+							AllowCredentials:     true,
+							AllowPrivateNetwork:  false,
+							OptionsSuccessStatus: 0,
+						},
 					},
+					Get: nil,
 				},
 			},
 			Sites: map[string]*testSite{
@@ -452,19 +455,19 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				{
 					Name: "Home",
 					Path: "/",
-					API:  false,
-					Get:  false,
+					API:  nil,
+					Get:  nil,
 				},
 			},
-			`at least one of "get" and "api" has to be true`,
+			`at least one of "get" and "api" has to be set`,
 		},
 		{
 			[]Route{
 				{
 					Name: "SomethingMissing",
 					Path: "/",
-					API:  false,
-					Get:  true,
+					API:  nil,
+					Get:  &RouteOptions{},
 				},
 			},
 			`handler not found`,
@@ -474,8 +477,8 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				{
 					Name: "Proxy",
 					Path: "/",
-					API:  false,
-					Get:  true,
+					API:  nil,
+					Get:  &RouteOptions{},
 				},
 			},
 			`invalid handler type`,
@@ -485,8 +488,8 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				{
 					Name: "SomethingMissing",
 					Path: "/",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 			},
 			`no API handler found`,
@@ -496,8 +499,8 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				{
 					Name: "InvalidHandlerType",
 					Path: "/",
-					API:  true,
-					Get:  false,
+					API:  &RouteOptions{},
+					Get:  nil,
 				},
 			},
 			`invalid API handler type`,
@@ -505,36 +508,13 @@ func TestServiceConfigureRoutes(t *testing.T) {
 		{
 			[]Route{
 				{
-					Name:    "CORS",
-					Path:    "/cors",
-					API:     true,
-					Get:     false,
-					GetCors: &CorsOptions{},
-				},
-			},
-			`GET CORS configured but "get" is not true`,
-		},
-		{
-			[]Route{
-				{
-					Name:    "CORS",
-					Path:    "/cors",
-					API:     false,
-					Get:     true,
-					APICors: &CorsOptions{},
-				},
-			},
-			`API CORS configured but "api" is not true`,
-		},
-		{
-			[]Route{
-				{
 					Name: "CORS",
 					Path: "/cors",
-					API:  false,
-					Get:  true,
-					GetCors: &CorsOptions{
-						AllowedMethods: []string{http.MethodPatch},
+					API:  nil,
+					Get: &RouteOptions{
+						CORS: &CORSOptions{
+							AllowedMethods: []string{http.MethodPatch},
+						},
 					},
 				},
 			},
@@ -545,11 +525,12 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				{
 					Name: "CORS",
 					Path: "/cors",
-					API:  true,
-					Get:  false,
-					APICors: &CorsOptions{
-						AllowedMethods: []string{http.MethodGet, http.MethodDelete},
+					API: &RouteOptions{
+						CORS: &CORSOptions{
+							AllowedMethods: []string{http.MethodGet, http.MethodDelete},
+						},
 					},
+					Get: nil,
 				},
 			},
 			`CORS allowed methods contain methods without handlers`,
@@ -3081,7 +3062,7 @@ func TestRoutesConfiguration(t *testing.T) {
 	err := json.Unmarshal(routesConfiguration, &config)
 	assert.NoError(t, err)
 	assert.Equal(t, []Route{
-		{Name: "Home", Path: "/", API: false, Get: true},
+		{Name: "Home", Path: "/", API: nil, Get: &RouteOptions{}},
 	}, config.Routes)
 
 	_ = &Service[*Site]{

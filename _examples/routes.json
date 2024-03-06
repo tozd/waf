@@ -3,8 +3,7 @@
     {
       "name": "Home",
       "path": "/",
-      "api": false,
-      "get": true
+      "get": {}
     }
   ]
 }

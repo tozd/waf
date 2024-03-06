@@ -32,12 +32,12 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-// CorsOptions is a subset of cors.Options.
+// CORSOptions is a subset of cors.Options.
 //
 // See description of fields in cors.Options.
 //
 // See: https://github.com/rs/cors/pull/164
-type CorsOptions struct {
+type CORSOptions struct {
 	AllowedOrigins       []string `json:"allowedOrigins,omitempty"`
 	AllowedMethods       []string `json:"allowedMethods,omitempty"`
 	AllowedHeaders       []string `json:"allowedHeaders,omitempty"`
@@ -48,7 +48,7 @@ type CorsOptions struct {
 	OptionsSuccessStatus int      `json:"optionsSuccessStatus,omitempty"`
 }
 
-func (c *CorsOptions) GetAllowedMethods() []string {
+func (c *CORSOptions) GetAllowedMethods() []string {
 	if len(c.AllowedMethods) == 0 {
 		// We allow only GET and HEAD by default.
 		// This is different from the cors package which also has POST.
@@ -75,6 +75,21 @@ func (c *CorsOptions) GetAllowedMethods() []string {
 	return allowedMethods
 }
 
+type RouteWhere string
+
+const (
+	RouteFrontend RouteWhere = "frontend"
+	RouteBackend  RouteWhere = "backend"
+)
+
+type RouteOptions struct {
+	// Should this route be defined only on frontend, only on backend, or both?
+	Where RouteWhere `json:"where,omitempty"`
+
+	// Enable CORS on handler(s)?
+	CORS *CORSOptions `json:"cors,omitempty"`
+}
+
 // Route is a high-level route definition which is used by a service
 // to register handlers with the router. It can also be used by Vue Router
 // to register routes there.
@@ -87,16 +102,10 @@ type Route struct {
 
 	// Does this route support API handlers.
 	// API paths are automatically prefixed with /api.
-	API bool `json:"api,omitempty"`
+	API *RouteOptions `json:"api,omitempty"`
 
 	// Does this route have a non-API handler.
-	Get bool `json:"get,omitempty"`
-
-	// Enable CORS on API handlers?
-	APICors *CorsOptions `json:"apiCors,omitempty"`
-
-	// Enable CORS on non-API handler?
-	GetCors *CorsOptions `json:"getCors,omitempty"`
+	Get *RouteOptions `json:"get,omitempty"`
 }
 
 type staticFile struct {
@@ -207,7 +216,7 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 	return st, site
 }
 
-func newCors(options *CorsOptions) *cors.Cors {
+func newCORS(options *CORSOptions) *cors.Cors {
 	if options == nil {
 		return nil
 	}
@@ -227,11 +236,11 @@ func newCors(options *CorsOptions) *cors.Cors {
 	})
 }
 
-func wrapGetCors(options *CorsOptions, h func(http.ResponseWriter, *http.Request, Params)) (
+func wrapGetCORS(options *CORSOptions, h func(http.ResponseWriter, *http.Request, Params)) (
 	func(http.ResponseWriter, *http.Request, Params),
 	func(http.ResponseWriter, *http.Request, Params),
 ) {
-	c := newCors(options)
+	c := newCORS(options)
 	optionsSuccessStatus := options.OptionsSuccessStatus
 	if optionsSuccessStatus == 0 {
 		optionsSuccessStatus = http.StatusNoContent
@@ -251,7 +260,7 @@ func wrapGetCors(options *CorsOptions, h func(http.ResponseWriter, *http.Request
 		}
 }
 
-func wrapCors(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) func(http.ResponseWriter, *http.Request, Params) {
+func wrapCORS(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) func(http.ResponseWriter, *http.Request, Params) {
 	return func(w http.ResponseWriter, r *http.Request, params Params) {
 		c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h(w, r, params)
@@ -259,7 +268,7 @@ func wrapCors(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) 
 	}
 }
 
-func methodsSubset(options *CorsOptions, methodsWithHandlers []string) errors.E {
+func methodsSubset(options *CORSOptions, methodsWithHandlers []string) errors.E {
 	allowedMethods := mapset.NewThreadUnsafeSet[string]()
 	allowedMethods.Append(options.GetAllowedMethods()...)
 
@@ -514,26 +523,14 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 	v := reflect.ValueOf(service)
 
 	for _, route := range s.Routes {
-		if !route.Get && !route.API {
-			errE := errors.New(`at least one of "get" and "api" has to be true`)
-			errors.Details(errE)["route"] = route.Name
-			errors.Details(errE)["path"] = route.Path
-			return errE
-		}
-		if !route.Get && route.GetCors != nil {
-			errE := errors.New(`GET CORS configured but "get" is not true`)
-			errors.Details(errE)["route"] = route.Name
-			errors.Details(errE)["path"] = route.Path
-			return errE
-		}
-		if !route.API && route.APICors != nil {
-			errE := errors.New(`API CORS configured but "api" is not true`)
+		if route.Get == nil && route.API == nil {
+			errE := errors.New(`at least one of "get" and "api" has to be set`)
 			errors.Details(errE)["route"] = route.Name
 			errors.Details(errE)["path"] = route.Path
 			return errE
 		}
 
-		if route.Get {
+		if route.Get != nil && (route.Get.Where == RouteBackend || route.Get.Where == "") {
 			handlerName := route.Name
 			m := v.MethodByName(handlerName)
 			if !m.IsValid() {
@@ -554,8 +551,8 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
 				return errE
 			}
-			if route.GetCors != nil {
-				errE := methodsSubset(route.GetCors, []string{http.MethodGet, http.MethodHead})
+			if route.Get.CORS != nil {
+				errE := methodsSubset(route.Get.CORS, []string{http.MethodGet, http.MethodHead})
 				if errE != nil {
 					errors.Details(errE)["handler"] = handlerName
 					errors.Details(errE)["route"] = route.Name
@@ -563,7 +560,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					return errE
 				}
 				var optionsH func(http.ResponseWriter, *http.Request, Params)
-				h, optionsH = wrapGetCors(route.GetCors, h)
+				h, optionsH = wrapGetCORS(route.Get.CORS, h)
 				optionsH = logHandlerName(handlerName, optionsH)
 				errE = s.router.Handle(route.Name, http.MethodOptions, route.Path, false, optionsH)
 				if errE != nil {
@@ -583,8 +580,8 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				return errE
 			}
 		}
-		if route.API { //nolint:nestif
-			c := newCors(route.APICors)
+		if route.API != nil && (route.API.Where == RouteBackend || route.API.Where == "") { //nolint:nestif
+			c := newCORS(route.API.CORS)
 			foundAnyAPIHandler := false
 			foundOptionsHandler := false
 			foundMethods := []string{}
@@ -612,7 +609,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 					return errE
 				}
 				if c != nil {
-					h = wrapCors(c, h)
+					h = wrapCORS(c, h)
 					if method == http.MethodOptions {
 						foundOptionsHandler = true
 					}
@@ -646,7 +643,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			if c != nil {
 				if !foundOptionsHandler {
 					handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(http.MethodOptions))) //nolint:staticcheck
-					optionsSuccessStatus := route.APICors.OptionsSuccessStatus
+					optionsSuccessStatus := route.API.CORS.OptionsSuccessStatus
 					if optionsSuccessStatus == 0 {
 						optionsSuccessStatus = http.StatusNoContent
 					}
@@ -666,7 +663,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 						return errE
 					}
 				}
-				errE := methodsSubset(route.APICors, foundMethods)
+				errE := methodsSubset(route.API.CORS, foundMethods)
 				if errE != nil {
 					errors.Details(errE)["route"] = route.Name
 					errors.Details(errE)["path"] = route.Path
