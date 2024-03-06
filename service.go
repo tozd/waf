@@ -75,17 +75,7 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 	return allowedMethods
 }
 
-type RouteWhere string
-
-const (
-	RouteFrontend RouteWhere = "frontend"
-	RouteBackend  RouteWhere = "backend"
-)
-
 type RouteOptions struct {
-	// Should this route be defined only on frontend, only on backend, or both?
-	Where RouteWhere `json:"where,omitempty"`
-
 	// Enable CORS on handler(s)?
 	CORS *CORSOptions `json:"cors,omitempty"`
 }
@@ -530,7 +520,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 			return errE
 		}
 
-		if route.Get != nil && (route.Get.Where == RouteBackend || route.Get.Where == "") {
+		if route.Get != nil {
 			handlerName := route.Name
 			m := v.MethodByName(handlerName)
 			if !m.IsValid() {
@@ -580,7 +570,7 @@ func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
 				return errE
 			}
 		}
-		if route.API != nil && (route.API.Where == RouteBackend || route.API.Where == "") { //nolint:nestif
+		if route.API != nil { //nolint:nestif
 			c := newCORS(route.API.CORS)
 			foundAnyAPIHandler := false
 			foundOptionsHandler := false
