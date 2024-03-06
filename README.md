@@ -98,8 +98,8 @@ use both in your Go code and Vue Router as a single source of truth for routes:
     {
       "name": "Home",
       "path": "/",
-      "api": false,
-      "get": true
+      "api": null,
+      "get": {}
     }
   ]
 }

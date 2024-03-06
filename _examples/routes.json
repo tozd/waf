@@ -3,6 +3,7 @@
     {
       "name": "Home",
       "path": "/",
+      "api": null,
       "get": {}
     }
   ]
