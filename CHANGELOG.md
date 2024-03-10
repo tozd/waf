@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2024-03-10
+
 ### Changed
 
 - Renamed `Service.Development` to `Service.ProxyStaticTo`.
@@ -139,7 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.12.0...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.13.0...main
+[0.13.0]: https://gitlab.com/tozd/waf/-/compare/v0.12.0...v0.13.0
 [0.12.0]: https://gitlab.com/tozd/waf/-/compare/v0.11.0...v0.12.0
 [0.11.0]: https://gitlab.com/tozd/waf/-/compare/v0.10.1...v0.11.0
 [0.10.1]: https://gitlab.com/tozd/waf/-/compare/v0.10.0...v0.10.1
