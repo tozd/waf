@@ -79,8 +79,8 @@ type Server[SiteT hasSite] struct {
 	// Logger to be used by the server.
 	Logger zerolog.Logger `kong:"-" yaml:"-"`
 
-	// Run in development mode and proxy unknown requests.
-	Development bool `help:"Run in development mode and proxy unknown requests." short:"d" yaml:"development"`
+	// Run in development mode. By default proxy unknown requests.
+	Development bool `help:"Run in development mode.${developmentModeHelp}" short:"d" yaml:"development"`
 
 	// Base URL to proxy to in development mode.
 	ProxyTo string `default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode. Default: ${defaultProxyTo}." placeholder:"URL" short:"P" yaml:"proxyTo"`

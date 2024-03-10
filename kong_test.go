@@ -30,9 +30,10 @@ func TestKong(t *testing.T) {
 			buf,
 		),
 		kong.Vars{
-			"defaultProxyTo":  "http://localhost:5173",
-			"defaultTLSCache": "letsencrypt",
-			"defaultTitle":    "test",
+			"defaultProxyTo":      "http://localhost:5173",
+			"defaultTLSCache":     "letsencrypt",
+			"defaultTitle":        "test",
+			"developmentModeHelp": ". Proxy unknown requests.",
 		},
 	)
 	require.NoError(t, err)
@@ -44,7 +45,7 @@ func TestKong(t *testing.T) {
 
 Flags:
   -h, --help            Show context-sensitive help.
-  -d, --development     Run in development mode and proxy unknown requests.
+  -d, --development     Run in development mode. Proxy unknown requests.
   -P, --proxy-to=URL    Base URL to proxy to in development mode. Default:
                         http://localhost:5173.
 
