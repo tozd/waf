@@ -71,7 +71,7 @@ func TestServer(t *testing.T) {
 		"localhost":   {Domain: "localhost"},
 	}, sites)
 
-	assert.Equal(t, "", server.InDevelopment())
+	assert.Equal(t, "", server.ProxyToInDevelopment())
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -89,7 +89,7 @@ func TestServer(t *testing.T) {
 		"localhost":   {Domain: "localhost"},
 	}, sites)
 
-	assert.Equal(t, "http://localhost:8000", server.InDevelopment())
+	assert.Equal(t, "http://localhost:8000", server.ProxyToInDevelopment())
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -107,7 +107,7 @@ func TestServer(t *testing.T) {
 		"localhost":   {Domain: "localhost"},
 	}, sites)
 
-	assert.Equal(t, "", server.InDevelopment())
+	assert.Equal(t, "", server.ProxyToInDevelopment())
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -207,7 +207,7 @@ func TestServer(t *testing.T) {
 		"localhost":   {Domain: "localhost"},
 	}, sites)
 
-	assert.Equal(t, "", server.InDevelopment())
+	assert.Equal(t, "", server.ProxyToInDevelopment())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -278,7 +278,7 @@ func TestServerConnection(t *testing.T) {
 		"localhost":   {Domain: "localhost"},
 	}, sites)
 
-	assert.Equal(t, "", server.InDevelopment())
+	assert.Equal(t, "", server.ProxyToInDevelopment())
 
 	ts := httptest.NewUnstartedServer(nil)
 	ts.EnableHTTP2 = true
@@ -375,7 +375,7 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 		"site.test": {Domain: "site.test"},
 	}, sites)
 
-	assert.Equal(t, "", server.InDevelopment())
+	assert.Equal(t, "", server.ProxyToInDevelopment())
 
 	getCertificate := server.HTTPServer.TLSConfig.GetCertificate
 	server.HTTPServer.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {

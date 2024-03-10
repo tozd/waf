@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed `Service.Development` to `Service.ProxyStaticTo`.
+- Renamed `Server.InDevelopment` to `Server.ProxyToInDevelopment`.
+
 ## [0.12.0] - 2024-03-10
 
 ### Added

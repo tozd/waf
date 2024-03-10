@@ -188,14 +188,14 @@ func (s *Service[SiteT]) WithError(ctx context.Context, err errors.E) {
 
 // Proxy proxies request to the development backend (e.g., Vite).
 func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
-	if s.Development == "" {
-		s.InternalServerErrorWithError(w, req, errors.New("Proxy called while not in development"))
+	if s.ProxyStaticTo == "" {
+		s.InternalServerErrorWithError(w, req, errors.New("Proxy called without ProxyStaticTo config"))
 		return
 	}
 
 	logger := canonicalLogger(req.Context())
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Str("proxied", s.Development)
+		return c.Str("proxied", s.ProxyStaticTo)
 	})
 	s.reverseProxy.ServeHTTP(w, req)
 }

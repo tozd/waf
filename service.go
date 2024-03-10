@@ -319,10 +319,10 @@ type Service[SiteT hasSite] struct {
 	// MetadataHeaderPrefix is an optional prefix to the Metadata response header.
 	MetadataHeaderPrefix string `exhaustruct:"optional"`
 
-	// Development is a base URL to proxy to during development, if set.
-	// This should generally be set to result of Server.InDevelopment method.
+	// ProxyStaticTo is a base URL to proxy to during development, if set.
+	// This should generally be set to result of Server.ProxyToInDevelopment method.
 	// If set, StaticFiles are not served by the service so that they can be proxied instead.
-	Development string `exhaustruct:"optional"`
+	ProxyStaticTo string `exhaustruct:"optional"`
 
 	// IsImmutableFile should return true if the static file is immutable and
 	// should have such caching headers. Static files are those which do not change
@@ -356,8 +356,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		return nil, errE
 	}
 
-	if s.Development != "" {
-		s.Logger.Debug().Str("proxy", s.Development).Msg("running in development mode")
+	if s.ProxyStaticTo != "" {
+		s.Logger.Debug().Str("proxy", s.ProxyStaticTo).Msg("proxying static files")
 		errE := s.renderAndCompressSiteContext()
 		if errE != nil {
 			return nil, errE
@@ -801,10 +801,10 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 		return errors.New("makeReverseProxy called more than once")
 	}
 
-	target, err := url.Parse(s.Development)
+	target, err := url.Parse(s.ProxyStaticTo)
 	if err != nil {
 		errE := errors.WithStack(err)
-		errors.Details(errE)["url"] = s.Development
+		errors.Details(errE)["url"] = s.ProxyStaticTo
 		return errE
 	}
 

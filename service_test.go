@@ -135,7 +135,7 @@ func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params
 }
 
 func (s *testService) Home(w http.ResponseWriter, req *http.Request, _ Params) {
-	if s.Development != "" {
+	if s.ProxyStaticTo != "" {
 		s.Proxy(w, req)
 	} else {
 		s.ServeStaticFile(w, req, "/index.html")
@@ -225,7 +225,7 @@ func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request 
 	return req
 }
 
-func newService(t *testing.T, logger zerolog.Logger, https2 bool, development string) (*testService, *httptest.Server) {
+func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo string) (*testService, *httptest.Server) {
 	t.Helper()
 
 	build := zerolog.Dict()
@@ -343,7 +343,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, development st
 			},
 			SiteContextPath:      "/index.json",
 			MetadataHeaderPrefix: "Test-",
-			Development:          development,
+			ProxyStaticTo:        proxyStaticTo,
 			IsImmutableFile: func(path string) bool {
 				return strings.HasPrefix(path, "/assets/")
 			},
@@ -1613,7 +1613,7 @@ func TestService(t *testing.T) {
 			"",
 			http.StatusInternalServerError,
 			[]byte("Internal Server Error\n"),
-			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","error":"Proxy called while not in development","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":},"message":"Helper"}` + "\n",
+			`{"level":"error","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/helper/Proxy","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","error":"Proxy called without ProxyStaticTo config","code":500,"responseBody":22,"requestBody":0,"metrics":{"t":},"message":"Helper"}` + "\n",
 			http.Header{
 				"Extra":                  {"1234"},
 				"Cache-Control":          {"no-cache"},

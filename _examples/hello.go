@@ -118,7 +118,7 @@ func main() {
 				Routes:          routesConfig.Routes,
 				Sites:           sites,
 				SiteContextPath: "/context.json",
-				Development:     app.Server.InDevelopment(),
+				ProxyStaticTo:   app.Server.ProxyToInDevelopment(),
 				SkipServingFile: func(path string) bool {
 					// We want the file to be served by Home route at / and not be
 					// available at index.html (as well).

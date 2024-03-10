@@ -392,14 +392,14 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	return sites, nil
 }
 
-// InDevelopment returns ProxyTo base URL if Development is true.
+// ProxyToInDevelopment returns ProxyTo base URL if Development is true.
 // Otherwise it returns an empty string.
-func (s *Server[SiteT]) InDevelopment() string {
-	development := s.ProxyTo
+func (s *Server[SiteT]) ProxyToInDevelopment() string {
+	proxyTo := s.ProxyTo
 	if !s.Development {
-		development = ""
+		proxyTo = ""
 	}
-	return development
+	return proxyTo
 }
 
 // Run runs the server serving requests using the provided handler.
