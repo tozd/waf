@@ -33,7 +33,7 @@ func TestKong(t *testing.T) {
 			"defaultProxyTo":      "http://localhost:5173",
 			"defaultTLSCache":     "letsencrypt",
 			"defaultTitle":        "test",
-			"developmentModeHelp": ". Proxy unknown requests.",
+			"developmentModeHelp": " Proxy unknown requests.",
 		},
 	)
 	require.NoError(t, err)
