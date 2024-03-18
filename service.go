@@ -130,6 +130,19 @@ type Site struct {
 	staticFiles map[string]map[string]staticFile
 }
 
+func (s *Site) Validate() error {
+	if s.CertFile != "" || s.KeyFile != "" {
+		if s.CertFile == "" {
+			return errors.Errorf(`missing file certificate for provided private key for site "%s"`, s.Domain)
+		}
+		if s.KeyFile == "" {
+			return errors.Errorf(`missing file certificate's matching private key for site "%s"`, s.Domain)
+		}
+	}
+
+	return nil
+}
+
 // GetSite returns Site. This is used when you want to provide your own
 // site struct to access the Site struct. If you embed Site inside your
 // site struct then this method propagates to your site struct and does
