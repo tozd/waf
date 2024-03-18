@@ -37,6 +37,15 @@ type App struct {
 	Domains []string `help:"Domain name(s) to use. If not provided, they are determined from domain names found in TLS certificates." name:"domain" placeholder:"STRING" short:"D" yaml:"domains"`
 }
 
+func (a *App) Validate() error {
+	// We have to call Validate on kong-embedded structs ourselves.
+	// See: https://github.com/alecthomas/kong/issues/90
+	if err := a.Server.TLS.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // We extend Site with a title.
 type Site struct {
 	waf.Site
