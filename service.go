@@ -115,14 +115,14 @@ type staticFile struct {
 //
 // Certificate and key file paths are not exposed in site context JSON.
 type Site struct {
-	Domain string `json:"domain" yaml:"domain"`
+	Domain string `json:"domain" required:"" yaml:"domain"`
 
 	// Certificate file path for the site. It should be valid for the domain.
 	// Used when Let's Encrypt is not configured.
-	CertFile string `json:"-" yaml:"cert,omitempty"`
+	CertFile string `help:"Certificate for TLS, when not using Let's Encrypt." json:"-" name:"cert" placeholder:"PATH" type:"existingfile" yaml:"cert,omitempty"`
 
 	// Key file path. Used when Let's Encrypt is not configured.
-	KeyFile string `json:"-" yaml:"key,omitempty"`
+	KeyFile string `help:"Certificate's private key, when not using Let's Encrypt." json:"-" name:"key" placeholder:"PATH" type:"existingfile" yaml:"key,omitempty"`
 
 	// Maps between content types, paths, and data/etag/media type.
 	// They are per site because they can include rendered per-site data.
