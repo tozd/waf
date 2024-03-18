@@ -41,7 +41,7 @@ func (a *App) Validate() error {
 	// We have to call Validate on kong-embedded structs ourselves.
 	// See: https://github.com/alecthomas/kong/issues/90
 	if err := a.Server.TLS.Validate(); err != nil {
-		return err
+		return err //nolint:wrapcheck
 	}
 	return nil
 }
