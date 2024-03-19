@@ -312,7 +312,7 @@ func TestServerConnection(t *testing.T) {
 	assert.NoError(t, err, "% -+#.1v", err)
 	assert.NotNil(t, c)
 
-	// This does not start server.HTTPServer's managers, but that is OK for this test.
+	// This does not start server's managers, but that is OK for this test.
 	ts.StartTLS()
 
 	// Our certificate is for localhost domain and not 127.0.0.1 IP.
