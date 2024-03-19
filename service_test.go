@@ -147,8 +147,7 @@ func (s *testService) Helper(w http.ResponseWriter, req *http.Request, p Params)
 	case "NotFound":
 		s.NotFound(w, req)
 	case "NotFoundWithError":
-		s.WithError(req.Context(), errors.New("test"))
-		s.NotFound(w, req)
+		s.NotFoundWithError(w, req, errors.New("test"))
 	case "MethodNotAllowed":
 		s.MethodNotAllowed(w, req, []string{http.MethodDelete, http.MethodGet})
 	case "InternalServerError":

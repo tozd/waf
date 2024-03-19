@@ -20,7 +20,7 @@ import (
 func Error(w http.ResponseWriter, _ *http.Request, code int) {
 	body := http.StatusText(code)
 	w.Header().Set("Cache-Control", "no-cache")
-	// http.Error append a newline so we have to add 1.
+	// http.Error appends a newline so we have to add 1.
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)+1))
 	http.Error(w, body, code)
 }
@@ -78,6 +78,33 @@ func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	// We do not use http.NotFound because http.StatusText(http.StatusNotFound)
 	// is different from what http.NotFound uses, and we want to use the same pattern.
 	Error(w, req, http.StatusNotFound)
+}
+
+// NotFound replies to the request with the 404 (not found) HTTP code and the corresponding
+// error message. Error err is logged to the canonical log line.
+//
+// As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it instead replies
+// with the 408 (request timeout) HTTP code, the corresponding error message, and logs to the canonical log line
+// that the context has been canceled or that deadline exceeded, respectively.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
+func (s *Service[SiteT]) NotFoundWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+	s.WithError(req.Context(), err)
+
+	if errors.Is(err, context.Canceled) {
+		// Rationale: the client canceled the request and stopped reading the response, so in
+		// a way we are not prepared to wait indefinitely for the client to read the response.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		// Rationale: the client was reading the response too slowly, and we were
+		// not prepared to wait for so long.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	}
+
+	s.NotFound(w, req)
 }
 
 // MethodNotAllowed replies to the request with the 405 (method not allowed) HTTP code and the corresponding
