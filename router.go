@@ -2,7 +2,6 @@ package waf
 
 import (
 	"net/http"
-	"net/url"
 	"regexp"
 	"slices"
 	"sort"
@@ -118,6 +117,10 @@ type route struct {
 	APIHandlers map[string]Handler
 }
 
+type encoder interface {
+	Encode() string
+}
+
 type ResolvedRoute struct {
 	Name    string
 	Handler Handler
@@ -166,7 +169,7 @@ type Router struct {
 
 	// EncodeQuery allows customization of how query strings are encoded
 	// when reversing a route in Reverse and ReverseAPI methods.
-	EncodeQuery func(qs url.Values) string
+	EncodeQuery func(qs encoder) string
 
 	// A map between route name and routes.
 	routes   map[string]*route
@@ -453,7 +456,7 @@ func (r *Router) Get(path, method string) (ResolvedRoute, errors.E) {
 	}, nil
 }
 
-func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (string, errors.E) {
+func (r *Router) reverse(name string, params Params, qs encoder, api bool) (string, errors.E) {
 	ro, ok := r.routes[name]
 	if !ok {
 		err := errors.New("route does not exist")
@@ -515,12 +518,17 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		res.WriteString("/")
 	}
 
-	if len(qs) > 0 {
-		res.WriteString("?")
+	if qs != nil {
+		var encoded string
 		if r.EncodeQuery != nil {
-			res.WriteString(r.EncodeQuery(qs))
+			encoded = r.EncodeQuery(qs)
 		} else {
-			res.WriteString(qs.Encode())
+			encoded = qs.Encode()
+		}
+
+		if encoded != "" {
+			res.WriteString("?")
+			res.WriteString(encoded)
 		}
 	}
 
@@ -529,12 +537,12 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 
 // Reverse constructs the path and query string portion of an URL based on the route name,
 // Params, and query string values.
-func (r *Router) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
+func (r *Router) Reverse(name string, params Params, qs encoder) (string, errors.E) {
 	return r.reverse(name, params, qs, false)
 }
 
 // ReverseAPI constructs the path and query string portion of an URL for API calls
 // based on the route name, Params, and query string values.
-func (r *Router) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
+func (r *Router) ReverseAPI(name string, params Params, qs encoder) (string, errors.E) {
 	return r.reverse(name, params, qs, true)
 }

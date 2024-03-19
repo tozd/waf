@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Use encoder interface instead of `url.Values` for query string values.
+
 ## [0.14.0] - 2024-03-19
 
 ### Added

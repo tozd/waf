@@ -505,7 +505,7 @@ func TestRouterReverse(t *testing.T) {
 		description   string
 		path          string
 		api           bool
-		encodeQuery   func(qs url.Values) string
+		encodeQuery   func(qs encoder) string
 		params        Params
 		qs            url.Values
 		inputAPI      bool
@@ -640,15 +640,15 @@ func TestRouterReverse(t *testing.T) {
 			params:      Params{"id": "123"},
 			qs:          url.Values{"param1": {"value1"}, "param2": {"value2"}},
 			inputAPI:    false,
-			encodeQuery: func(qs url.Values) string {
+			encodeQuery: func(qs encoder) string {
 				var buf strings.Builder
 				buf.WriteString(url.QueryEscape("param2"))
 				buf.WriteByte('=')
-				buf.WriteString(url.QueryEscape(qs.Get("param2")))
+				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param2")))
 				buf.WriteByte('&')
 				buf.WriteString(url.QueryEscape("param1"))
 				buf.WriteByte('=')
-				buf.WriteString(url.QueryEscape(qs.Get("param1")))
+				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param1")))
 				return buf.String()
 			},
 			expectedPath:  "/users/123/posts?param2=value2&param1=value1",
