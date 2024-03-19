@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2024-03-19
+
 ### Added
 
 - `NotFoundWithError`.
@@ -155,7 +157,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.13.1...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.14.0...main
+[0.14.0]: https://gitlab.com/tozd/waf/-/compare/v0.13.1...v0.14.0
 [0.13.1]: https://gitlab.com/tozd/waf/-/compare/v0.13.0...v0.13.1
 [0.13.0]: https://gitlab.com/tozd/waf/-/compare/v0.12.0...v0.13.0
 [0.12.0]: https://gitlab.com/tozd/waf/-/compare/v0.11.0...v0.12.0
