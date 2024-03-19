@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
+	"gitlab.com/tozd/go/x"
 
 	// This is here because _examples/hello.go needs this dependency.
 	_ "gitlab.com/tozd/go/cli"
@@ -360,8 +361,8 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 	certPath := filepath.Join(tempDir, "test_cert.pem")
 	keyPath := filepath.Join(tempDir, "test_key.pem")
 
-	err := createTempCertificateFiles(certPath, keyPath, []string{"example.com", "other.example.com"})
-	require.NoError(t, err)
+	errE = x.CreateTempCertificateFiles(certPath, keyPath, []string{"example.com", "other.example.com"})
+	require.NoError(t, errE)
 
 	certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
 	require.NoError(t, err)

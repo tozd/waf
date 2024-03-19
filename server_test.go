@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/tozd/go/x"
 	"gitlab.com/tozd/identifier"
 	"golang.org/x/sync/errgroup"
 )
@@ -30,8 +31,8 @@ func TestServer(t *testing.T) {
 	certPath := filepath.Join(tempDir, "test_cert.pem")
 	keyPath := filepath.Join(tempDir, "test_key.pem")
 
-	err := createTempCertificateFiles(certPath, keyPath, []string{})
-	require.NoError(t, err)
+	errE := x.CreateTempCertificateFiles(certPath, keyPath, []string{})
+	require.NoError(t, errE)
 
 	server := &Server[*Site]{
 		Logger: zerolog.Nop(),
@@ -40,11 +41,11 @@ func TestServer(t *testing.T) {
 			KeyFile:  keyPath,
 		},
 	}
-	_, errE := server.Init(nil)
+	_, errE = server.Init(nil)
 	assert.EqualError(t, errE, "certificate is not valid for any domain")
 
-	err = createTempCertificateFiles(certPath, keyPath, []string{"example.com", "localhost"})
-	require.NoError(t, err)
+	errE = x.CreateTempCertificateFiles(certPath, keyPath, []string{"example.com", "localhost"})
+	require.NoError(t, errE)
 
 	ctx := context.Background()
 
@@ -252,14 +253,14 @@ func TestServerConnection(t *testing.T) {
 	certPath := filepath.Join(tempDir, "test_cert.pem")
 	keyPath := filepath.Join(tempDir, "test_key.pem")
 
-	err := createTempCertificateFiles(certPath, keyPath, []string{"localhost"})
-	require.NoError(t, err)
+	errE := x.CreateTempCertificateFiles(certPath, keyPath, []string{"localhost"})
+	require.NoError(t, errE)
 
 	cert2Path := filepath.Join(tempDir, "test_cert2.pem")
 	key2Path := filepath.Join(tempDir, "test_key2.pem")
 
-	err = createTempCertificateFiles(cert2Path, key2Path, []string{"example.com"})
-	require.NoError(t, err)
+	errE = x.CreateTempCertificateFiles(cert2Path, key2Path, []string{"example.com"})
+	require.NoError(t, errE)
 
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
