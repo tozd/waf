@@ -644,11 +644,11 @@ func TestRouterReverse(t *testing.T) {
 				var buf strings.Builder
 				buf.WriteString(url.QueryEscape("param2"))
 				buf.WriteByte('=')
-				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param2"))) //nolint:forcetypeassert
+				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param2")))
 				buf.WriteByte('&')
 				buf.WriteString(url.QueryEscape("param1"))
 				buf.WriteByte('=')
-				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param1"))) //nolint:forcetypeassert
+				buf.WriteString(url.QueryEscape(qs.(url.Values).Get("param1")))
 				return buf.String()
 			},
 			expectedPath:  "/users/123/posts?param2=value2&param1=value1",
