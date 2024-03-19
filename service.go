@@ -1059,12 +1059,12 @@ func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ir
 }
 
 // Reverse calls router's Reverse.
-func (s *Service[SiteT]) Reverse(name string, params Params, qs encoder) (string, errors.E) {
+func (s *Service[SiteT]) Reverse(name string, params Params, qs url.Values) (string, errors.E) {
 	return s.router.Reverse(name, params, qs)
 }
 
 // Reverse calls router's ReverseAPI.
-func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs encoder) (string, errors.E) {
+func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
 	return s.router.ReverseAPI(name, params, qs)
 }
 
