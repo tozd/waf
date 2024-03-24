@@ -2,6 +2,8 @@ SHELL = /bin/bash -o pipefail
 
 .PHONY: test test-ci lint lint-ci fmt fmt-ci clean release lint-docs audit encrypt decrypt sops
 
+# TODO: Use ./... for the go tool covdata percent's -pkg.
+#       See: https://github.com/golang/go/issues/66507
 test:
 	rm -rf coverage
 	mkdir -p coverage
