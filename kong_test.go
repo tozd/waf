@@ -45,7 +45,7 @@ func TestKong(t *testing.T) {
 
 Flags:
   -h, --help            Show context-sensitive help.
-  -d, --development     Run in development mode. Proxy unknown requests.
+  -D, --development     Run in development mode. Proxy unknown requests.
   -P, --proxy-to=URL    Base URL to proxy to in development mode. Default:
                         http://localhost:5173.
 
