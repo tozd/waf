@@ -516,11 +516,15 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 	}
 
 	if len(qs) > 0 {
-		res.WriteString("?")
+		var encoded string
 		if r.EncodeQuery != nil {
-			res.WriteString(r.EncodeQuery(qs))
+			encoded = r.EncodeQuery(qs)
 		} else {
-			res.WriteString(qs.Encode())
+			encoded = qs.Encode()
+		}
+		if encoded != "" {
+			res.WriteString("?")
+			res.WriteString(encoded)
 		}
 	}
 

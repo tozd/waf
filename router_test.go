@@ -654,6 +654,17 @@ func TestRouterReverse(t *testing.T) {
 			expectedPath:  "/users/123/posts?param2=value2&param1=value1",
 			expectedError: "",
 		},
+		{
+			description:   "Path with empty query string",
+			path:          "/users/:id/posts",
+			api:           false,
+			params:        Params{"id": "123"},
+			qs:            url.Values{"param1": {}},
+			inputAPI:      false,
+			encodeQuery:   nil,
+			expectedPath:  "/users/123/posts",
+			expectedError: "",
+		},
 	}
 
 	for _, tt := range tests {
