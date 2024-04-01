@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2024-04-01
+
 ### Fixed
 
 - Do not reverse with just `?` for empty query strings.
@@ -179,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.17.0...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.17.1...main
+[0.17.1]: https://gitlab.com/tozd/waf/-/compare/v0.17.0...v0.17.1
 [0.17.0]: https://gitlab.com/tozd/waf/-/compare/v0.16.0...v0.17.0
 [0.16.0]: https://gitlab.com/tozd/waf/-/compare/v0.15.0...v0.16.0
 [0.15.0]: https://gitlab.com/tozd/waf/-/compare/v0.14.0...v0.15.0
