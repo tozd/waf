@@ -58,6 +58,9 @@ var siteContextKey = &contextKey{"site"} //nolint:gochecknoglobals
 // metadataContextKey accumulates metadata for the HTTP response.
 var metadataContextKey = &contextKey{"metadata"} //nolint:gochecknoglobals
 
+// metricsContextKey provides metrics for each HTTP request.
+var metricsContextKey = &contextKey{"metadata"} //nolint:gochecknoglobals
+
 // We have to use the same disabledLogger that is used in zerolog.Ctx because
 // it is checked in logger.UpdateContext.
 // See: https://github.com/rs/zerolog/issues/643

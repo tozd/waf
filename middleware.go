@@ -16,7 +16,6 @@ import (
 	"github.com/felixge/httpsnoop"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
-	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
@@ -131,7 +130,7 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 				if req.ProtoMajor > 1 && m.Code != http.StatusNotModified {
 					milliseconds := int64(m.Duration / time.Millisecond)
 					// This writes the trailer.
-					w.Header().Set(http.TrailerPrefix+servertiming.HeaderKey, fmt.Sprintf("t;dur=%d", milliseconds))
+					w.Header().Set(http.TrailerPrefix+serverTimingHeader, fmt.Sprintf("t;dur=%d", milliseconds))
 				}
 				f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) //nolint:forcetypeassert
 			}()
@@ -390,11 +389,10 @@ func setCanonicalLogger(next http.Handler) http.Handler {
 func addNosniffHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		headerWritten := false
-		headers := w.Header()
 		defer func() {
 			if !headerWritten {
 				headerWritten = true
-				headers.Set("X-Content-Type-Options", "nosniff")
+				w.Header().Set("X-Content-Type-Options", "nosniff")
 			}
 		}()
 		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
@@ -402,7 +400,7 @@ func addNosniffHeader(next http.Handler) http.Handler {
 				return func(code int) {
 					headerWritten = true
 					if code != http.StatusNotModified {
-						headers.Set("X-Content-Type-Options", "nosniff")
+						w.Header().Set("X-Content-Type-Options", "nosniff")
 					}
 					next(code)
 				}
@@ -413,7 +411,7 @@ func addNosniffHeader(next http.Handler) http.Handler {
 						// Calling Write without WriteHeader is the same as first
 						// calling WriteHeader(http.StatusOK), so we set the header.
 						headerWritten = true
-						headers.Set("X-Content-Type-Options", "nosniff")
+						w.Header().Set("X-Content-Type-Options", "nosniff")
 					}
 					return next(b)
 				}
@@ -452,5 +450,53 @@ func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Ha
 			}
 			next.ServeHTTP(w, req)
 		})
+	}
+}
+
+// metricsMiddleware add metrics to the context and adds Server-Timing header
+// to responses.
+func metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		headerWritten := false
+		metrics := NewMetrics()
+		req = req.WithContext(context.WithValue(req.Context(), metricsContextKey, metrics))
+		defer func() {
+			if !headerWritten {
+				headerWritten = true
+				writeServerTimingHeader(w, metrics, http.StatusOK)
+			}
+		}()
+		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
+			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+				return func(code int) {
+					headerWritten = true
+					writeServerTimingHeader(w, metrics, code)
+					next(code)
+				}
+			},
+			Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
+				return func(b []byte) (int, error) {
+					if !headerWritten {
+						// Calling Write without WriteHeader is the same as first
+						// calling WriteHeader(http.StatusOK), so we set the header.
+						headerWritten = true
+						writeServerTimingHeader(w, metrics, http.StatusOK)
+					}
+					return next(b)
+				}
+			},
+		}), req)
+	})
+}
+
+func writeServerTimingHeader(w http.ResponseWriter, m *Metrics, code int) {
+	// If status code is 304, do nothing.
+	if code == http.StatusNotModified {
+		return
+	}
+
+	h := m.ServerTimingString()
+	if h != "" {
+		w.Header().Set(serverTimingHeader, h)
 	}
 }

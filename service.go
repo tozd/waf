@@ -26,10 +26,14 @@ import (
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
-	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/go/x"
 	z "gitlab.com/tozd/go/zerolog"
+)
+
+const (
+	MetricCompress    = "c"
+	MetricJSONMarshal = "j"
 )
 
 // CORSOptions is a subset of cors.Options.
@@ -429,10 +433,8 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	c = c.Append(hlog.NewHandler(s.CanonicalLogger))
 	// Then we set the canonical log line logger under its own context key as well.
 	c = c.Append(setCanonicalLogger)
-	// It has to be before accessHandler so that it can access the timing context.
-	c = c.Append(func(next http.Handler) http.Handler {
-		return servertiming.Middleware(next, nil)
-	})
+	// It has to be before accessHandler so that it can access the metrics context.
+	c = c.Append(metricsMiddleware)
 
 	// Is logger enabled at all (not zerolog.Nop or zero zerolog struct)?
 	// See: https://github.com/rs/zerolog/pull/617
@@ -446,29 +448,17 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			if code >= http.StatusInternalServerError {
 				level = zerolog.ErrorLevel
 			}
-			timing := servertiming.FromContext(ctx)
-			metrics := zerolog.Dict()
-			seenMetrics := mapset.NewThreadUnsafeSet[string]()
-			for _, metric := range timing.Metrics {
-				// We log only really measured durations and not just initialized
-				// (it is impossible to both start and end the measurement with 0 duration).
-				if metric != nil && metric.Duration > 0 {
-					metrics.Dur(metric.Name, metric.Duration)
-					if !seenMetrics.Add(metric.Name) {
-						s.Logger.Warn().Str("metric", metric.Name).Msg("duplicate metric")
-					}
-				}
-			}
+			metrics := MustGetMetrics(ctx)
 			// Full duration is added to the response as a trailer in accessHandler for HTTP2,
 			// but it is not added to timing.Metrics. So we add it here to the log.
-			metrics.Dur("t", duration)
+			metrics.Add(&logOnlyDurationMetric{name: "t", duration: duration})
 			l := zerolog.Ctx(ctx).WithLevel(level) //nolint:zerologlint
 			if code != 0 {
 				l = l.Int("code", code)
 			}
 			l = l.Int64("responseBody", responseBody).
 				Int64("requestBody", requestBody).
-				Dict("metrics", metrics)
+				Object("metrics", metrics)
 			message := canonicalLoggerMessage(ctx)
 			if *message != "" {
 				l.Msg(*message)
@@ -948,7 +938,7 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 // If there is an error, PrepareJSON responds to the request and returns nil.
 func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) []byte {
 	ctx := req.Context()
-	timing := servertiming.FromContext(ctx)
+	metrics := MustGetMetrics(ctx)
 
 	var encoded []byte
 	switch d := data.(type) {
@@ -957,7 +947,7 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 	case json.RawMessage:
 		encoded = []byte(d)
 	default:
-		m := timing.NewMetric("j").Start()
+		m := metrics.Duration(MetricJSONMarshal).Start()
 		e, err := x.MarshalWithoutEscapeHTML(data)
 		m.Stop()
 
@@ -979,7 +969,7 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 	}
 
 	if contentEncoding != compressionIdentity {
-		m := timing.NewMetric("c").Start()
+		m := metrics.Duration(MetricCompress).Start()
 		compressed, errE := compress(contentEncoding, encoded)
 		m.Stop()
 

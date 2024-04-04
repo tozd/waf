@@ -20,7 +20,7 @@ Features:
   accessible from the Internet).
 - Efficient serving of static files from memory with compression, caching, and HTTP range requests.
 - Makes [canonical log lines](https://brandur.org/canonical-log-lines) for each request.
-- Supports [server timing](https://www.w3.org/TR/server-timing/) measurements and response header.
+- Supports metrics in context and [server timing](https://www.w3.org/TR/server-timing/) measurements in response header.
 - Supports structured metadata in a response header encoded based on
   [RFC 8941](https://www.rfc-editor.org/rfc/rfc8941).
 - Supports [web sockets](https://en.wikipedia.org/wiki/WebSocket).

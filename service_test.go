@@ -27,10 +27,8 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/go/x"
 
@@ -127,10 +125,12 @@ type testService struct {
 }
 
 func (s *testService) HomeGet(w http.ResponseWriter, req *http.Request, _ Params) {
-	timing := servertiming.FromContext(req.Context())
-	timing.NewMetric("test").Duration = 123456789 * time.Microsecond
+	ctx := req.Context()
 
-	hlog.FromRequest(req).Info().Msg("test msg")
+	metrics := MustGetMetrics(ctx)
+	metrics.Duration("test").Start().Duration = 123456789 * time.Microsecond
+
+	zerolog.Ctx(ctx).Info().Msg("test msg")
 
 	s.ServeStaticFile(w, req, "/index.json")
 }
@@ -1440,7 +1440,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			[]byte(`{"domain":"example.com","title":"test","description":"test site","version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":},"message":"HomeGet"}` + "\n",
+				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"t":,"test":123456},"message":"HomeGet"}` + "\n",
 			http.Header{
 				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
@@ -2383,7 +2383,7 @@ func TestService(t *testing.T) {
 			http.StatusOK,
 			[]byte(`{"domain":"example.com","title":"test","description":"test site","version":"vTEST","buildTimestamp":"2023-11-03T00:51:07Z","revision":"abcde"}`),
 			`{"level":"info","request":"","message":"test msg"}` + "\n" +
-				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"test":123456,"t":},"message":"HomeGet"}` + "\n",
+				`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","etag":"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok","code":200,"responseBody":142,"requestBody":0,"metrics":{"t":,"test":123456},"message":"HomeGet"}` + "\n",
 			http.Header{
 				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},

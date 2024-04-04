@@ -18,7 +18,6 @@ import (
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	servertiming "github.com/tozd/go-server-timing"
 	"gitlab.com/tozd/identifier"
 	"nhooyr.io/websocket"
 )
@@ -137,7 +136,7 @@ func TestAccessHandler(t *testing.T) {
 				t.Cleanup(func() {
 					res.Body.Close()
 				})
-				trailer := res.Trailer.Get(servertiming.HeaderKey)
+				trailer := res.Trailer.Get(serverTimingHeader)
 				if protocol > 1 {
 					assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
 				} else {
