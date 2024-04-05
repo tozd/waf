@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GetMetrics` and `MustGetMetrics` to access new metrics API through context.
+- New metrics API supports durations, counters, counters with duration, and multiple durations.
+
+### Changed
+
+- `Server-Timing` header is now always issued for all metrics as a trailer.
+
+### Removed
+
+- `github.com/tozd/go-server-timing` as a dependency. It cannot be used anymore to
+  add metrics. Use `GetMetrics` and `MustGetMetrics` instead.
+
 ## [0.17.1] - 2024-04-01
 
 ### Fixed
