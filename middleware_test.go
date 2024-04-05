@@ -137,12 +137,6 @@ func TestAccessHandler(t *testing.T) {
 				t.Cleanup(func() {
 					res.Body.Close()
 				})
-				trailer := res.Trailer.Get(serverTimingHeader)
-				if protocol > 1 {
-					assert.True(t, strings.HasPrefix(trailer, "t;dur="), trailer)
-				} else {
-					assert.Equal(t, "", trailer)
-				}
 			})
 		}
 	}
@@ -663,6 +657,8 @@ func TestMetricsMiddleware(t *testing.T) {
 		metrics.Counter("counter").Inc()
 		metrics.DurationCounter("dc").Inc()
 		w.WriteHeader(http.StatusOK)
+		// This goes into the trailer.
+		metrics.Duration("trailer").Start().Stop()
 	}))
 	h = metricsMiddleware(h)
 	h = setCanonicalLogger(h)
@@ -673,9 +669,9 @@ func TestMetricsMiddleware(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+},"duration":[0-9]+,"durations":{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+}}}`), out.String())
+	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+\},"duration":[0-9]+,"durations":\{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+\},"trailer":[0-9]+\}\}`), out.String())
 	header := res.Header.Get(serverTimingHeader)
-	assert.Equal(t, `dc;dur=,duration;dur=`, headerCleanupRegexp.ReplaceAllString(header, ""))
+	assert.Empty(t, header)
 	trailer := res.Trailer.Get(serverTimingHeader)
-	assert.Equal(t, `t;dur=`, headerCleanupRegexp.ReplaceAllString(trailer, ""))
+	assert.Equal(t, `dc;dur=,duration;dur=,trailer;dur=`, headerCleanupRegexp.ReplaceAllString(trailer, ""))
 }

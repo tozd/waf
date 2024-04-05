@@ -12,6 +12,12 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
+const (
+	MetricCompress    = "c"
+	MetricJSONMarshal = "j"
+	MetricTotal       = "t"
+)
+
 const serverTimingHeader = "Server-Timing"
 
 // DurationMeasurement is a measurement of a duration.
@@ -555,21 +561,4 @@ func (m *Metrics) ServerTimingString() string {
 	}
 
 	return strings.Join(parts, ",")
-}
-
-type logOnlyDurationMetric struct {
-	name     string
-	duration time.Duration
-}
-
-func (d *logOnlyDurationMetric) Name() string {
-	return d.name
-}
-
-func (d *logOnlyDurationMetric) MarshalZerologObject(e *zerolog.Event) {
-	e.Dur(d.name, d.duration)
-}
-
-func (d *logOnlyDurationMetric) ServerTimingString() string {
-	return ""
 }

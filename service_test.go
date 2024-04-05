@@ -1450,12 +1450,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {`"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok"`},
 				"Request-Id":             {""},
-				"Server-Timing":          {"test;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"t;dur=,test;dur="},
 			},
 		},
 		{
@@ -1707,12 +1706,11 @@ func TestService(t *testing.T) {
 				"Etag":                   {`"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE"`},
 				"Request-Id":             {""},
 				"Test-Metadata":          {"foobar=42"},
-				"Server-Timing":          {"j;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"j;dur=,t;dur="},
 			},
 		},
 		{
@@ -1736,12 +1734,11 @@ func TestService(t *testing.T) {
 				"Etag":                   {`"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE"`},
 				"Request-Id":             {""},
 				"Test-Metadata":          {"foobar=42"},
-				"Server-Timing":          {"j;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"j;dur=,t;dur="},
 			},
 		},
 		{
@@ -1882,12 +1879,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -1978,12 +1974,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2036,12 +2031,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2136,12 +2130,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2195,12 +2188,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2253,12 +2245,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {largeJSONGzipEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2281,12 +2272,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {nonCompressibleDataEtag},
 				"Request-Id":             {""},
-				"Server-Timing":          {"c;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"c;dur=,t;dur="},
 			},
 		},
 		{
@@ -2393,12 +2383,11 @@ func TestService(t *testing.T) {
 				"Date":                   {""},
 				"Etag":                   {`"L-2SWZmdBbqCzd6xOfS5Via-1_urwrPdsIWeC-2XAok"`},
 				"Request-Id":             {""},
-				"Server-Timing":          {"test;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"t;dur=,test;dur="},
 			},
 		},
 		{
@@ -2439,12 +2428,11 @@ func TestService(t *testing.T) {
 				"Etag":                   {`"j0Jw1Eosvc8TRxjb6f9Gy2tYjfHaVdlIoKpog0X2WKE"`},
 				"Request-Id":             {""},
 				"Test-Metadata":          {"foobar=42"},
-				"Server-Timing":          {"j;dur="},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
 			},
 			http.Header{
-				"Server-Timing": {"t;dur="},
+				"Server-Timing": {"j;dur=,t;dur="},
 			},
 		},
 		{

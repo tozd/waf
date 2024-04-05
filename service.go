@@ -31,11 +31,6 @@ import (
 	z "gitlab.com/tozd/go/zerolog"
 )
 
-const (
-	MetricCompress    = "c"
-	MetricJSONMarshal = "j"
-)
-
 // CORSOptions is a subset of cors.Options.
 //
 // See description of fields in cors.Options.
@@ -441,6 +436,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	if l := s.CanonicalLogger.Sample(nil); l.Info().Enabled() { //nolint:zerologlint
 		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
 			ctx := req.Context()
+
 			level := zerolog.InfoLevel
 			if code >= http.StatusBadRequest {
 				level = zerolog.WarnLevel
@@ -448,10 +444,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			if code >= http.StatusInternalServerError {
 				level = zerolog.ErrorLevel
 			}
+
 			metrics := MustGetMetrics(ctx)
-			// Full duration is added to the response as a trailer in accessHandler for HTTP2,
-			// but it is not added to timing.Metrics. So we add it here to the log.
-			metrics.Add(&logOnlyDurationMetric{name: "t", duration: duration})
+			metrics.Duration(MetricTotal).Duration = duration
+
 			l := zerolog.Ctx(ctx).WithLevel(level) //nolint:zerologlint
 			if code != 0 {
 				l = l.Int("code", code)
@@ -459,6 +455,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			l = l.Int64("responseBody", responseBody).
 				Int64("requestBody", requestBody).
 				Object("metrics", metrics)
+
 			message := canonicalLoggerMessage(ctx)
 			if *message != "" {
 				l.Msg(*message)
@@ -480,7 +477,11 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 		c = c.Append(hlog.EtagHandler("etag"))
 		c = c.Append(hlog.ResponseHeaderHandler("encoding", "Content-Encoding"))
 	} else {
-		c = c.Append(accessHandler(func(_ *http.Request, _ int, _, _ int64, _ time.Duration) {}))
+		c = c.Append(accessHandler(func(req *http.Request, _ int, _, _ int64, duration time.Duration) {
+			ctx := req.Context()
+			metrics := MustGetMetrics(ctx)
+			metrics.Duration(MetricTotal).Duration = duration
+		}))
 		c = c.Append(requestIDHandler("", "Request-Id"))
 	}
 

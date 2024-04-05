@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -106,12 +105,10 @@ func urlHandler(pathKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-// accessHandler is similar to hlog.accessHandler, but it uses github.com/felixge/httpsnoop.
+// accessHandler is similar to hlog.accessHandler, but it uses github.com/felixge/httpsnoop
+// and counts bytes read from the body.
 // See: https://github.com/rs/zerolog/issues/417
-// Afterwards, it was extended with Server-Timing trailer and counting of bytes read from the body.
 // See: https://github.com/rs/zerolog/pull/562
-// Trailers are added only on HTTP2 so that we are not required to use chunked transport encoding
-// with HTTP1.1 to support trailers (which conflicts with us setting Content-Length response header).
 func accessHandler(f func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -125,17 +122,10 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			}
 			body := newCounterReadCloser(req.Body)
 			req.Body = body
-			defer func() {
-				// We use trailers only with HTTP2 and when status is not 304.
-				if req.ProtoMajor > 1 && m.Code != http.StatusNotModified {
-					milliseconds := int64(m.Duration / time.Millisecond)
-					// This writes the trailer.
-					w.Header().Set(http.TrailerPrefix+serverTimingHeader, fmt.Sprintf("t;dur=%d", milliseconds))
-				}
-				f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) //nolint:forcetypeassert
-			}()
-			m.CaptureMetrics(w, func(ww http.ResponseWriter) {
-				next.ServeHTTP(ww, req)
+			// We use a closure so that m is accessed when function closure runs.
+			defer func() { f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) }() //nolint:forcetypeassert
+			m.CaptureMetrics(w, func(w http.ResponseWriter) {
+				next.ServeHTTP(w, req)
 			})
 		})
 	}
@@ -453,50 +443,41 @@ func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Ha
 	}
 }
 
-// metricsMiddleware add metrics to the context and adds Server-Timing header
-// to responses.
+// metricsMiddleware add metrics to the context and on HTTP2 adds Server-Timing trailer to
+// responses (unless a response is 304 Not Modified).
+//
+// It uses a trailer for all metrics to simplify the logic. Otherwise we could issue
+// completed durations when headers are written (but cannot counters because we do not
+// know when they have finished counting and some could continue counting even after
+// headers are written in the request handler, e.g., in defer) and the rest of metrics
+// in a trailer. But it does not seem worth making the logic (and ServerTimingString method
+// to support this) more complicated.
 func metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		headerWritten := false
 		metrics := NewMetrics()
 		req = req.WithContext(context.WithValue(req.Context(), metricsContextKey, metrics))
+		addTrailer := true
 		defer func() {
-			if !headerWritten {
-				headerWritten = true
-				writeServerTimingHeader(w, metrics, http.StatusOK)
+			// Trailers are added only on HTTP2 so that we are not required to use chunked transport encoding
+			// with HTTP1.1 to support trailers (which conflicts with us setting Content-Length response header).
+			if req.ProtoMajor > 1 && addTrailer {
+				t := metrics.ServerTimingString()
+				if t != "" {
+					// This writes the trailer.
+					w.Header().Set(http.TrailerPrefix+serverTimingHeader, t)
+				}
 			}
 		}()
 		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
 			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 				return func(code int) {
-					headerWritten = true
-					writeServerTimingHeader(w, metrics, code)
-					next(code)
-				}
-			},
-			Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
-				return func(b []byte) (int, error) {
-					if !headerWritten {
-						// Calling Write without WriteHeader is the same as first
-						// calling WriteHeader(http.StatusOK), so we set the header.
-						headerWritten = true
-						writeServerTimingHeader(w, metrics, http.StatusOK)
+					// We add trailers only when status is not 304.
+					if code == http.StatusNotModified {
+						addTrailer = false
 					}
-					return next(b)
+					next(code)
 				}
 			},
 		}), req)
 	})
-}
-
-func writeServerTimingHeader(w http.ResponseWriter, m *Metrics, code int) {
-	// If status code is 304, do nothing.
-	if code == http.StatusNotModified {
-		return
-	}
-
-	h := m.ServerTimingString()
-	if h != "" {
-		w.Header().Set(serverTimingHeader, h)
-	}
 }
