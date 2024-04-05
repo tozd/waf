@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -624,4 +625,44 @@ func TestRedirectToMainSite(t *testing.T) {
 			assert.Equal(t, tt.ExpectedLocation, res.Header.Get("Location"))
 		})
 	}
+}
+
+func TestMetricsMiddleware(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	r := &http.Request{}
+	r.ProtoMajor = 2
+	h := accessHandler(func(r *http.Request, _ int, _, _ int64, _ time.Duration) {
+		ctx := r.Context()
+		l := zerolog.Ctx(ctx)
+		metrics := MustGetMetrics(ctx)
+		l.Log().Object("metrics", metrics).Msg("")
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		metrics := MustGetMetrics(ctx)
+		metrics.Counter("counter").Start().Add(42)
+		metrics.Duration("duration").Start().Stop()
+		metrics.Duration("foreverDuration").Start() // We do not stop on purpose.
+		d := metrics.Durations("durations")
+		d.Start().Stop()
+		d.Start().Stop()
+		metrics.DurationCounter("dc").Start().Add(43).Stop()
+		metrics.DurationCounter("foreverDc").Start().Add(43) // We do not stop on purpose.
+		w.WriteHeader(http.StatusOK)
+	}))
+	h = metricsMiddleware(h)
+	h = setCanonicalLogger(h)
+	h = hlog.NewHandler(zerolog.New(out))(h)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close()
+	})
+	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":42,"dc":\{"dur":[0-9]+,"count":43,"rate":[0-9.]+},"duration":[0-9]+,"durations":{"min":[0-9]+,"max":[0-9]+,"dur":[0-9]+,"count":[0-9]+,"avg":[0-9]+}}}`), out.String())
+	header := res.Header.Get(serverTimingHeader)
+	assert.Equal(t, `dc;dur=,duration;dur=`, headerCleanupRegexp.ReplaceAllString(header, ""))
+	trailer := res.Trailer.Get(serverTimingHeader)
+	assert.Equal(t, `t;dur=`, headerCleanupRegexp.ReplaceAllString(trailer, ""))
 }

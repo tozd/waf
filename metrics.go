@@ -317,7 +317,10 @@ func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 		dict := zerolog.Dict()
 		dict.Dur("dur", d.measurement.Duration)
 		dict.Int64("count", d.measurement.Count)
-		dict.Float64("rate", float64(d.measurement.Count)/float64(d.measurement.Duration.Milliseconds()))
+		// We do not use Duration.Milliseconds() here but divide by time.Millisecond
+		// ourselves so that rate computation works also for sub-millisecond durations
+		// and is rounded only then (otherwise you get +Inf).
+		dict.Float64("rate", float64(d.measurement.Count)/float64(d.measurement.Duration)/float64(time.Millisecond))
 		e.Dict(d.name, dict)
 	}
 }
