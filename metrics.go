@@ -18,13 +18,15 @@ const serverTimingHeader = "Server-Timing"
 type DurationMeasurement struct {
 	startTime time.Time
 
-	Duration time.Duration
+	Discarded bool
+	Duration  time.Duration
 }
 
-// Start records the start of the duration measurement.
-//
-// Not safe for concurrency.
+// Start records the start of the duration.
 func (d *DurationMeasurement) Start() *DurationMeasurement {
+	if d.Discarded {
+		return d
+	}
 	if !d.startTime.IsZero() {
 		panic(errors.New("duration measurement already started"))
 	}
@@ -32,10 +34,11 @@ func (d *DurationMeasurement) Start() *DurationMeasurement {
 	return d
 }
 
-// Stop computes the duration of the duration measurement.
-//
-// Not safe for concurrency.
-func (d *DurationMeasurement) Stop() {
+// Stop computes the duration.
+func (d *DurationMeasurement) Stop() *DurationMeasurement {
+	if d.Discarded {
+		return d
+	}
 	if d.startTime.IsZero() {
 		panic(errors.New("duration measurement not started"))
 	}
@@ -43,15 +46,24 @@ func (d *DurationMeasurement) Stop() {
 		panic(errors.New("duration measurement already stopped"))
 	}
 	d.Duration = time.Since(d.startTime)
+	return d
+}
+
+// Discard discards the measurement.
+//
+// Any future calls to measurement methods are ignored.
+func (d *DurationMeasurement) Discard() *DurationMeasurement {
+	d.Discarded = true
+	return d
 }
 
 // DurationMetric is a metric of a duration.
 type DurationMetric struct {
-	name string
+	name      string
+	startTime time.Time
 
-	measurement *DurationMeasurement
-
-	mu sync.Mutex
+	Discarded bool
+	Duration  time.Duration
 }
 
 func (d *DurationMetric) Name() string {
@@ -59,75 +71,69 @@ func (d *DurationMetric) Name() string {
 }
 
 func (d *DurationMetric) MarshalZerologObject(e *zerolog.Event) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.measurement != nil && d.measurement.Duration != 0 {
-		e.Dur(d.name, d.measurement.Duration)
+	if d.Discarded || d.Duration == 0 {
+		return
 	}
+
+	e.Dur(d.name, d.Duration)
 }
 
 func (d *DurationMetric) ServerTimingString() string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.measurement != nil && d.measurement.Duration != 0 {
-		// We want only millisecond precision to minimize side channels.
-		return fmt.Sprintf("%s;dur=%d", d.name, d.measurement.Duration.Milliseconds())
+	if d.Discarded || d.Duration == 0 {
+		return ""
 	}
 
-	return ""
+	// We want only millisecond precision to minimize side channels.
+	return fmt.Sprintf("%s;dur=%d", d.name, d.Duration.Milliseconds())
 }
 
-// Start starts a duration measurement.
+// Start records the start of the duration.
 //
 // Can be called only once per metric.
-func (d *DurationMetric) Start() *DurationMeasurement {
-	m := new(DurationMeasurement)
-	d.mu.Lock()
-	// We do not allow starting an already started duration metrics.
-	if d.measurement != nil {
-		d.mu.Unlock()
+func (d *DurationMetric) Start() *DurationMetric {
+	if d.Discarded {
+		return d
+	}
+	if !d.startTime.IsZero() {
 		panic(errors.New("duration metric already started"))
 	}
-	d.measurement = m
-	d.mu.Unlock()
-	// We call Start outside of lock to minimize its impact on measurement.
-	return m.Start()
+	d.startTime = time.Now()
+	return d
 }
 
-// CounterMeasurement is a counter measurement.
-type CounterMeasurement struct {
-	Count int64
+// Stop computes the duration.
+func (d *DurationMetric) Stop() *DurationMetric {
+	if d.Discarded {
+		return d
+	}
+	if d.startTime.IsZero() {
+		panic(errors.New("duration metric not started"))
+	}
+	if d.Duration != 0 {
+		panic(errors.New("duration metric already stopped"))
+	}
+	d.Duration = time.Since(d.startTime)
+	return d
 }
 
-// Inc increases the counter by one.
+// Discard discards the metric.
 //
-// Not safe for concurrency.
-func (c *CounterMeasurement) Inc() *CounterMeasurement {
-	c.Count++
-	return c
-}
-
-// Add increases the counter by n.
-//
-// Not safe for concurrency.
-func (c *CounterMeasurement) Add(n int64) *CounterMeasurement {
-	c.Count += n
-	return c
+// Any future calls to metric methods are ignored.
+func (d *DurationMetric) Discard() *DurationMetric {
+	d.Discarded = true
+	return d
 }
 
 // CounterMetric is a counter metric.
 type CounterMetric struct {
 	name string
 
-	measurement *CounterMeasurement
-
-	mu sync.Mutex
+	Discarded bool
+	Count     int64
 }
 
 func (c *CounterMetric) Name() string {
@@ -135,12 +141,11 @@ func (c *CounterMetric) Name() string {
 }
 
 func (c *CounterMetric) MarshalZerologObject(e *zerolog.Event) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.measurement != nil {
-		e.Int64(c.name, c.measurement.Count)
+	if c.Discarded {
+		return
 	}
+
+	e.Int64(c.name, c.Count)
 }
 
 func (c *CounterMetric) ServerTimingString() string {
@@ -149,25 +154,40 @@ func (c *CounterMetric) ServerTimingString() string {
 	return ""
 }
 
-// Start starts a counter measurement.
-//
-// Can be called multiple times per metric with counter continuing.
-func (c *CounterMetric) Start() *CounterMeasurement {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	// We do allow starting an already started counter metrics.
-	if c.measurement == nil {
-		c.measurement = new(CounterMeasurement)
+// Inc increases the counter by one.
+func (c *CounterMetric) Inc() *CounterMetric {
+	if c.Discarded {
+		return c
 	}
-	return c.measurement
+	c.Count++
+	return c
+}
+
+// Add increases the counter by n.
+func (c *CounterMetric) Add(n int64) *CounterMetric {
+	if c.Discarded {
+		return c
+	}
+	c.Count += n
+	return c
+}
+
+// Discard discards the metric.
+//
+// Any future calls to metric methods are ignored.
+func (c *CounterMetric) Discard() *CounterMetric {
+	c.Discarded = true
+	return c
 }
 
 // DurationsMetric is a metric of multiple durations.
 type DurationsMetric struct {
 	name string
 
-	measurement []*DurationMeasurement
+	Discarded bool
+	Durations []*DurationMeasurement
 
+	// Lock for appending to Durations.
 	mu sync.Mutex
 }
 
@@ -176,27 +196,30 @@ func (d *DurationsMetric) Name() string {
 }
 
 func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if d.Discarded {
+		return
+	}
 
 	var min time.Duration = math.MaxInt64
 	var max time.Duration
 	var sum time.Duration
 	var count int
 
-	for _, m := range d.measurement {
+	for _, m := range d.Durations {
 		// We use only really measured durations and not just started
 		// (it is impossible to both start and end the measurement with 0 duration).
-		if m.Duration != 0 {
-			if min > m.Duration {
-				min = m.Duration
-			}
-			if max < m.Duration {
-				max = m.Duration
-			}
-			sum += m.Duration
-			count++
+		if m.Discarded || m.Duration == 0 {
+			continue
 		}
+
+		if min > m.Duration {
+			min = m.Duration
+		}
+		if max < m.Duration {
+			max = m.Duration
+		}
+		sum += m.Duration
+		count++
 	}
 
 	if count == 0 {
@@ -204,11 +227,12 @@ func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 	}
 
 	dict := zerolog.Dict()
-	dict.Dur("min", min)
-	dict.Dur("max", max)
-	dict.Dur("dur", sum)
-	dict.Int("count", count)
+	// We add fields in the alphabetical order to match Go JSON marshaling order.
 	dict.Dur("avg", time.Duration(int64(max-min)/int64(count)))
+	dict.Int("count", count)
+	dict.Dur("dur", sum)
+	dict.Dur("max", max)
+	dict.Dur("min", min)
 	e.Dict(d.name, dict)
 }
 
@@ -223,56 +247,109 @@ func (d *DurationsMetric) ServerTimingString() string {
 // Can be called multiple times per metric with each call returning a new measurement.
 func (d *DurationsMetric) Start() *DurationMeasurement {
 	m := new(DurationMeasurement)
+	if d.Discarded {
+		m.Discarded = true
+		return m
+	}
 	d.mu.Lock()
-	d.measurement = append(d.measurement, m)
+	d.Durations = append(d.Durations, m)
 	d.mu.Unlock()
 	// We call Start outside of lock to minimize its impact on measurement.
 	return m.Start()
 }
 
-// DurationMeasurement is a counter measurement within a duration.
-type DurationCounterMeasurement struct {
-	startTime time.Time
-
-	Duration time.Duration
-	Count    int64
+// Discard discards the metric.
+//
+// Any future calls to Start return an already discarded duration measurement.
+func (d *DurationsMetric) Discard() *DurationsMetric {
+	d.Discarded = true
+	return d
 }
 
-// Start records the start of the duration measurement.
+// DurationCounterMetric is a counter metric with a duration.
+type DurationCounterMetric struct {
+	name      string
+	startTime time.Time
+
+	Discarded bool
+	Duration  time.Duration
+	Count     int64
+}
+
+func (d *DurationCounterMetric) Name() string {
+	return d.name
+}
+
+func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
+	// We use only really measured durations and not just started
+	// (it is impossible to both start and end the measurement with 0 duration).
+	if d.Discarded || d.Duration == 0 {
+		return
+	}
+
+	dict := zerolog.Dict()
+	// We add fields in the alphabetical order to match Go JSON marshaling order.
+	dict.Int64("count", d.Count)
+	dict.Dur("dur", d.Duration)
+	// We do not use Duration.Milliseconds() here but divide by time.Millisecond
+	// ourselves so that rate computation works also for sub-millisecond durations
+	// and is rounded only then (otherwise you get +Inf).
+	dict.Float64("rate", float64(d.Count)/float64(d.Duration)/float64(time.Millisecond))
+	e.Dict(d.name, dict)
+}
+
+func (d *DurationCounterMetric) ServerTimingString() string {
+	// We use only really measured durations and not just started
+	// (it is impossible to both start and end the measurement with 0 duration).
+	if d.Discarded || d.Duration == 0 {
+		return ""
+	}
+
+	// We want only millisecond precision to minimize any side channels.
+	return fmt.Sprintf("%s;dur=%d", d.name, d.Duration.Milliseconds())
+}
+
+// Start records the start of the duration.
 //
-// Not safe for concurrency.
-func (d *DurationCounterMeasurement) Start() *DurationCounterMeasurement {
+// Can be called only once per metric.
+func (d *DurationCounterMetric) Start() *DurationCounterMetric {
+	if d.Discarded {
+		return d
+	}
 	if !d.startTime.IsZero() {
-		panic(errors.New("duration counter measurement already started"))
+		panic(errors.New("duration counter metric already started"))
 	}
 	d.startTime = time.Now()
 	return d
 }
 
-// Stop computes the duration of the duration measurement.
-//
-// Not safe for concurrency.
-func (d *DurationCounterMeasurement) Stop() {
+// Stop computes the duration.
+func (d *DurationCounterMetric) Stop() *DurationCounterMetric {
+	if d.Discarded {
+		return d
+	}
 	if d.startTime.IsZero() {
-		panic(errors.New("duration counter measurement not started"))
+		panic(errors.New("duration counter metric not started"))
 	}
 	if d.Duration != 0 {
-		panic(errors.New("duration counter measurement already stopped"))
+		panic(errors.New("duration counter metric already stopped"))
 	}
 	d.Duration = time.Since(d.startTime)
+	return d
 }
 
 // Inc increases the counter by one.
 //
 // Only possible after calling Start and before calling Stop.
-//
-// Not safe for concurrency.
-func (d *DurationCounterMeasurement) Inc() *DurationCounterMeasurement {
+func (d *DurationCounterMetric) Inc() *DurationCounterMetric {
+	if d.Discarded {
+		return d
+	}
 	if d.startTime.IsZero() {
-		panic(errors.New("duration counter measurement not started"))
+		panic(errors.New("duration counter metric not started"))
 	}
 	if d.Duration != 0 {
-		panic(errors.New("duration counter measurement already stopped"))
+		panic(errors.New("duration counter metric already stopped"))
 	}
 	d.Count++
 	return d
@@ -281,79 +358,26 @@ func (d *DurationCounterMeasurement) Inc() *DurationCounterMeasurement {
 // Add increases the counter by n.
 //
 // Only possible after calling Start and before calling Stop.
-//
-// Not safe for concurrency.
-func (d *DurationCounterMeasurement) Add(n int64) *DurationCounterMeasurement {
+func (d *DurationCounterMetric) Add(n int64) *DurationCounterMetric {
+	if d.Discarded {
+		return d
+	}
 	if d.startTime.IsZero() {
-		panic(errors.New("duration counter measurement not started"))
+		panic(errors.New("duration counter metric not started"))
 	}
 	if d.Duration != 0 {
-		panic(errors.New("duration counter measurement already stopped"))
+		panic(errors.New("duration counter metric already stopped"))
 	}
 	d.Count += n
 	return d
 }
 
-// DurationCounterMetric is a counter metric with a duration.
-type DurationCounterMetric struct {
-	name string
-
-	measurement *DurationCounterMeasurement
-
-	mu sync.Mutex
-}
-
-func (d *DurationCounterMetric) Name() string {
-	return d.name
-}
-
-func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	// We use only really measured durations and not just started
-	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.measurement != nil && d.measurement.Duration != 0 {
-		dict := zerolog.Dict()
-		dict.Dur("dur", d.measurement.Duration)
-		dict.Int64("count", d.measurement.Count)
-		// We do not use Duration.Milliseconds() here but divide by time.Millisecond
-		// ourselves so that rate computation works also for sub-millisecond durations
-		// and is rounded only then (otherwise you get +Inf).
-		dict.Float64("rate", float64(d.measurement.Count)/float64(d.measurement.Duration)/float64(time.Millisecond))
-		e.Dict(d.name, dict)
-	}
-}
-
-func (d *DurationCounterMetric) ServerTimingString() string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	// We use only really measured durations and not just started
-	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.measurement != nil && d.measurement.Duration != 0 {
-		// We want only millisecond precision to minimize any side channels.
-		return fmt.Sprintf("%s;dur=%d", d.name, d.measurement.Duration.Milliseconds())
-	}
-
-	return ""
-}
-
-// Start starts a duration counter measurement.
+// Discard discards the metric.
 //
-// Can be called only once per metric.
-func (d *DurationCounterMetric) Start() *DurationCounterMeasurement {
-	m := new(DurationCounterMeasurement)
-	d.mu.Lock()
-	// We do not allow starting an already started duration metrics.
-	if d.measurement != nil {
-		d.mu.Unlock()
-		panic(errors.New("duration counter metric already started"))
-	}
-	d.measurement = m
-	d.mu.Unlock()
-	// We call Start outside of lock to minimize its impact on measurement.
-	return m.Start()
+// Any future calls to metric methods are ignored.
+func (d *DurationCounterMetric) Discard() *DurationCounterMetric {
+	d.Discarded = true
+	return d
 }
 
 type metric interface {

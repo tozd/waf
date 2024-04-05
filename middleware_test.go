@@ -641,14 +641,27 @@ func TestMetricsMiddleware(t *testing.T) {
 	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		metrics := MustGetMetrics(ctx)
-		metrics.Counter("counter").Start().Add(42)
+		metrics.Counter("counter").Add(40)
+		metrics.Counter("discardedCounter").Inc().Discard()
 		metrics.Duration("duration").Start().Stop()
 		metrics.Duration("foreverDuration").Start() // We do not stop on purpose.
-		d := metrics.Durations("durations")
-		d.Start().Stop()
-		d.Start().Stop()
-		metrics.DurationCounter("dc").Start().Add(43).Stop()
+		metrics.Duration("discardedDuration1").Start().Discard().Stop()
+		metrics.Duration("discardedDuration2").Start().Stop().Discard()
+		ds := metrics.Durations("durations")
+		ds.Start().Stop()
+		ds.Start().Stop()
+		ds = metrics.Durations("discardedDurations")
+		ds.Start().Discard().Stop()
+		ds.Start().Stop().Discard()
+		dc := metrics.DurationCounter("dc").Start().Add(43)
+		// defer is called after WriteHeader, so "dc" goes into the trailer.
+		defer dc.Stop()
+		metrics.DurationCounter("discardedDc1").Start().Add(32).Discard().Stop()
+		metrics.DurationCounter("discardedDc2").Start().Add(33).Stop().Discard()
 		metrics.DurationCounter("foreverDc").Start().Add(43) // We do not stop on purpose.
+		// Continue counters.
+		metrics.Counter("counter").Inc()
+		metrics.DurationCounter("dc").Inc()
 		w.WriteHeader(http.StatusOK)
 	}))
 	h = metricsMiddleware(h)
@@ -660,7 +673,7 @@ func TestMetricsMiddleware(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":42,"dc":\{"dur":[0-9]+,"count":43,"rate":[0-9.]+},"duration":[0-9]+,"durations":{"min":[0-9]+,"max":[0-9]+,"dur":[0-9]+,"count":[0-9]+,"avg":[0-9]+}}}`), out.String())
+	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+},"duration":[0-9]+,"durations":{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+}}}`), out.String())
 	header := res.Header.Get(serverTimingHeader)
 	assert.Equal(t, `dc;dur=,duration;dur=`, headerCleanupRegexp.ReplaceAllString(header, ""))
 	trailer := res.Trailer.Get(serverTimingHeader)
