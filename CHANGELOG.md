@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Metrics API works when metrics are nil (e.g., not available in the context).
+  All calls are noop.
+
 ## [0.18.0] - 2024-04-05
 
 ### Added

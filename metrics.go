@@ -30,7 +30,7 @@ type DurationMeasurement struct {
 
 // Start records the start of the duration.
 func (d *DurationMeasurement) Start() *DurationMeasurement {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if !d.startTime.IsZero() {
@@ -42,7 +42,7 @@ func (d *DurationMeasurement) Start() *DurationMeasurement {
 
 // Stop computes the duration.
 func (d *DurationMeasurement) Stop() *DurationMeasurement {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if d.startTime.IsZero() {
@@ -59,6 +59,9 @@ func (d *DurationMeasurement) Stop() *DurationMeasurement {
 //
 // Any future calls to measurement methods are ignored.
 func (d *DurationMeasurement) Discard() *DurationMeasurement {
+	if d == nil {
+		return d
+	}
 	d.Discarded = true
 	return d
 }
@@ -73,13 +76,16 @@ type DurationMetric struct {
 }
 
 func (d *DurationMetric) Name() string {
+	if d == nil {
+		return ""
+	}
 	return d.name
 }
 
 func (d *DurationMetric) MarshalZerologObject(e *zerolog.Event) {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.Discarded || d.Duration == 0 {
+	if d == nil || d.Discarded || d.Duration == 0 {
 		return
 	}
 
@@ -89,7 +95,7 @@ func (d *DurationMetric) MarshalZerologObject(e *zerolog.Event) {
 func (d *DurationMetric) ServerTimingString() string {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.Discarded || d.Duration == 0 {
+	if d == nil || d.Discarded || d.Duration == 0 {
 		return ""
 	}
 
@@ -101,7 +107,7 @@ func (d *DurationMetric) ServerTimingString() string {
 //
 // Can be called only once per metric.
 func (d *DurationMetric) Start() *DurationMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if !d.startTime.IsZero() {
@@ -113,7 +119,7 @@ func (d *DurationMetric) Start() *DurationMetric {
 
 // Stop computes the duration.
 func (d *DurationMetric) Stop() *DurationMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if d.startTime.IsZero() {
@@ -130,6 +136,9 @@ func (d *DurationMetric) Stop() *DurationMetric {
 //
 // Any future calls to metric methods are ignored.
 func (d *DurationMetric) Discard() *DurationMetric {
+	if d == nil {
+		return d
+	}
 	d.Discarded = true
 	return d
 }
@@ -143,11 +152,14 @@ type CounterMetric struct {
 }
 
 func (c *CounterMetric) Name() string {
+	if c == nil {
+		return ""
+	}
 	return c.name
 }
 
 func (c *CounterMetric) MarshalZerologObject(e *zerolog.Event) {
-	if c.Discarded {
+	if c == nil || c.Discarded {
 		return
 	}
 
@@ -162,7 +174,7 @@ func (c *CounterMetric) ServerTimingString() string {
 
 // Inc increases the counter by one.
 func (c *CounterMetric) Inc() *CounterMetric {
-	if c.Discarded {
+	if c == nil || c.Discarded {
 		return c
 	}
 	c.Count++
@@ -171,7 +183,7 @@ func (c *CounterMetric) Inc() *CounterMetric {
 
 // Add increases the counter by n.
 func (c *CounterMetric) Add(n int64) *CounterMetric {
-	if c.Discarded {
+	if c == nil || c.Discarded {
 		return c
 	}
 	c.Count += n
@@ -182,6 +194,9 @@ func (c *CounterMetric) Add(n int64) *CounterMetric {
 //
 // Any future calls to metric methods are ignored.
 func (c *CounterMetric) Discard() *CounterMetric {
+	if c == nil {
+		return c
+	}
 	c.Discarded = true
 	return c
 }
@@ -198,11 +213,14 @@ type DurationsMetric struct {
 }
 
 func (d *DurationsMetric) Name() string {
+	if d == nil {
+		return ""
+	}
 	return d.name
 }
 
 func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return
 	}
 
@@ -252,6 +270,9 @@ func (d *DurationsMetric) ServerTimingString() string {
 //
 // Can be called multiple times per metric with each call returning a new measurement.
 func (d *DurationsMetric) Start() *DurationMeasurement {
+	if d == nil {
+		return nil
+	}
 	m := new(DurationMeasurement)
 	if d.Discarded {
 		m.Discarded = true
@@ -268,6 +289,9 @@ func (d *DurationsMetric) Start() *DurationMeasurement {
 //
 // Any future calls to Start return an already discarded duration measurement.
 func (d *DurationsMetric) Discard() *DurationsMetric {
+	if d == nil {
+		return d
+	}
 	d.Discarded = true
 	return d
 }
@@ -283,13 +307,16 @@ type DurationCounterMetric struct {
 }
 
 func (d *DurationCounterMetric) Name() string {
+	if d == nil {
+		return ""
+	}
 	return d.name
 }
 
 func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.Discarded || d.Duration == 0 {
+	if d == nil || d.Discarded || d.Duration == 0 {
 		return
 	}
 
@@ -307,7 +334,7 @@ func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 func (d *DurationCounterMetric) ServerTimingString() string {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
-	if d.Discarded || d.Duration == 0 {
+	if d == nil || d.Discarded || d.Duration == 0 {
 		return ""
 	}
 
@@ -319,7 +346,7 @@ func (d *DurationCounterMetric) ServerTimingString() string {
 //
 // Can be called only once per metric.
 func (d *DurationCounterMetric) Start() *DurationCounterMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if !d.startTime.IsZero() {
@@ -331,7 +358,7 @@ func (d *DurationCounterMetric) Start() *DurationCounterMetric {
 
 // Stop computes the duration.
 func (d *DurationCounterMetric) Stop() *DurationCounterMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if d.startTime.IsZero() {
@@ -348,7 +375,7 @@ func (d *DurationCounterMetric) Stop() *DurationCounterMetric {
 //
 // Only possible after calling Start and before calling Stop.
 func (d *DurationCounterMetric) Inc() *DurationCounterMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if d.startTime.IsZero() {
@@ -365,7 +392,7 @@ func (d *DurationCounterMetric) Inc() *DurationCounterMetric {
 //
 // Only possible after calling Start and before calling Stop.
 func (d *DurationCounterMetric) Add(n int64) *DurationCounterMetric {
-	if d.Discarded {
+	if d == nil || d.Discarded {
 		return d
 	}
 	if d.startTime.IsZero() {
@@ -382,6 +409,9 @@ func (d *DurationCounterMetric) Add(n int64) *DurationCounterMetric {
 //
 // Any future calls to metric methods are ignored.
 func (d *DurationCounterMetric) Discard() *DurationCounterMetric {
+	if d == nil {
+		return d
+	}
 	d.Discarded = true
 	return d
 }
@@ -418,6 +448,10 @@ func NewMetrics() *Metrics {
 // nothing is added if the existing metric is equal
 // to the metric being added. Otherwise Add panics.
 func (m *Metrics) Add(mt metric) {
+	if m == nil {
+		return
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -438,6 +472,10 @@ func (m *Metrics) Add(mt metric) {
 // If called with the name of an existing duration metric,
 // that duration metric is returned instead.
 func (m *Metrics) Duration(name string) *DurationMetric {
+	if m == nil {
+		return nil
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -460,6 +498,10 @@ func (m *Metrics) Duration(name string) *DurationMetric {
 // If called with the name of an existing counter metric,
 // that counter metric is returned instead.
 func (m *Metrics) Counter(name string) *CounterMetric {
+	if m == nil {
+		return nil
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -482,6 +524,10 @@ func (m *Metrics) Counter(name string) *CounterMetric {
 // If called with the name of an existing durations metric,
 // that durations metric is returned instead.
 func (m *Metrics) Durations(name string) *DurationsMetric {
+	if m == nil {
+		return nil
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -504,6 +550,10 @@ func (m *Metrics) Durations(name string) *DurationsMetric {
 // If called with the name of an existing duration counter metric,
 // that duration counter metric is returned instead.
 func (m *Metrics) DurationCounter(name string) *DurationCounterMetric {
+	if m == nil {
+		return nil
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -522,6 +572,10 @@ func (m *Metrics) DurationCounter(name string) *DurationCounterMetric {
 }
 
 func (m *Metrics) MarshalZerologObject(e *zerolog.Event) {
+	if m == nil {
+		return
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -542,6 +596,10 @@ func (m *Metrics) MarshalZerologObject(e *zerolog.Event) {
 }
 
 func (m *Metrics) ServerTimingString() string {
+	if m == nil {
+		return ""
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

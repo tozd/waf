@@ -635,6 +635,7 @@ func TestMetricsMiddleware(t *testing.T) {
 	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		metrics := MustGetMetrics(ctx)
+		// There is a similar set of calls in TestMetrics.
 		metrics.Counter("counter").Add(40)
 		metrics.Counter("discardedCounter").Inc().Discard()
 		metrics.Duration("duration").Start().Stop()
