@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `GetMetrics` and `MustGetMetrics` to access new metrics API through context.
 - New metrics API supports durations, counters, counters with duration, and multiple durations.
+  [#1](https://gitlab.com/tozd/waf/-/issues/1)
 
 ### Changed
 
