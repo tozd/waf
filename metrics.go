@@ -324,10 +324,7 @@ func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	// We add fields in the alphabetical order to match Go JSON marshaling order.
 	dict.Int64("count", d.Count)
 	dict.Dur("dur", d.Duration)
-	// We do not use Duration.Milliseconds() here but divide by time.Millisecond
-	// ourselves so that rate computation works also for sub-millisecond durations
-	// and is rounded only then (otherwise you get +Inf).
-	dict.Float64("rate", float64(d.Count)/float64(d.Duration)/float64(time.Millisecond))
+	dict.Float64("rate", float64(d.Count)/d.Duration.Seconds())
 	e.Dict(d.name, dict)
 }
 
