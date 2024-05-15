@@ -29,6 +29,7 @@ test:
   variables:
     DOCKER_HOST: tcp://pebble:2375
     PEBBLE_HOST: pebble
+    CI_DEBUG_SERVICES: "true"
 
   before_script:
     - apk --update add make bash gcc musl-dev mailcap
