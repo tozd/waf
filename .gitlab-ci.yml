@@ -15,7 +15,7 @@ test:
   image: golang:$IMAGE_TAG
 
   services:
-    - name: ghcr.io/letsencrypt/pebble-challtestsrv:2.5.1
+    - name: letsencrypt/pebble-challtestsrv:v2.3.1
       alias: pebble-challtestsrv
       command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", ""]
     - name: ghcr.io/letsencrypt/pebble:2.5.1
@@ -29,7 +29,6 @@ test:
   variables:
     DOCKER_HOST: tcp://pebble:2375
     PEBBLE_HOST: pebble
-    CI_DEBUG_SERVICES: "true"
 
   before_script:
     - apk --update add make bash gcc musl-dev mailcap
