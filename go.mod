@@ -9,7 +9,7 @@ require (
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/justinas/alice v1.2.0
-	github.com/rs/zerolog v1.31.1-0.20231108200417-bb14b8b9de11
+	github.com/rs/zerolog v1.32.1-0.20240504134327-c78e50e2da70
 	github.com/stretchr/testify v1.8.4
 	gitlab.com/tozd/go/errors v0.8.1
 	gitlab.com/tozd/go/x v0.0.0-20240319120849-eb6a32121198
@@ -59,7 +59,7 @@ require (
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/whilp/git-urls v1.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	gitlab.com/tozd/go/zerolog v0.5.1
+	gitlab.com/tozd/go/zerolog v0.7.0
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
