@@ -392,7 +392,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 	return service, ts
 }
 
-var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("time":")[^"]+(")|("[tjc]":)[0-9]+`)
+var logCleanupRegexp = regexp.MustCompile(`("proxied":")[^"]+(")|("connection":")[^"]+(")|("request":")[^"]+(")|("time":")[^"]+(")|("[tjc]":)[0-9.]+`)
 
 func logCleanup(t *testing.T, http2 bool, log string) string {
 	t.Helper()
