@@ -433,7 +433,7 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 
 	// Is logger enabled at all (not zerolog.Nop or zero zerolog struct)?
 	// See: https://github.com/rs/zerolog/pull/617
-	if l := s.CanonicalLogger.Sample(nil); l.Info().Enabled() { //nolint:zerologlint
+	if l := s.CanonicalLogger.Sample(nil); l.Log().Enabled() { //nolint:zerologlint
 		c = c.Append(accessHandler(func(req *http.Request, code int, responseBody, requestBody int64, duration time.Duration) {
 			ctx := req.Context()
 
