@@ -3047,10 +3047,6 @@ func TestRoutesConfiguration(t *testing.T) {
 	assert.Equal(t, []Route{
 		{Name: "Home", Path: "/", API: nil, Get: &RouteOptions{}},
 	}, config.Routes)
-
-	_ = &Service[*Site]{
-		Routes: config.Routes,
-	}
 }
 
 // We do not enable t.Parallel() here because it uses 5001 port

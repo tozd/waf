@@ -224,8 +224,8 @@ func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 		return
 	}
 
-	var min time.Duration = math.MaxInt64
-	var max time.Duration
+	var minDuration time.Duration = math.MaxInt64
+	var maxDuration time.Duration
 	var sum time.Duration
 	var count int
 
@@ -236,11 +236,11 @@ func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 			continue
 		}
 
-		if min > m.Duration {
-			min = m.Duration
+		if minDuration > m.Duration {
+			minDuration = m.Duration
 		}
-		if max < m.Duration {
-			max = m.Duration
+		if maxDuration < m.Duration {
+			maxDuration = m.Duration
 		}
 		sum += m.Duration
 		count++
@@ -252,11 +252,11 @@ func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 
 	dict := zerolog.Dict()
 	// We add fields in the alphabetical order to match Go JSON marshaling order.
-	dict.Dur("avg", time.Duration(int64(max-min)/int64(count)))
+	dict.Dur("avg", time.Duration(int64(maxDuration-minDuration)/int64(count)))
 	dict.Int("count", count)
 	dict.Dur("dur", sum)
-	dict.Dur("max", max)
-	dict.Dur("min", min)
+	dict.Dur("max", maxDuration)
+	dict.Dur("min", minDuration)
 	e.Dict(d.name, dict)
 }
 
