@@ -144,7 +144,7 @@ func logMetadata(metadataHeaderPrefix string) func(next http.Handler) http.Handl
 			metadata := map[string]interface{}{}
 			req = req.WithContext(context.WithValue(req.Context(), metadataContextKey, metadata))
 			logMetadata := true
-			defer func() {
+			defer func() { //nolint:contextcheck
 				if logMetadata && len(metadata) > 0 {
 					logger := canonicalLogger(req.Context())
 					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
