@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `DurationCounterMetric` logged rate is per second and not anymore per millisecond.
+- Go 1.23 or newer is required.
 
 ## [0.18.1] - 2024-04-08
 
