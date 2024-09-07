@@ -46,25 +46,25 @@ func encodeMetadataSignedInteger(v int64, b *bytes.Buffer) errors.E {
 		return errE
 	}
 
-	out := strconv.AppendInt(b.AvailableBuffer(), v, 10) //nolint:gomnd
+	out := strconv.AppendInt(b.AvailableBuffer(), v, 10) //nolint:mnd
 	b.Write(out)
 	return nil
 }
 
 func encodeMetadataUnsignedInteger(v uint64, b *bytes.Buffer) errors.E {
-	if v > 999_999_999_999_999 { //nolint:gomnd
+	if v > 999_999_999_999_999 { //nolint:mnd
 		errE := errors.New("integer out of range")
 		errors.Details(errE)["value"] = v
 		return errE
 	}
 
-	out := strconv.AppendUint(b.AvailableBuffer(), v, 10) //nolint:gomnd
+	out := strconv.AppendUint(b.AvailableBuffer(), v, 10) //nolint:mnd
 	b.Write(out)
 	return nil
 }
 
 func encodeMetadataDecimal(v float64, b *bytes.Buffer) errors.E {
-	rounded := math.RoundToEven(v/0.001) * 0.001 //nolint:gomnd
+	rounded := math.RoundToEven(v/0.001) * 0.001 //nolint:mnd
 	if rounded < -999_999_999_999 || rounded > 999_999_999_999 {
 		errE := errors.New("decimal out of range")
 		errors.Details(errE)["value"] = v

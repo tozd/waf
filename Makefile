@@ -1,6 +1,6 @@
 SHELL = /bin/bash -o pipefail
 
-.PHONY: test test-ci lint lint-ci fmt fmt-ci clean release lint-docs audit encrypt decrypt sops
+.PHONY: test test-ci lint lint-ci fmt fmt-ci upgrade clean release lint-docs audit encrypt decrypt sops
 
 # TODO: Use ./... for the go tool covdata percent's -pkg.
 #       See: https://github.com/golang/go/issues/66507
@@ -16,12 +16,12 @@ test-ci: test
 	go tool cover -html=coverage.txt -o coverage.html
 
 lint:
-	golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix %
+	golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix --max-issues-per-linter 0 --max-same-issues 0
+	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix --max-issues-per-linter 0 --max-same-issues 0 %
 
 lint-ci:
-	golangci-lint run --timeout 4m --out-format colored-line-number,code-climate:codeclimate.json --issues-exit-code 0
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --out-format colored-line-number,code-climate:%_codeclimate.json --issues-exit-code 0 %
+	golangci-lint run --timeout 4m --max-issues-per-linter 0 --max-same-issues 0 --out-format colored-line-number,code-climate:codeclimate.json --issues-exit-code 0
+	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --max-issues-per-linter 0 --max-same-issues 0 --out-format colored-line-number,code-climate:%_codeclimate.json --issues-exit-code 0 %
 	jq -s 'add' codeclimate.json _examples/*_codeclimate.json > /tmp/codeclimate.json
 	mv /tmp/codeclimate.json codeclimate.json
 	rm -f _examples/*_codeclimate.json
@@ -34,6 +34,10 @@ fmt:
 
 fmt-ci: fmt
 	git diff --exit-code --color=always
+
+upgrade:
+	go run github.com/icholy/gomajor@v0.13.2 get all
+	go mod tidy
 
 clean:
 	rm -rf coverage.* codeclimate.json _examples/*_codeclimate.json tests.xml coverage

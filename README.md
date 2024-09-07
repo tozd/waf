@@ -35,7 +35,7 @@ This is a Go package. You can add it to your project using `go get`:
 go get gitlab.com/tozd/waf
 ```
 
-It requires Go 1.21 or newer.
+It requires Go 1.23 or newer.
 
 Automatic media type detection uses file extensions and a file extension database has to be available
 on the system.
