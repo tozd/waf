@@ -112,11 +112,7 @@ func TestAccessHandler(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		for _, protocol := range []int{1, 2} {
-			protocol := protocol
-
 			t.Run(fmt.Sprintf("case=%d/protocol=%d", k, protocol), func(t *testing.T) {
 				t.Parallel()
 
@@ -149,7 +145,7 @@ func TestLogMetadata(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := &http.Request{}
 	h := logMetadata("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("test-metadata", "foobar=1234")
+		w.Header().Set("Test-Metadata", "foobar=1234")
 		logMetadata := r.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
 		logMetadata["foobar"] = 1234
 		w.WriteHeader(http.StatusOK)
@@ -166,14 +162,14 @@ func TestLogMetadata(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Equal(t, "foobar=1234", res.Header.Get("test-metadata"))
+	assert.Equal(t, "foobar=1234", res.Header.Get("Test-Metadata"))
 	assert.Equal(t, `{"metadata":{"foobar":1234}}`+"\n", out.String())
 
 	out.Reset()
 	w = httptest.NewRecorder()
 	r = &http.Request{}
 	h = logMetadata("test-")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("test-metadata", "foobar=1234")
+		w.Header().Set("Test-Metadata", "foobar=1234")
 		logMetadata := r.Context().Value(metadataContextKey).(map[string]interface{}) //nolint:errcheck,forcetypeassert
 		logMetadata["foobar"] = 1234
 		w.WriteHeader(http.StatusNotModified)
@@ -190,7 +186,7 @@ func TestLogMetadata(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Equal(t, "", res.Header.Get("test-metadata"))
+	assert.Equal(t, "", res.Header.Get("Test-Metadata"))
 	assert.Equal(t, "{}\n", out.String())
 }
 
@@ -231,12 +227,11 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 	ts = httptest.NewServer(h3)
 	t.Cleanup(ts.Close)
 	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
-	if assert.NoError(t, err) {
-		t.Cleanup(func() { resp.Body.Close() })
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() { resp.Body.Close() })
 	out, err := io.ReadAll(pipeR)
 	pipeR.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 232, resp.StatusCode)
 	assert.Equal(t, `{"wsFromClient":0,"wsToClient":`+strconv.Itoa(len(response))+`}`+"\n", string(out))
 }
@@ -308,7 +303,7 @@ func TestWebsocketHandler(t *testing.T) {
 
 	out, err := io.ReadAll(pipeR)
 	pipeR.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `{"wsFromClient":16,"wsToClient":8}`+"\n", string(out))
 }
 
@@ -353,8 +348,6 @@ func TestParseForm(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -438,8 +431,6 @@ func TestValidatePath(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -503,8 +494,6 @@ func TestValidateSite(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -602,8 +591,6 @@ func TestRedirectToMainSite(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 

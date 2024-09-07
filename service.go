@@ -863,10 +863,10 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 			var n string
 			var h Handler
 			if s.IsImmutableFile != nil && s.IsImmutableFile(path) {
-				n = fmt.Sprintf("ImmutableFile:%s", path)
+				n = "ImmutableFile:" + path
 				h = immutableH
 			} else {
-				n = fmt.Sprintf("StaticFile:%s", path)
+				n = "StaticFile:" + path
 				h = staticH
 			}
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockBase struct{}
@@ -173,8 +174,6 @@ func TestNetConnCounters(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("%T", tt.Type), func(t *testing.T) {
 			t.Parallel()
 
@@ -183,16 +182,16 @@ func TestNetConnCounters(t *testing.T) {
 
 			data := make([]byte, 1024)
 			n, err := conn.Read(data)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, 9, n)
 			assert.Equal(t, []byte("test data"), data[:n])
 
 			n, err = conn.Write([]byte("foobar"))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, 6, n)
 
 			n, err = conn.Read(data)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, 6, n)
 			assert.Equal(t, []byte("foobar"), data[:n])
 
@@ -212,22 +211,22 @@ func TestNetConnCounters(t *testing.T) {
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
 		n, err := conn.(io.WriterTo).WriteTo(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 9, n2)
 		assert.Equal(t, []byte("test data"), data[:n2])
 
 		buff.Reset()
 		buff.WriteString("foobar")
 		n, err = conn.(io.ReaderFrom).ReadFrom(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 
 		buff.Reset()
 		n, err = conn.(io.WriterTo).WriteTo(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 		assert.Equal(t, "foobar", buff.String())
 
@@ -246,20 +245,20 @@ func TestNetConnCounters(t *testing.T) {
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
 		n, err := conn.(io.WriterTo).WriteTo(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 9, n2)
 		assert.Equal(t, []byte("test data"), data[:n2])
 
 		n2, err = conn.Write([]byte("foobar"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 6, n2)
 
 		buff.Reset()
 		n, err = conn.(io.WriterTo).WriteTo(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 		assert.Equal(t, "foobar", buff.String())
 
@@ -277,18 +276,18 @@ func TestNetConnCounters(t *testing.T) {
 
 		data := make([]byte, 1024)
 		n2, err := conn.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 9, n2)
 		assert.Equal(t, []byte("test data"), data[:n2])
 
 		buff := &bytes.Buffer{}
 		buff.WriteString("foobar")
 		n, err := conn.(io.ReaderFrom).ReadFrom(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 
 		n2, err = conn.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 6, n2)
 		assert.Equal(t, []byte("foobar"), data[:n2])
 
@@ -310,12 +309,12 @@ func TestReadCloserCounters(t *testing.T) {
 
 		data := make([]byte, 1024)
 		n, err := counter.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 9, n)
 		assert.Equal(t, []byte("test data"), data[:n])
 
 		err = counter.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, int64(9), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
 	})
@@ -331,25 +330,25 @@ func TestReadCloserCounters(t *testing.T) {
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
 		n, err := counter.(io.WriterTo).WriteTo(buff)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 9, n2)
 		assert.Equal(t, []byte("test data"), data[:n2])
 
 		mockBuffer.Reset()
 		n2, err = mockBuffer.WriteString("foobar")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 6, n2)
 
 		n2, err = counter.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 6, n2)
 		assert.Equal(t, []byte("foobar"), data[:n2])
 
 		err = counter.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, int64(15), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
 	})

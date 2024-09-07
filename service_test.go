@@ -538,8 +538,6 @@ func TestServiceConfigureRoutes(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -554,7 +552,7 @@ func TestServiceConfigureRoutes(t *testing.T) {
 			if tt.Err != "" {
 				assert.EqualError(t, errE, tt.Err)
 			} else {
-				assert.NoError(t, errE, "% -+#.1v", errE)
+				require.NoError(t, errE, "% -+#.1v", errE)
 			}
 		})
 	}
@@ -568,12 +566,14 @@ func TestServiceReverse(t *testing.T) {
 	service, _ := newService(t, zerolog.New(out), false, "")
 
 	p, errE := service.Reverse("Home", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
-	assert.NoError(t, errE, "% -+#.1v", errE)
-	assert.Equal(t, `/?a=b&a=c&x=y`, p)
+	if assert.NoError(t, errE, "% -+#.1v", errE) {
+		assert.Equal(t, `/?a=b&a=c&x=y`, p)
+	}
 
 	p, errE = service.ReverseAPI("Home", nil, url.Values{"x": []string{"y"}, "a": []string{"b", "c"}, "b": []string{}})
-	assert.NoError(t, errE, "% -+#.1v", errE)
-	assert.Equal(t, `/api?a=b&a=c&x=y`, p)
+	if assert.NoError(t, errE, "% -+#.1v", errE) {
+		assert.Equal(t, `/api?a=b&a=c&x=y`, p)
+	}
 
 	_, errE = service.Reverse("Home", Params{"x": "y"}, nil)
 	assert.EqualError(t, errE, "extra parameters")
@@ -664,7 +664,9 @@ func TestService(t *testing.T) {
 
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		assert.NotEmpty(t, r.Header.Get("Request-Id"), "Request-Id")
 		w.Header().Add("Test-Header", "foobar")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -2976,14 +2978,8 @@ func TestService(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		for _, http2 := range []bool{false, true} {
-			http2 := http2
-
 			for _, logEnabled := range []bool{false, true} {
-				logEnabled := logEnabled
-
 				t.Run(fmt.Sprintf("case=%d/http2=%t/log=%t", k, http2, logEnabled), func(t *testing.T) {
 					t.Parallel()
 
@@ -3010,30 +3006,29 @@ func TestService(t *testing.T) {
 					})
 
 					resp, err := ts.Client().Do(tt.Request())
-					if assert.NoError(t, err) {
-						t.Cleanup(func() { resp.Body.Close() })
-						out, err := io.ReadAll(resp.Body)
-						assert.NoError(t, err)
+					require.NoError(t, err)
+					t.Cleanup(func() { resp.Body.Close() })
+					out, err := io.ReadAll(resp.Body)
+					require.NoError(t, err)
 
-						if logEnabled {
-							log, err := io.ReadAll(pipeR)
-							pipeR.Close()
-							assert.NoError(t, err)
-							assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
-						}
+					if logEnabled {
+						log, err := io.ReadAll(pipeR)
+						pipeR.Close()
+						require.NoError(t, err)
+						assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
+					}
 
-						assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
-						assert.Equal(t, tt.ExpectedBody, out)
-						if !assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header)) {
-							t.Log("here")
-						}
-						if http2 {
-							assert.Equal(t, 2, resp.ProtoMajor)
-							assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))
-						} else {
-							assert.Equal(t, 1, resp.ProtoMajor)
-							assert.Equal(t, http.Header(nil), resp.Trailer)
-						}
+					assert.Equal(t, tt.ExpectedStatus, resp.StatusCode)
+					assert.Equal(t, tt.ExpectedBody, out)
+					if !assert.Equal(t, tt.ExpectedHeader, headerCleanup(t, resp.Header)) {
+						t.Log("here")
+					}
+					if http2 {
+						assert.Equal(t, 2, resp.ProtoMajor)
+						assert.Equal(t, tt.ExpectedTrailer, headerCleanup(t, resp.Trailer))
+					} else {
+						assert.Equal(t, 1, resp.ProtoMajor)
+						assert.Equal(t, http.Header(nil), resp.Trailer)
 					}
 				})
 			}
@@ -3048,7 +3043,7 @@ func TestRoutesConfiguration(t *testing.T) {
 		Routes []Route `json:"routes"`
 	}
 	err := json.Unmarshal(routesConfiguration, &config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []Route{
 		{Name: "Home", Path: "/", API: nil, Get: &RouteOptions{}},
 	}, config.Routes)
@@ -3138,7 +3133,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			if assert.NoError(t, err) {
 				t.Cleanup(func() { resp.Body.Close() })
 				out, err := io.ReadAll(resp.Body) //nolint:govet
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
 				assert.Equal(t, `<!DOCTYPE html>`+"\n"+
@@ -3168,7 +3163,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			if assert.NoError(t, err) {
 				t.Cleanup(func() { resp.Body.Close() })
 				out, err := io.ReadAll(resp.Body) //nolint:govet
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
 				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out))
@@ -3189,7 +3184,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			}
 
 			err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
-			assert.NoError(t, err)
+			assert.NoError(t, err) //nolint:testifylint
 
 			err = cmd.Wait()
 			var exitError *exec.ExitError
@@ -3200,7 +3195,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			if errors.As(err, &exitError) && exitError.ExitCode() > 0 {
 				assert.Equal(t, 1, exitError.ExitCode())
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, err) //nolint:testifylint
 			}
 
 			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}

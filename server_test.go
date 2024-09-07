@@ -66,7 +66,7 @@ func TestServer(t *testing.T) {
 		ProxyTo: "http://localhost:8000",
 	}
 	sites, errE := server.Init(nil)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
@@ -84,7 +84,7 @@ func TestServer(t *testing.T) {
 		Development: true,
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
@@ -102,7 +102,7 @@ func TestServer(t *testing.T) {
 		Development: true,
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
@@ -117,7 +117,7 @@ func TestServer(t *testing.T) {
 		"example.com": {Domain: "example.com", CertFile: certPath, KeyFile: keyPath},
 		"localhost":   {Domain: "localhost", CertFile: certPath, KeyFile: keyPath},
 	})
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", CertFile: certPath, KeyFile: keyPath},
 		"localhost":   {Domain: "localhost", CertFile: certPath, KeyFile: keyPath},
@@ -166,7 +166,7 @@ func TestServer(t *testing.T) {
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
 	})
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
@@ -202,7 +202,7 @@ func TestServer(t *testing.T) {
 		Addr: "localhost:0",
 	}
 	sites, errE = server.Init(nil)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com"},
 		"localhost":   {Domain: "localhost"},
@@ -231,12 +231,12 @@ func TestServer(t *testing.T) {
 	cancel()
 
 	err = g.Wait()
-	assert.NoError(t, err, "% -+#.1v", err)
+	require.NoError(t, err, "% -+#.1v", err)
 
 	pipeW.Close()
 	out, err := io.ReadAll(pipeR)
 	pipeR.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(
 		t,
@@ -273,7 +273,7 @@ func TestServerConnection(t *testing.T) {
 		"example.com": {Domain: "example.com", CertFile: cert2Path, KeyFile: key2Path},
 		"localhost":   {Domain: "localhost"},
 	})
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"example.com": {Domain: "example.com", CertFile: cert2Path, KeyFile: key2Path},
 		"localhost":   {Domain: "localhost"},
@@ -309,7 +309,7 @@ func TestServerConnection(t *testing.T) {
 	c, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
 		ServerName: "EXAMPLE.com",
 	})
-	assert.NoError(t, err, "% -+#.1v", err)
+	require.NoError(t, err, "% -+#.1v", err)
 	assert.NotNil(t, c)
 
 	// This does not start server's managers, but that is OK for this test.
@@ -319,14 +319,13 @@ func TestServerConnection(t *testing.T) {
 	ts.URL = strings.ReplaceAll(ts.URL, "127.0.0.1", "localhost")
 
 	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
-	if assert.NoError(t, err) {
-		t.Cleanup(func() { resp.Body.Close() })
-		out, err := io.ReadAll(resp.Body)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, 2, resp.ProtoMajor)
-		assert.Equal(t, `test`, string(out))
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() { resp.Body.Close() })
+	out, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, resp.ProtoMajor)
+	assert.Equal(t, `test`, string(out))
 }
 
 func getACMERootCAs(t *testing.T) *x509.CertPool {
@@ -371,7 +370,7 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	sites, errE := server.Init(map[string]*Site{
 		"site.test": {Domain: "site.test"},
 	})
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, map[string]*Site{
 		"site.test": {Domain: "site.test"},
 	}, sites)
@@ -420,14 +419,15 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	if assert.NoError(t, err) {
 		t.Cleanup(func() { resp.Body.Close() })
 		out, err := io.ReadAll(resp.Body) //nolint:govet
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, 2, resp.ProtoMajor)
-		assert.Equal(t, `test`, string(out))
+		if assert.NoError(t, err) {
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, 2, resp.ProtoMajor)
+			assert.Equal(t, `test`, string(out))
+		}
 	}
 
 	cancel()
 
 	err = g.Wait()
-	assert.NoError(t, err, "% -+#.1v", err)
+	require.NoError(t, err, "% -+#.1v", err)
 }

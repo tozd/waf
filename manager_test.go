@@ -33,11 +33,11 @@ func TestCertificateManager(t *testing.T) {
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	cert, err := certManager.GetCertificate(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cert)
 
 	errE = certManager.ValidForDomain("example.com")
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	assert.NoError(t, errE, "% -+#.1v", errE) //nolint:testifylint
 
 	errE = certManager.ValidForDomain("")
 	assert.ErrorIs(t, errE, errCertificateNotValid)
@@ -50,11 +50,11 @@ func TestCertificateManager(t *testing.T) {
 	t.Cleanup(certManager.Stop)
 
 	cert, err = certManager.GetCertificate(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cert)
 
 	errE = certManager.reloadCertificate()
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 
 	// Simulate an error condition for reloading the certificate.
 	certManager.CertFile = filepath.Join(tempDir, "non_existent_cert.pem")

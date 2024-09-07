@@ -443,7 +443,7 @@ func (r *Router) get(path, method string) (*route, Handler, Params, errors.E) {
 func (r *Router) Get(path, method string) (ResolvedRoute, errors.E) {
 	route, handler, params, errE := r.get(path, method)
 	if errE != nil {
-		return ResolvedRoute{}, errE //nolint:exhaustruct
+		return ResolvedRoute{}, errE
 	}
 
 	return ResolvedRoute{

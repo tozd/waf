@@ -28,8 +28,6 @@ func TestGetHost(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
@@ -48,7 +46,7 @@ func TestParsePostForm(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	errE := parsePostForm(req)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Nil(t, req.Form)
 
 	require.NotNil(t, req.PostForm)
@@ -66,7 +64,7 @@ func TestGetQueryForm(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	queryForm, errE := getQueryForm(req)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 
 	assert.Len(t, queryForm, 2)
 	assert.Equal(t, "value1", queryForm.Get("key1"))
@@ -76,7 +74,7 @@ func TestGetQueryForm(t *testing.T) {
 	assert.Nil(t, req.PostForm)
 
 	errE = parsePostForm(req)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Nil(t, req.Form)
 
 	require.NotNil(t, req.PostForm)
@@ -85,7 +83,7 @@ func TestGetQueryForm(t *testing.T) {
 	assert.Equal(t, "value4", req.PostForm.Get("key4"))
 
 	queryForm, errE = getQueryForm(req)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 
 	assert.Len(t, queryForm, 2)
 	assert.Equal(t, "value1", queryForm.Get("key1"))

@@ -40,7 +40,7 @@ func TestKong(t *testing.T) {
 	ctx, err := k.Parse([]string{})
 	require.NoError(t, err)
 	err = kong.DefaultHelpPrinter(kong.HelpOptions{}, ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `Usage: waf.test
 
 Flags:
@@ -75,14 +75,14 @@ func TestConfig(t *testing.T) {
 	decoder.KnownFields(true)
 	var site testSite
 	err := decoder.Decode(&site)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test", site.Title)
 	assert.Equal(t, "desc", site.Description)
 	assert.Equal(t, "example.com", site.Domain)
 
 	site = testSite{}
 	errE := x.UnmarshalWithoutUnknownFields([]byte(config), &site)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, "test", site.Title)
 	assert.Equal(t, "desc", site.Description)
 	assert.Equal(t, "example.com", site.Domain)

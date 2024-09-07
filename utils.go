@@ -327,7 +327,7 @@ func postFormParsed(req *http.Request) bool {
 		return false
 	}
 
-	if !(req.Method == "POST" || req.Method == "PUT" || req.Method == "PATCH") {
+	if !(req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch) {
 		return false
 	}
 

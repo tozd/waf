@@ -155,7 +155,7 @@ func encodeMetadataInnerList(value interface{}, b *bytes.Buffer) errors.E {
 	b.WriteString(`(`)
 	v := reflect.ValueOf(value)
 	first := true
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		if first {
 			first = false
 		} else {

@@ -90,8 +90,6 @@ func TestParsePath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.inputPath, func(t *testing.T) {
 			t.Parallel()
 
@@ -100,7 +98,7 @@ func TestParsePath(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, errE, "% -+#.1v", errE)
+				require.NoError(t, errE, "% -+#.1v", errE)
 			}
 		})
 	}
@@ -141,8 +139,6 @@ func TestCompileRegexp(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -153,7 +149,7 @@ func TestCompileRegexp(t *testing.T) {
 				assert.Nil(t, paramMapFunc)
 				assert.EqualError(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, errE, "% -+#.1v", errE)
+				require.NoError(t, errE, "% -+#.1v", errE)
 				if assert.NotNil(t, re) {
 					assert.Equal(t, tt.expectedRegexp, re.String())
 				}
@@ -474,8 +470,6 @@ func TestRouterHandle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
 
@@ -489,7 +483,7 @@ func TestRouterHandle(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, errE, "% -+#.1v", errE)
+				require.NoError(t, errE, "% -+#.1v", errE)
 				for _, route := range tt.routes {
 					assert.NotNil(t, r.routes[route.routeName])
 				}
@@ -668,8 +662,6 @@ func TestRouterReverse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
 
@@ -685,7 +677,7 @@ func TestRouterReverse(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, errE, tt.expectedError)
 			} else {
-				assert.NoError(t, errE, "% -+#.1v", errE)
+				require.NoError(t, errE, "% -+#.1v", errE)
 				assert.Equal(t, tt.expectedPath, path)
 			}
 		})
@@ -746,8 +738,6 @@ func TestRouterErrorHandlers(t *testing.T) {
 	}
 
 	for k, tt := range tests {
-		tt := tt
-
 		t.Run(fmt.Sprintf("case=%d", k), func(t *testing.T) {
 			t.Parallel()
 
@@ -990,8 +980,6 @@ func TestRouterServeHTTP(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
 
@@ -1036,7 +1024,7 @@ func TestRouterGet(t *testing.T) {
 	_, errE = r.Get("/none", http.MethodGet)
 	assert.ErrorIs(t, errE, ErrNotFound)
 	route, errE := r.Get("/foobar/123", http.MethodGet)
-	assert.NoError(t, errE, "% -+#.1v", errE)
+	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.Equal(t, "PathName", route.Name)
 	assert.Equal(t, Params{"x": "123"}, route.Params)
 	require.NotNil(t, route.Handler)
