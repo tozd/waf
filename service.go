@@ -1004,11 +1004,8 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 	w.Header().Set("Content-Type", "application/json")
 	if contentEncoding != compressionIdentity {
 		w.Header().Set("Content-Encoding", contentEncoding)
-	} else {
-		// TODO: Always set Content-Length.
-		//       See: https://github.com/golang/go/pull/50904
-		w.Header().Set("Content-Length", strconv.Itoa(len(encoded)))
 	}
+	w.Header().Set("Content-Length", strconv.Itoa(len(encoded)))
 	if len(w.Header().Values("Cache-Control")) == 0 {
 		w.Header().Set("Cache-Control", "no-cache")
 	}
@@ -1137,11 +1134,8 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	w.Header().Set("Content-Type", f.MediaType)
 	if contentEncoding != compressionIdentity {
 		w.Header().Set("Content-Encoding", contentEncoding)
-	} else {
-		// TODO: Always set Content-Length.
-		//       See: https://github.com/golang/go/pull/50904
-		w.Header().Set("Content-Length", strconv.Itoa(len(f.Data)))
 	}
+	w.Header().Set("Content-Length", strconv.Itoa(len(f.Data)))
 	if immutable {
 		w.Header().Set("Cache-Control", "max-age=31536000,immutable,stale-while-revalidate=86400")
 	} else {

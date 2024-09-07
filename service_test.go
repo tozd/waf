@@ -1030,11 +1030,10 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":},"message":"StaticFile"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {strconv.Itoa(len(semiCompressibleDataGzip))},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {strconv.Itoa(len(semiCompressibleDataGzip))},
 				"Content-Type":           {"application/octet-stream"},
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},
@@ -1181,11 +1180,10 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"t":},"message":"StaticFile"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {"19901"},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19901"},
 				"Content-Range":          {"bytes 100-20000/" + strconv.Itoa(len(semiCompressibleDataGzip))},
 				"Content-Type":           {"application/octet-stream"},
 				"Content-Encoding":       {"gzip"},
@@ -1396,11 +1394,10 @@ func TestService(t *testing.T) {
 			semiCompressibleDataGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + semiCompressibleDataGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(semiCompressibleDataGzip)) + `,"requestBody":0,"metrics":{"t":},"message":"StaticFile"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {strconv.Itoa(len(semiCompressibleDataGzip))},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {strconv.Itoa(len(semiCompressibleDataGzip))},
 				"Content-Type":           {"application/octet-stream"},
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},
@@ -1871,11 +1868,10 @@ func TestService(t *testing.T) {
 			largeJSONGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":},"message":"LargeGet"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {strconv.Itoa(len(largeJSONGzip))},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {strconv.Itoa(len(largeJSONGzip))},
 				"Content-Type":           {"application/json"},
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},
@@ -2022,11 +2018,10 @@ func TestService(t *testing.T) {
 			largeJSONGzip[100:20001],
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":206,"responseBody":19901,"requestBody":0,"metrics":{"c":,"t":},"message":"LargeGet"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {"19901"},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"19901"},
 				"Content-Range":          {"bytes 100-20000/" + strconv.Itoa(len(largeJSONGzip))},
 				"Content-Type":           {"application/json"},
 				"Content-Encoding":       {"gzip"},
@@ -2237,11 +2232,10 @@ func TestService(t *testing.T) {
 			largeJSONGzip,
 			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/api/large","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","encoding":"gzip","etag":` + largeJSONGzipEtag + `,"code":200,"responseBody":` + strconv.Itoa(len(largeJSONGzip)) + `,"requestBody":0,"metrics":{"c":,"t":},"message":"LargeGet"}` + "\n",
 			http.Header{
-				"Extra":         {"1234"},
-				"Accept-Ranges": {"bytes"},
-				"Cache-Control": {"no-cache"},
-				// TODO: Uncomment. See: https://github.com/golang/go/pull/50904
-				// "Content-Length": {strconv.Itoa(len(largeJSONGzip))},.
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {strconv.Itoa(len(largeJSONGzip))},
 				"Content-Type":           {"application/json"},
 				"Content-Encoding":       {"gzip"},
 				"Date":                   {""},

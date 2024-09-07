@@ -41,7 +41,7 @@ func TestKong(t *testing.T) {
 	require.NoError(t, err)
 	err = kong.DefaultHelpPrinter(kong.HelpOptions{}, ctx)
 	require.NoError(t, err)
-	assert.Equal(t, `Usage: waf.test
+	assert.Equal(t, `Usage: waf.test [flags]
 
 Flags:
   -h, --help            Show context-sensitive help.
