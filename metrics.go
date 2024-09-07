@@ -99,7 +99,7 @@ func (d *DurationMetric) ServerTimingString() string {
 		return ""
 	}
 
-	// We want only millisecond precision to minimize side channels.
+	// We want only millisecond precision to minimize any side channels.
 	return fmt.Sprintf("%s;dur=%d", d.name, d.Duration.Milliseconds())
 }
 
