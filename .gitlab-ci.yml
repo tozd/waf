@@ -17,10 +17,10 @@ test:
   services:
     - name: ghcr.io/letsencrypt/pebble-challtestsrv:2.6.0
       alias: pebble-challtestsrv
-      command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", ""]
+      command: ["-defaultIPv6", "", "-defaultIPv4", ""]
     - name: ghcr.io/letsencrypt/pebble:2.6.0
       alias: pebble
-      command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
+      command: ["-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
       variables:
         PEBBLE_VA_NOSLEEP: 1
         PEBBLE_WFE_NONCEREJECT: 0
