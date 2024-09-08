@@ -15,10 +15,10 @@ test:
   image: golang:$IMAGE_TAG
 
   services:
-    - name: letsencrypt/pebble-challtestsrv:v2.6.0
+    - name: ghcr.io/letsencrypt/pebble-challtestsrv:2.6.0
       alias: pebble-challtestsrv
       command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", ""]
-    - name: letsencrypt/pebble:v2.6.0
+    - name: ghcr.io/letsencrypt/pebble:2.6.0
       alias: pebble
       command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
       variables:
