@@ -282,7 +282,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 					API: &RouteOptions{
 						CORS: &CORSOptions{
 							AllowedOrigins:       []string{"https://other.example.com"},
-							AllowedMethods:       []string{"GET", "POST"}, // HEAD should be added.
+							AllowedMethods:       []string{"GET", "POST"}, // HEAD should be added automatically.
 							AllowedHeaders:       []string{"FooBar", "foo-zoo"},
 							ExposedHeaders:       []string{"BarFoo", "zooFoo"},
 							MaxAge:               54,
@@ -2756,7 +2756,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "GET")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2773,7 +2773,7 @@ func TestService(t *testing.T) {
 				"Access-Control-Allow-Origin":          {"https://other.example.com"},
 				"Access-Control-Max-Age":               {"54"},
 				"Access-Control-Allow-Methods":         {"GET"},
-				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Headers":         {"foo-zoo,foobar"},
 				"Access-Control-Allow-Private-Network": {"true"},
 			},
 			http.Header{
@@ -2786,7 +2786,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "HEAD")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2803,7 +2803,7 @@ func TestService(t *testing.T) {
 				"Access-Control-Allow-Origin":          {"https://other.example.com"},
 				"Access-Control-Max-Age":               {"54"},
 				"Access-Control-Allow-Methods":         {"HEAD"},
-				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Headers":         {"foo-zoo,foobar"},
 				"Access-Control-Allow-Private-Network": {"true"},
 			},
 			http.Header{
@@ -2816,7 +2816,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "POST")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2833,7 +2833,7 @@ func TestService(t *testing.T) {
 				"Access-Control-Allow-Origin":          {"https://other.example.com"},
 				"Access-Control-Max-Age":               {"54"},
 				"Access-Control-Allow-Methods":         {"POST"},
-				"Access-Control-Allow-Headers":         {"Foobar, Foo-Zoo"},
+				"Access-Control-Allow-Headers":         {"foo-zoo,foobar"},
 				"Access-Control-Allow-Private-Network": {"true"},
 			},
 			http.Header{
@@ -2846,7 +2846,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "PATCH")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2871,7 +2871,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://another.example.com")
 				req.Header.Add("Access-Control-Request-Method", "GET")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2896,7 +2896,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "PATCH")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar, foo-zoo")
+				req.Header.Add("Access-Control-Request-Headers", "foo-zoo,foobar")
 				return req
 			},
 			"",
@@ -2920,7 +2920,7 @@ func TestService(t *testing.T) {
 				req.Header.Add("Origin", "https://other.example.com")
 				req.Header.Add("Access-Control-Request-Method", "PATCH")
 				req.Header.Add("Access-Control-Request-Private-Network", "true")
-				req.Header.Add("Access-Control-Request-Headers", "FooBar")
+				req.Header.Add("Access-Control-Request-Headers", "foobar")
 				return req
 			},
 			"",
@@ -2936,7 +2936,7 @@ func TestService(t *testing.T) {
 				"Access-Control-Allow-Origin":      {"https://other.example.com"},
 				"Access-Control-Max-Age":           {"56"},
 				"Access-Control-Allow-Methods":     {"PATCH"},
-				"Access-Control-Allow-Headers":     {"Foobar"},
+				"Access-Control-Allow-Headers":     {"foobar"},
 				"Access-Control-Allow-Credentials": {"true"},
 			},
 			http.Header{
