@@ -13,7 +13,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/rs/zerolog v1.33.0
 	github.com/stretchr/testify v1.9.0
-	gitlab.com/tozd/go/errors v0.9.0
+	gitlab.com/tozd/go/errors v0.10.0
 	gitlab.com/tozd/go/x v0.0.0-20240906084819-fda0a3bbba65
 	gitlab.com/tozd/identifier v0.4.0
 	golang.org/x/crypto v0.27.0

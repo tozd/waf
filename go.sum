@@ -164,8 +164,8 @@ github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 gitlab.com/tozd/go/cli v0.4.0 h1:VHUmsGSCjwwUkLD+H084NunSVO/kYo06fbwlaXbBKaM=
 gitlab.com/tozd/go/cli v0.4.0/go.mod h1:ES9m5hom8pYSCcZVHM+FZwOx9+zxVHOTWYlbD0C7bBY=
-gitlab.com/tozd/go/errors v0.9.0 h1:Iw7tP/WZLbZxjP1QVp2ifEtCelTvvDR2CC9xXpwthJo=
-gitlab.com/tozd/go/errors v0.9.0/go.mod h1:q3Ugr0C8dCzMEkrzjjlV2qNsm9e0KvqBjwcbcjCpBe4=
+gitlab.com/tozd/go/errors v0.10.0 h1:A98kL+gaDvWnY6ZB/u8zP+sYaWsWUGBHeFMtamvW/74=
+gitlab.com/tozd/go/errors v0.10.0/go.mod h1:q3Ugr0C8dCzMEkrzjjlV2qNsm9e0KvqBjwcbcjCpBe4=
 gitlab.com/tozd/go/x v0.0.0-20240906084819-fda0a3bbba65 h1:EOPL0NFJdCOGgw30Fliw/w9FSg+dayvqjLk+pAQrhEo=
 gitlab.com/tozd/go/x v0.0.0-20240906084819-fda0a3bbba65/go.mod h1:lFvcc9G8jYZ4JDjrgpPbKulVRhDhrA+pVDSsDur84wQ=
 gitlab.com/tozd/go/zerolog v0.8.0 h1:TulC8FS+YWFMhYVkZA1MT1UXyKYL7HbVvdcafZgrvi0=
