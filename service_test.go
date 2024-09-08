@@ -1115,6 +1115,30 @@ func TestService(t *testing.T) {
 		{
 			func() *http.Request {
 				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.foobar", nil)
+				req.Header.Add("Range", "bytes=35000-37000")
+				return req
+			},
+			"",
+			http.StatusRequestedRangeNotSatisfiable,
+			[]byte("invalid range: failed to overlap\n"),
+			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/semicompressible.foobar","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","code":416,"responseBody":33,"requestBody":0,"metrics":{"t":},"message":"StaticFile"}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Content-Length":         {"33"},
+				"Content-Range":          {"bytes */32768"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				req := newRequest(t, http.MethodGet, "https://example.com/semicompressible.foobar", nil)
 				req.Header.Add("Accept-Encoding", "gzip")
 				req.Header.Add("Range", "bytes=100-200")
 				return req
