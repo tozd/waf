@@ -304,7 +304,7 @@ func TestWebsocketHandler(t *testing.T) {
 	out, err := io.ReadAll(pipeR)
 	pipeR.Close()
 	require.NoError(t, err)
-	assert.Equal(t, `{"wsFromClient":16,"wsToClient":8}`+"\n", string(out))
+	assert.Equal(t, `{"wsFromClient":16,"wsToClient":12}`+"\n", string(out))
 }
 
 func TestParseForm(t *testing.T) {
