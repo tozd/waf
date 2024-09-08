@@ -20,7 +20,7 @@ test:
       command: ["pebble-challtestsrv", "-defaultIPv6", "", "-defaultIPv4", ""]
     - name: letsencrypt/pebble:v2.6.0
       alias: pebble
-      command: ["-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
+      command: ["pebble", "-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
       variables:
         PEBBLE_VA_NOSLEEP: 1
         PEBBLE_WFE_NONCEREJECT: 0
