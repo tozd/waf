@@ -1141,8 +1141,6 @@ func (s *Service[SiteT]) serveStaticFile(w http.ResponseWriter, req *http.Reques
 	}
 	w.Header().Set("Etag", f.Etag)
 
-	// See: https://github.com/golang/go/issues/50905
-	// See: https://github.com/golang/go/pull/50903
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(f.Data))
 }
 
