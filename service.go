@@ -1029,8 +1029,6 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 		return
 	}
 
-	// See: https://github.com/golang/go/issues/50905
-	// See: https://github.com/golang/go/pull/50903
 	http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(encoded))
 }
 
