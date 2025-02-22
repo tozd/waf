@@ -15,7 +15,7 @@ import (
 type configTest struct {
 	Server[*testSite]
 
-	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${defaultTitle}." placeholder:"NAME" short:"T" yaml:"title"`
+	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${default}." placeholder:"NAME" short:"T" yaml:"title"`
 }
 
 func TestKong(t *testing.T) {
