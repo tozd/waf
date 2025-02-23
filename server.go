@@ -122,7 +122,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	//       See: https://github.com/golang/go/issues/16100
 	//       See: https://github.com/golang/go/issues/21389
 	//       See: https://github.com/golang/go/issues/59602
-	server := &http.Server{
+	server := &http.Server{ //nolint:exhaustruct
 		Addr:                         s.Addr,
 		Handler:                      nil,
 		DisableGeneralOptionsHandler: false,
@@ -149,8 +149,6 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		WriteTimeout:      0,
 		IdleTimeout:       idleTimeout,
 		MaxHeaderBytes:    0,
-		TLSNextProto:      nil,
-		ConnState:         nil,
 		ErrorLog:          log.New(s.Logger, "", 0),
 		BaseContext: func(l net.Listener) context.Context {
 			errE := s.listenAddr.Store(l.Addr().String())
