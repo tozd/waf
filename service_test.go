@@ -381,13 +381,13 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 
 	// We make a client version which maps example.com to the address ts is listening on.
 	client := ts.Client()
-	client.Transport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) { //nolint:forcetypeassert
+	client.Transport.(*http.Transport).DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) { //nolint:forcetypeassert,errcheck
 		if addr == "example.com:443" || addr == "other.example.com:443" {
 			addr = listenAddr.Load().(string) //nolint:forcetypeassert,errcheck
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}
-	client.Transport.(*http.Transport).DisableCompression = true //nolint:forcetypeassert
+	client.Transport.(*http.Transport).DisableCompression = true //nolint:forcetypeassert,errcheck
 
 	return service, ts
 }
@@ -587,6 +587,7 @@ func TestServiceReverse(t *testing.T) {
 	_, errE = service.Reverse("something", nil, nil)
 	assert.EqualError(t, errE, "route does not exist")
 
+	//nolint:testifylint
 	assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","message":"route registration: handler found"}
 {"level":"debug","handler":"HomeGet","route":"Home","path":"/","message":"route registration: API handler found"}
 {"level":"debug","handler":"HomePost","route":"Home","path":"/","message":"route registration: API handler not found"}
@@ -3180,7 +3181,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
-				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out))
+				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out)) //nolint:testifylint
 				assert.Equal(t, http.Header{
 					"Server-Timing": {"t;dur="},
 				}, headerCleanup(t, resp.Trailer))
@@ -3212,6 +3213,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 				assert.NoError(t, err) //nolint:testifylint
 			}
 
+			//nolint:testifylint
 			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}
 {"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
 {"level":"debug","path":"/context.json","time":"","message":"added file to static files"}

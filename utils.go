@@ -289,7 +289,7 @@ func acmeClient(certsPath string) (*http.Client, errors.E) {
 		if err != nil {
 			return nil, err
 		}
-		client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{ //nolint:exhaustruct,gosec,forcetypeassert
+		client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{ //nolint:exhaustruct,gosec,forcetypeassert,errcheck
 			RootCAs: certpool,
 		}
 	}

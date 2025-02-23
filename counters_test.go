@@ -195,8 +195,8 @@ func TestNetConnCounters(t *testing.T) {
 			assert.Equal(t, 6, n)
 			assert.Equal(t, []byte("foobar"), data[:n])
 
-			assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
-			assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+			assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert,errcheck
+			assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 		})
 	}
 
@@ -210,7 +210,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
-		n, err := conn.(io.WriterTo).WriteTo(buff)
+		n, err := conn.(io.WriterTo).WriteTo(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
@@ -220,18 +220,18 @@ func TestNetConnCounters(t *testing.T) {
 
 		buff.Reset()
 		buff.WriteString("foobar")
-		n, err = conn.(io.ReaderFrom).ReadFrom(buff)
+		n, err = conn.(io.ReaderFrom).ReadFrom(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 
 		buff.Reset()
-		n, err = conn.(io.WriterTo).WriteTo(buff)
+		n, err = conn.(io.WriterTo).WriteTo(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 		assert.Equal(t, "foobar", buff.String())
 
-		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
-		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert,errcheck
+		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 	})
 
 	t.Run("MockConnWriterTo", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
-		n, err := conn.(io.WriterTo).WriteTo(buff)
+		n, err := conn.(io.WriterTo).WriteTo(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
@@ -257,13 +257,13 @@ func TestNetConnCounters(t *testing.T) {
 		assert.Equal(t, 6, n2)
 
 		buff.Reset()
-		n, err = conn.(io.WriterTo).WriteTo(buff)
+		n, err = conn.(io.WriterTo).WriteTo(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 		assert.Equal(t, "foobar", buff.String())
 
-		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
-		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert,errcheck
+		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 	})
 
 	t.Run("MockConnReaderFrom", func(t *testing.T) {
@@ -282,7 +282,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		buff := &bytes.Buffer{}
 		buff.WriteString("foobar")
-		n, err := conn.(io.ReaderFrom).ReadFrom(buff)
+		n, err := conn.(io.ReaderFrom).ReadFrom(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(6), n)
 
@@ -291,8 +291,8 @@ func TestNetConnCounters(t *testing.T) {
 		assert.Equal(t, 6, n2)
 		assert.Equal(t, []byte("foobar"), data[:n2])
 
-		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert
-		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+		assert.Equal(t, int64(9+6), conn.(interface{ BytesRead() int64 }).BytesRead())     //nolint:forcetypeassert,errcheck
+		assert.Equal(t, int64(6), conn.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 	})
 }
 
@@ -316,7 +316,7 @@ func TestReadCloserCounters(t *testing.T) {
 		err = counter.Close()
 		require.NoError(t, err)
 
-		assert.Equal(t, int64(9), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
+		assert.Equal(t, int64(9), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert,errcheck
 	})
 
 	t.Run("MockReadCloserWriterTo", func(t *testing.T) {
@@ -329,7 +329,7 @@ func TestReadCloserCounters(t *testing.T) {
 
 		data := make([]byte, 1024)
 		buff := &bytes.Buffer{}
-		n, err := counter.(io.WriterTo).WriteTo(buff)
+		n, err := counter.(io.WriterTo).WriteTo(buff) //nolint:forcetypeassert,errcheck
 		require.NoError(t, err)
 		assert.Equal(t, int64(9), n)
 		n2, err := buff.Read(data)
@@ -350,6 +350,6 @@ func TestReadCloserCounters(t *testing.T) {
 		err = counter.Close()
 		require.NoError(t, err)
 
-		assert.Equal(t, int64(15), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert
+		assert.Equal(t, int64(15), counter.(interface{ BytesRead() int64 }).BytesRead()) //nolint:forcetypeassert,errcheck
 	})
 }

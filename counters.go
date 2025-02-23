@@ -101,7 +101,7 @@ func (c *counterConnWriterToReaderFrom) Write(b []byte) (int, error) {
 }
 
 func (c *counterConnWriterToReaderFrom) WriteTo(w io.Writer) (int64, error) {
-	n, err := c.Conn.(io.WriterTo).WriteTo(w)
+	n, err := c.Conn.(io.WriterTo).WriteTo(w) //nolint:forcetypeassert,errcheck
 	atomic.AddInt64(c.read, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
@@ -111,7 +111,7 @@ func (c *counterConnWriterToReaderFrom) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (c *counterConnWriterToReaderFrom) ReadFrom(r io.Reader) (int64, error) {
-	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
+	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r) //nolint:forcetypeassert,errcheck
 	atomic.AddInt64(c.written, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
@@ -155,7 +155,7 @@ func (c *counterConnWriterTo) Write(b []byte) (int, error) {
 }
 
 func (c *counterConnWriterTo) WriteTo(w io.Writer) (int64, error) {
-	n, err := c.Conn.(io.WriterTo).WriteTo(w)
+	n, err := c.Conn.(io.WriterTo).WriteTo(w) //nolint:forcetypeassert,errcheck
 	atomic.AddInt64(c.read, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
@@ -199,7 +199,7 @@ func (c *counterConnReaderFrom) Write(b []byte) (int, error) {
 }
 
 func (c *counterConnReaderFrom) ReadFrom(r io.Reader) (int64, error) {
-	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r)
+	n, err := c.Conn.(io.ReaderFrom).ReadFrom(r) //nolint:forcetypeassert,errcheck
 	atomic.AddInt64(c.written, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155
@@ -259,7 +259,7 @@ type counterReadCloserWriterTo struct {
 }
 
 func (c *counterReadCloserWriterTo) WriteTo(w io.Writer) (int64, error) {
-	n, err := c.rc.(io.WriterTo).WriteTo(w)
+	n, err := c.rc.(io.WriterTo).WriteTo(w) //nolint:forcetypeassert,errcheck
 	atomic.AddInt64(c.read, n)
 	if err == io.EOF { //nolint:errorlint
 		// See: https://github.com/golang/go/issues/39155

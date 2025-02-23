@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -79,7 +78,7 @@ func TestURLHandler(t *testing.T) {
 	h = setCanonicalLogger(h)
 	h = hlog.NewHandler(zerolog.New(out))(h)
 	h.ServeHTTP(nil, r)
-	assert.Equal(t, `{"url":"/path"}`+"\n", out.String())
+	assert.Equal(t, `{"url":"/path"}`+"\n", out.String()) //nolint:testifylint
 }
 
 func TestAccessHandler(t *testing.T) {
@@ -163,7 +162,7 @@ func TestLogMetadata(t *testing.T) {
 		res.Body.Close()
 	})
 	assert.Equal(t, "foobar=1234", res.Header.Get("Test-Metadata"))
-	assert.Equal(t, `{"metadata":{"foobar":1234}}`+"\n", out.String())
+	assert.Equal(t, `{"metadata":{"foobar":1234}}`+"\n", out.String()) //nolint:testifylint
 
 	out.Reset()
 	w = httptest.NewRecorder()
@@ -204,7 +203,7 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 	})
 	require.NoError(t, err)
 	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := http.NewResponseController(w) //nolint:bodyclose
+		rc := http.NewResponseController(w)
 		netConn, _, e := rc.Hijack()
 		if e != nil {
 			Error(w, r, http.StatusInternalServerError)
@@ -526,8 +525,8 @@ func TestSetCanonicalLogger(t *testing.T) {
 	})))
 	h = hlog.NewHandler(zerolog.New(out1))(h)
 	h.ServeHTTP(nil, r)
-	assert.Equal(t, `{"message":"test2"}`+"\n", out1.String())
-	assert.Equal(t, `{"message":"test1"}`+"\n", out2.String())
+	assert.Equal(t, `{"message":"test2"}`+"\n", out1.String()) //nolint:testifylint
+	assert.Equal(t, `{"message":"test1"}`+"\n", out2.String()) //nolint:testifylint
 }
 
 func TestAddNosniffHeader(t *testing.T) {
@@ -659,7 +658,7 @@ func TestMetricsMiddleware(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Regexp(t, regexp.MustCompile(`\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+\},"duration":[0-9]+,"durations":\{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+\},"trailer":[0-9]+\}\}`), out.String())
+	assert.Regexp(t, `\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+\},"duration":[0-9]+,"durations":\{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+\},"trailer":[0-9]+\}\}`, out.String())
 	header := res.Header.Get(serverTimingHeader)
 	assert.Empty(t, header)
 	trailer := res.Trailer.Get(serverTimingHeader)

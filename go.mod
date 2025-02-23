@@ -2,7 +2,7 @@ module gitlab.com/tozd/waf
 
 go 1.23
 
-toolchain go1.23.1
+toolchain go1.23.6
 
 require (
 	github.com/andybalholm/brotli v1.1.0

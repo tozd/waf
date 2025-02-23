@@ -123,7 +123,7 @@ func accessHandler(f func(req *http.Request, code int, responseBody, requestBody
 			body := newCounterReadCloser(req.Body)
 			req.Body = body
 			// We use a closure so that m is accessed when function closure runs.
-			defer func() { f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) }() //nolint:forcetypeassert
+			defer func() { f(req, m.Code, m.Written, body.(interface{ BytesRead() int64 }).BytesRead(), m.Duration) }() //nolint:forcetypeassert,errcheck
 			m.CaptureMetrics(w, func(w http.ResponseWriter) {
 				next.ServeHTTP(w, req)
 			})
@@ -183,8 +183,8 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 				if nc != nil {
 					logger := hlog.FromRequest(req)
 					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-						c = c.Int64(fromClient, nc.(interface{ BytesRead() int64 }).BytesRead())                     //nolint:forcetypeassert
-						c = c.Int64(toClient, int64(buffered)+nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert
+						c = c.Int64(fromClient, nc.(interface{ BytesRead() int64 }).BytesRead())                     //nolint:forcetypeassert,errcheck
+						c = c.Int64(toClient, int64(buffered)+nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 						return c
 					})
 				}
