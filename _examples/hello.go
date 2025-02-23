@@ -123,7 +123,7 @@ func main() {
 				Logger:          app.Logger,
 				CanonicalLogger: app.Logger,
 				WithContext:     app.WithContext,
-				StaticFiles:     f.(fs.ReadFileFS),
+				StaticFiles:     f.(fs.ReadFileFS), //nolint:errcheck
 				Routes:          routesConfig.Routes,
 				Sites:           sites,
 				SiteContextPath: "/context.json",
