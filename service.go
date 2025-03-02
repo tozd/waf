@@ -1055,8 +1055,8 @@ func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (
 }
 
 // GetRoute calls router's Get.
-func (s *Service[SiteT]) GetRoute(name, method string) (ResolvedRoute, errors.E) {
-	return s.router.Get(name, method)
+func (s *Service[SiteT]) GetRoute(path, method string) (ResolvedRoute, errors.E) {
+	return s.router.Get(path, method)
 }
 
 // TODO: Use Vite's manifest.json to send preload headers.
