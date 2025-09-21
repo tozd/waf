@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2025-09-21
+
 ### Changed
 
 - Update dependencies.
@@ -216,7 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.19.0...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.20.0...main
+[0.20.0]: https://gitlab.com/tozd/waf/-/compare/v0.19.0...v0.20.0
 [0.19.0]: https://gitlab.com/tozd/waf/-/compare/v0.18.1...v0.19.0
 [0.18.1]: https://gitlab.com/tozd/waf/-/compare/v0.18.0...v0.18.1
 [0.18.0]: https://gitlab.com/tozd/waf/-/compare/v0.17.1...v0.18.0
