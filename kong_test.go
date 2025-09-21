@@ -8,6 +8,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/tozd/go/cli"
 	"gitlab.com/tozd/go/x"
 	"gopkg.in/yaml.v3"
 )
@@ -15,7 +16,7 @@ import (
 type configTest struct {
 	Server[*testSite]
 
-	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured. Default: ${default}." placeholder:"NAME" short:"T" yaml:"title"`
+	Title string `default:"${defaultTitle}" group:"Sites:" help:"Title to be shown to the users when sites are not configured." placeholder:"NAME" short:"T" yaml:"title"`
 }
 
 func TestKong(t *testing.T) {
@@ -35,6 +36,7 @@ func TestKong(t *testing.T) {
 			"defaultTitle":        "test",
 			"developmentModeHelp": " Proxy unknown requests.",
 		},
+		kong.ValueFormatter(cli.DefaultValueFormatter),
 	)
 	require.NoError(t, err)
 	ctx, err := k.Parse([]string{})

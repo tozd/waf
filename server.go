@@ -41,7 +41,7 @@ type TLS struct {
 	Email string `group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." short:"E" yaml:"email"`
 
 	// Let's Encrypt's cache directory.
-	Cache string `default:"${defaultTLSCache}" group:"Let's Encrypt:" help:"Let's Encrypt's cache directory. Default: ${default}." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
+	Cache string `default:"${defaultTLSCache}" group:"Let's Encrypt:" help:"Let's Encrypt's cache directory." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
@@ -83,7 +83,7 @@ type Server[SiteT hasSite] struct {
 	Development bool `help:"Run in development mode.${developmentModeHelp}" short:"D" yaml:"development"`
 
 	// Base URL to proxy to in development mode.
-	ProxyTo string `default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode. Default: ${default}." placeholder:"URL" short:"P" yaml:"proxyTo"`
+	ProxyTo string `default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode." placeholder:"URL" short:"P" yaml:"proxyTo"`
 
 	// TLS configuration.
 	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
