@@ -12,6 +12,8 @@ github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8v
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/kong v1.8.1 h1:6aamvWBE/REnR/BCq10EcozmcpUPc5aGI1lPAWdB0EE=
 github.com/alecthomas/kong v1.8.1/go.mod h1:p2vqieVMeTAnaC83txKtXe8FLke2X07aruPWXyMPQrU=
+github.com/alecthomas/kong v1.12.2-0.20250922094329-a62e6a47decf h1:y1z7eKn4g56p+klKC4EgC1jaJ/+KJLCC6nZKptCpgZc=
+github.com/alecthomas/kong v1.12.2-0.20250922094329-a62e6a47decf/go.mod h1:wrlbXem1CWqUV5Vbmss5ISYhsVPkBb1Yo7YKJghju2I=
 github.com/alecthomas/repr v0.4.0 h1:GhI2A8MACjfegCPVq9f1FLvIBS+DrQ2KQBFZP1iFzXc=
 github.com/alecthomas/repr v0.4.0/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=
 github.com/andybalholm/brotli v1.1.0 h1:eLKJA0d02Lf0mVpIDgYnqXcUn0GqVmEFny3VuID1U3M=
@@ -161,6 +163,8 @@ github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM
 github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI1Bc68Uw=
 gitlab.com/tozd/go/cli v0.5.0 h1:7bskXpmaW3ujBPsnsWDNJJKLFKHI1NG3EVNE2YE5pko=
 gitlab.com/tozd/go/cli v0.5.0/go.mod h1:7gzx/8VDLhugiHiIztY841YDv0G+GVuJva+Ac9ja4Jc=
+gitlab.com/tozd/go/cli v0.5.1 h1:wjhmyzFcxyMxE4HlZ9ZiIsCxw/pYOJn3w9/jJYMW1e4=
+gitlab.com/tozd/go/cli v0.5.1/go.mod h1:bfGe46KlEG94uEcwtpbWoOuClCWY/nqZKFQIlozWoxs=
 gitlab.com/tozd/go/errors v0.10.0 h1:A98kL+gaDvWnY6ZB/u8zP+sYaWsWUGBHeFMtamvW/74=
 gitlab.com/tozd/go/errors v0.10.0/go.mod h1:q3Ugr0C8dCzMEkrzjjlV2qNsm9e0KvqBjwcbcjCpBe4=
 gitlab.com/tozd/go/x v0.0.0-20240906084819-fda0a3bbba65 h1:EOPL0NFJdCOGgw30Fliw/w9FSg+dayvqjLk+pAQrhEo=

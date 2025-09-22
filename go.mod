@@ -21,12 +21,12 @@ require (
 	golang.org/x/sync v0.14.0
 )
 
-require github.com/alecthomas/kong v1.8.1
+require github.com/alecthomas/kong v1.12.2-0.20250922094329-a62e6a47decf
 
 require (
 	github.com/coder/websocket v1.8.12
 	github.com/rs/cors v1.11.1
-	gitlab.com/tozd/go/cli v0.5.0
+	gitlab.com/tozd/go/cli v0.5.1
 )
 
 require (
