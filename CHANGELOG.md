@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update dependencies.
+- Go 1.24 or newer is required.
 
 ## [0.19.0] - 2024-09-09
 
