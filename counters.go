@@ -42,6 +42,7 @@ func newCounterConn(c net.Conn) net.Conn {
 
 type counterConn struct {
 	net.Conn
+
 	read    *int64
 	written *int64
 }
@@ -76,6 +77,7 @@ func (c *counterConn) BytesWritten() int64 {
 
 type counterConnWriterToReaderFrom struct {
 	net.Conn
+
 	read    *int64
 	written *int64
 }
@@ -130,6 +132,7 @@ func (c *counterConnWriterToReaderFrom) BytesWritten() int64 {
 
 type counterConnWriterTo struct {
 	net.Conn
+
 	read    *int64
 	written *int64
 }
@@ -174,6 +177,7 @@ func (c *counterConnWriterTo) BytesWritten() int64 {
 
 type counterConnReaderFrom struct {
 	net.Conn
+
 	read    *int64
 	written *int64
 }

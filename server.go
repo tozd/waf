@@ -459,7 +459,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 		// Parent context was not canceled (is nil) or the error is different,
 		// which both means the server's goroutine exited with an error.
 		// We do not have to do anything.
-		if ctx.Err() != errCtx.Err() { //nolint:errorlint,goerr113
+		if ctx.Err() != errCtx.Err() { //nolint:errorlint,err113
 			return nil
 		}
 

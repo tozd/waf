@@ -288,7 +288,8 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 
 		ro.APIHandlers[method] = handler
 	} else {
-		if method == http.MethodGet {
+		switch method {
+		case http.MethodGet:
 			if ro.GetHandler != nil {
 				err := errors.New("non-API GET handler already exists")
 				errors.Details(err)["route"] = name
@@ -297,7 +298,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			}
 
 			ro.GetHandler = handler
-		} else if method == http.MethodOptions {
+		case http.MethodOptions:
 			if ro.OptionsHandler != nil {
 				err := errors.New("non-API OPTIONS handler already exists")
 				errors.Details(err)["route"] = name
@@ -306,7 +307,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			}
 
 			ro.OptionsHandler = handler
-		} else {
+		default:
 			err := errors.New("non-API handler must use GET or OPTIONS HTTP method")
 			errors.Details(err)["route"] = name
 			errors.Details(err)["path"] = path

@@ -60,9 +60,10 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 	for _, method := range c.AllowedMethods {
 		method = strings.ToUpper(method)
 		allowedMethods = append(allowedMethods, method)
-		if method == http.MethodGet {
+		switch method {
+		case http.MethodGet:
 			hasGet = true
-		} else if method == http.MethodHead {
+		case http.MethodHead:
 			hasHead = true
 		}
 	}

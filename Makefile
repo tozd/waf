@@ -16,12 +16,12 @@ test-ci: test
 	go tool cover -html=coverage.txt -o coverage.html
 
 lint:
-	golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix --max-issues-per-linter 0 --max-same-issues 0
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --color always --allow-parallel-runners --fix --max-issues-per-linter 0 --max-same-issues 0 %
+	golangci-lint run --output.text.colors --allow-parallel-runners --fix
+	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --output.text.colors --allow-parallel-runners --fix %
 
 lint-ci:
-	golangci-lint run --timeout 4m --max-issues-per-linter 0 --max-same-issues 0 --out-format colored-line-number,code-climate:codeclimate.json --issues-exit-code 0
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --timeout 4m --max-issues-per-linter 0 --max-same-issues 0 --out-format colored-line-number,code-climate:%_codeclimate.json --issues-exit-code 0 %
+	golangci-lint run --output.text.path=stdout --output.code-climate.path=codeclimate.json
+	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --output.text.path=stdout --output.code-climate.path=%_codeclimate.json %
 	jq -s 'add' codeclimate.json _examples/*_codeclimate.json > /tmp/codeclimate.json
 	mv /tmp/codeclimate.json codeclimate.json
 	rm -f _examples/*_codeclimate.json
@@ -43,10 +43,10 @@ clean:
 	rm -rf coverage.* codeclimate.json _examples/*_codeclimate.json tests.xml coverage
 
 release:
-	npx --yes --package 'release-it@15.4.2' --package '@release-it/keep-a-changelog@3.1.0' -- release-it
+	npx --yes --package 'release-it@19.0.5' --package '@release-it/keep-a-changelog@7.0.0' -- release-it
 
 lint-docs:
-	npx --yes --package 'markdownlint-cli@~0.41.0' -- markdownlint --ignore-path .gitignore --ignore testdata/ --fix '**/*.md'
+	npx --yes --package 'markdownlint-cli@~0.45.0' -- markdownlint --ignore-path .gitignore --ignore testdata/ --fix '**/*.md'
 
 lint-docs-ci: lint-docs
 	git diff --exit-code --color=always

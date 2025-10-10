@@ -199,7 +199,7 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 						// We first make sure anything pending to write is flushed
 						// (and we count bytes we flushed).
 						buffered = bufrw.Writer.Buffered()
-						err = bufrw.Writer.Flush()
+						err = bufrw.Flush()
 						if err != nil {
 							return conn, bufrw, errors.WithStack(err)
 						}
@@ -209,7 +209,7 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 						// goes to our wrapped connection and not the original connection.
 						bufrw.Writer.Reset(nc)
 						// We read any buffered data pending reading.
-						b, _ := bufrw.Reader.Peek(bufrw.Reader.Buffered())
+						b, _ := bufrw.Peek(bufrw.Reader.Buffered())
 						// We count bytes buffered.
 						buffered += len(b)
 						// And then we set the underlying reader with our wrapped connection

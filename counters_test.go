@@ -50,6 +50,7 @@ var _ net.Conn = (*mockBase)(nil)
 
 type MockConn struct {
 	mockBase
+
 	buffer *bytes.Buffer
 }
 
@@ -67,6 +68,7 @@ func (c *MockConn) Close() error {
 
 type MockConnWriterToReaderFrom struct {
 	mockBase
+
 	buffer *bytes.Buffer
 }
 
@@ -92,6 +94,7 @@ func (c *MockConnWriterToReaderFrom) ReadFrom(r io.Reader) (int64, error) {
 
 type MockConnWriterTo struct {
 	mockBase
+
 	buffer *bytes.Buffer
 }
 
@@ -113,6 +116,7 @@ func (c *MockConnWriterTo) WriteTo(w io.Writer) (int64, error) {
 
 type MockConnReaderFrom struct {
 	mockBase
+
 	buffer *bytes.Buffer
 }
 

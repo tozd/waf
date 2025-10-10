@@ -185,7 +185,7 @@ func TestLogMetadata(t *testing.T) {
 	t.Cleanup(func() {
 		res.Body.Close()
 	})
-	assert.Equal(t, "", res.Header.Get("Test-Metadata"))
+	assert.Empty(t, res.Header.Get("Test-Metadata"))
 	assert.Equal(t, "{}\n", out.String())
 }
 
@@ -558,7 +558,7 @@ func TestAddNosniffHeader(t *testing.T) {
 		res.Body.Close()
 	})
 	assert.Equal(t, http.StatusNotModified, res.StatusCode)
-	assert.Equal(t, "", res.Header.Get("X-Content-Type-Options"))
+	assert.Empty(t, res.Header.Get("X-Content-Type-Options"))
 }
 
 func TestRedirectToMainSite(t *testing.T) {

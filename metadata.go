@@ -22,13 +22,13 @@ func encodeMetadataKey(key string, b *bytes.Buffer) errors.E {
 		errors.Details(errE)["value"] = key
 		return errE
 	}
-	if !('a' <= key[0] && key[0] <= 'z' || key[0] == '*') {
+	if ('a' > key[0] || key[0] > 'z') && key[0] != '*' {
 		errE := errors.New("unsupported dictionary key")
 		errors.Details(errE)["value"] = key
 		return errE
 	}
 	for _, k := range key {
-		if !('a' <= k && k <= 'z' || '0' <= k && k <= '9' || k == '_' || k == '-' || k == '.' || k == '*') {
+		if ('a' > k || k > 'z') && ('0' > k || k > '9') && k != '_' && k != '-' && k != '.' && k != '*' {
 			errE := errors.New("unsupported dictionary key")
 			errors.Details(errE)["value"] = key
 			return errE
