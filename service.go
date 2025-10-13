@@ -47,6 +47,7 @@ type CORSOptions struct {
 	OptionsSuccessStatus int      `json:"optionsSuccessStatus,omitempty"`
 }
 
+// GetAllowedMethods returns the list of allowed methods.
 func (c *CORSOptions) GetAllowedMethods() []string {
 	if len(c.AllowedMethods) == 0 {
 		// We allow only GET and HEAD by default.
@@ -75,6 +76,7 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 	return allowedMethods
 }
 
+// RouteOptions describe options for the route.
 type RouteOptions struct {
 	// Enable CORS on handler(s)?
 	CORS *CORSOptions `json:"cors,omitempty"`
@@ -130,6 +132,7 @@ type Site struct {
 	staticFiles map[string]map[string]staticFile
 }
 
+// Validate validates the site.
 func (s *Site) Validate() error {
 	if s.CertFile != "" || s.KeyFile != "" {
 		if s.CertFile == "" {
@@ -1050,7 +1053,7 @@ func (s *Service[SiteT]) Reverse(name string, params Params, qs url.Values) (str
 	return s.router.Reverse(name, params, qs)
 }
 
-// Reverse calls router's ReverseAPI.
+// ReverseAPI calls router's ReverseAPI.
 func (s *Service[SiteT]) ReverseAPI(name string, params Params, qs url.Values) (string, errors.E) {
 	return s.router.ReverseAPI(name, params, qs)
 }

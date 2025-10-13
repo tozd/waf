@@ -40,7 +40,8 @@ type App struct {
 func (a *App) Validate() error {
 	// We have to call Validate on kong-embedded structs ourselves.
 	// See: https://github.com/alecthomas/kong/issues/90
-	if err := a.Server.TLS.Validate(); err != nil {
+	err := a.Server.TLS.Validate()
+	if err != nil {
 		return err //nolint:wrapcheck
 	}
 	return nil
@@ -49,6 +50,7 @@ func (a *App) Validate() error {
 // We extend Site with a title.
 type Site struct {
 	waf.Site
+
 	Title string `json:"title"`
 }
 
@@ -137,7 +139,7 @@ func main() {
 		}
 
 		// Construct the main handler for the service using the router.
-		handler, errE := service.RouteWith(service, &waf.Router{}) //nolint:exhaustruct
+		handler, errE := service.RouteWith(service, &waf.Router{})
 		if errE != nil {
 			return errE
 		}

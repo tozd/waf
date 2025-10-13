@@ -14,6 +14,8 @@ import (
 
 var ErrNotFound = errors.Base("not found")
 
+// MethodNotAllowedError is an error returned by [Router.ServeHTTP] when
+// the request method is not allowed for the route.
 type MethodNotAllowedError struct {
 	Allow []string
 }
@@ -118,6 +120,7 @@ type route struct {
 	APIHandlers map[string]Handler
 }
 
+// ResolvedRoute is a route resolved from a URL path and a HTTP method.
 type ResolvedRoute struct {
 	Name    string
 	Handler Handler

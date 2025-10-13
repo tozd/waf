@@ -13,9 +13,14 @@ import (
 )
 
 const (
-	MetricCompress    = "c"
+	// MetricCompress is the name of the metric which measures the time it takes to compress a response.
+	MetricCompress = "c"
+
+	// MetricJSONMarshal is the name of the metric which measures the time it takes to marshal a JSON response.
 	MetricJSONMarshal = "j"
-	MetricTotal       = "t"
+
+	// MetricTotal is the name of the metric which measures the total time it takes to process a request.
+	MetricTotal = "t"
 )
 
 const serverTimingHeader = "Server-Timing"
@@ -75,6 +80,7 @@ type DurationMetric struct {
 	Duration  time.Duration
 }
 
+// Name returns the name of the metric.
 func (d *DurationMetric) Name() string {
 	if d == nil {
 		return ""
@@ -82,6 +88,7 @@ func (d *DurationMetric) Name() string {
 	return d.name
 }
 
+// MarshalZerologObject implements the [zerolog.LogObjectMarshaler] interface for DurationMetric.
 func (d *DurationMetric) MarshalZerologObject(e *zerolog.Event) {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
@@ -92,6 +99,7 @@ func (d *DurationMetric) MarshalZerologObject(e *zerolog.Event) {
 	e.Dur(d.name, d.Duration)
 }
 
+// ServerTimingString returns the Server-Timing header value for the metric.
 func (d *DurationMetric) ServerTimingString() string {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
@@ -151,6 +159,7 @@ type CounterMetric struct {
 	Count     int64
 }
 
+// Name returns the name of the metric.
 func (c *CounterMetric) Name() string {
 	if c == nil {
 		return ""
@@ -158,6 +167,7 @@ func (c *CounterMetric) Name() string {
 	return c.name
 }
 
+// MarshalZerologObject implements the [zerolog.LogObjectMarshaler] interface for CounterMetric.
 func (c *CounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	if c == nil || c.Discarded {
 		return
@@ -166,6 +176,7 @@ func (c *CounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	e.Int64(c.name, c.Count)
 }
 
+// ServerTimingString returns the Server-Timing header value for the metric.
 func (c *CounterMetric) ServerTimingString() string {
 	// Not supported.
 	// TODO: Should we use non-standard key name?
@@ -212,6 +223,7 @@ type DurationsMetric struct {
 	mu sync.Mutex
 }
 
+// Name returns the name of the metric.
 func (d *DurationsMetric) Name() string {
 	if d == nil {
 		return ""
@@ -219,6 +231,7 @@ func (d *DurationsMetric) Name() string {
 	return d.name
 }
 
+// MarshalZerologObject implements the [zerolog.LogObjectMarshaler] interface for DurationsMetric.
 func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 	if d == nil || d.Discarded {
 		return
@@ -260,6 +273,7 @@ func (d *DurationsMetric) MarshalZerologObject(e *zerolog.Event) {
 	e.Dict(d.name, dict)
 }
 
+// ServerTimingString returns the Server-Timing header value for the metric.
 func (d *DurationsMetric) ServerTimingString() string {
 	// Not supported.
 	// TODO: Should we support non-standard key name? Or use average? Or return multiple durations, one for min, avg, and max?
@@ -306,6 +320,7 @@ type DurationCounterMetric struct {
 	Count     int64
 }
 
+// Name returns the name of the metric.
 func (d *DurationCounterMetric) Name() string {
 	if d == nil {
 		return ""
@@ -313,6 +328,7 @@ func (d *DurationCounterMetric) Name() string {
 	return d.name
 }
 
+// MarshalZerologObject implements the [zerolog.LogObjectMarshaler] interface for DurationCounterMetric.
 func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
@@ -328,6 +344,7 @@ func (d *DurationCounterMetric) MarshalZerologObject(e *zerolog.Event) {
 	e.Dict(d.name, dict)
 }
 
+// ServerTimingString returns the Server-Timing header value for the metric.
 func (d *DurationCounterMetric) ServerTimingString() string {
 	// We use only really measured durations and not just started
 	// (it is impossible to both start and end the measurement with 0 duration).
@@ -568,6 +585,7 @@ func (m *Metrics) DurationCounter(name string) *DurationCounterMetric {
 	return dm
 }
 
+// MarshalZerologObject implements the [zerolog.LogObjectMarshaler] interface for Metrics.
 func (m *Metrics) MarshalZerologObject(e *zerolog.Event) {
 	if m == nil {
 		return
@@ -592,6 +610,7 @@ func (m *Metrics) MarshalZerologObject(e *zerolog.Event) {
 	}
 }
 
+// ServerTimingString returns the Server-Timing header value for the metrics.
 func (m *Metrics) ServerTimingString() string {
 	if m == nil {
 		return ""
