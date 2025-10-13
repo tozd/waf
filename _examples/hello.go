@@ -1,3 +1,4 @@
+// Command main is a simple example of a Waf service.
 package main
 
 import (
@@ -47,14 +48,14 @@ func (a *App) Validate() error {
 	return nil
 }
 
-// We extend Site with a title.
+// Site extends basic Site with a title.
 type Site struct {
 	waf.Site
 
 	Title string `json:"title"`
 }
 
-// We extend Service with our handlers.
+// Service extends basic Service with our handlers.
 type Service struct {
 	waf.Service[*Site]
 }
