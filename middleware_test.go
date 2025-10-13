@@ -303,9 +303,7 @@ func TestWebsocketHandler(t *testing.T) {
 	out, err := io.ReadAll(pipeR)
 	pipeR.Close()
 	require.NoError(t, err)
-	// TODO: It is not clear what should be the values here.
-	//       See: https://github.com/coder/websocket/pull/476#issuecomment-2336804362
-	assert.Contains(t, []string{`{"wsFromClient":16,"wsToClient":12}` + "\n", `{"wsFromClient":24,"wsToClient":12}` + "\n"}, string(out))
+	assert.Equal(t, `{"wsFromClient":16,"wsToClient":8}`+"\n", string(out))
 }
 
 func TestParseForm(t *testing.T) {
