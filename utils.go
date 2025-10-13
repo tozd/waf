@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -268,7 +269,7 @@ func parseCertPool(certs []byte) (*x509.CertPool, errors.E) {
 }
 
 func parseCertPoolFrom(certsPath string) (*x509.CertPool, errors.E) {
-	certs, err := os.ReadFile(certsPath)
+	certs, err := os.ReadFile(filepath.Clean(certsPath))
 	if err != nil {
 		errE := errors.WithMessage(err, "unable to read file")
 		errors.Details(errE)["certsPath"] = certsPath
@@ -276,7 +277,7 @@ func parseCertPoolFrom(certsPath string) (*x509.CertPool, errors.E) {
 	}
 	certpool, errE := parseCertPool(certs)
 	if errE != nil {
-		errors.Details(err)["certsPath"] = certsPath
+		errors.Details(errE)["certsPath"] = certsPath
 		return nil, errE
 	}
 	return certpool, nil

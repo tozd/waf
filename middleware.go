@@ -246,8 +246,8 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 				// This can make errors visible sooner if a handler attempts to read it again.
 				// We first still attempt to discard anything left in the body (an error might
 				// prevent the body from being fully read).
-				io.Copy(io.Discard, req.Body) //nolint:errcheck
-				req.Body.Close()
+				io.Copy(io.Discard, req.Body) //nolint:errcheck,gosec
+				req.Body.Close()              //nolint:errcheck,gosec
 			}
 			queryForm, queryErr := getQueryForm(req)
 			if queryErr != nil {

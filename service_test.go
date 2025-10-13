@@ -3005,8 +3005,8 @@ func TestService(t *testing.T) {
 					pipeR, pipeW, err := os.Pipe()
 					t.Cleanup(func() {
 						// We might double close but we do not care.
-						pipeR.Close()
-						pipeW.Close()
+						pipeR.Close() //nolint:errcheck,gosec
+						pipeW.Close() //nolint:errcheck,gosec
 					})
 					require.NoError(t, err)
 
@@ -3020,19 +3020,19 @@ func TestService(t *testing.T) {
 					// Close pipeW after serving.
 					h := ts.Config.Handler
 					ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						defer pipeW.Close()
+						defer pipeW.Close() //nolint:errcheck
 						h.ServeHTTP(w, r)
 					})
 
 					resp, err := ts.Client().Do(tt.Request())
 					require.NoError(t, err)
-					t.Cleanup(func() { resp.Body.Close() })
+					t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
 					out, err := io.ReadAll(resp.Body)
 					require.NoError(t, err)
 
 					if logEnabled {
 						log, err := io.ReadAll(pipeR)
-						pipeR.Close()
+						pipeR.Close() //nolint:errcheck,gosec
 						require.NoError(t, err)
 						assert.Equal(t, tt.ExpectedLog, logCleanup(t, http2, string(log)))
 					}
@@ -3098,7 +3098,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 
 			output := &bytes.Buffer{}
 
-			cmd := exec.CommandContext(ctx, "go", "run", "-race", "-cover", "-covermode", "atomic", file, "--config", base+".yml")
+			cmd := exec.CommandContext(ctx, "go", "run", "-race", "-cover", "-covermode", "atomic", file, "--config", base+".yml") //nolint:gosec
 			cmd.Dir = dir
 			cmd.Stdout = output
 			cmd.Stderr = output
@@ -3146,8 +3146,8 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 
 			resp, err := client.Get("https://site.test") //nolint:noctx
 			if assert.NoError(t, err) {
-				t.Cleanup(func() { resp.Body.Close() })
-				out, err := io.ReadAll(resp.Body) //nolint:govet
+				t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+				out, err := io.ReadAll(resp.Body)       //nolint:govet
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
@@ -3176,8 +3176,8 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 
 			resp, err = client.Get("https://site.test/context.json") //nolint:noctx
 			if assert.NoError(t, err) {
-				t.Cleanup(func() { resp.Body.Close() })
-				out, err := io.ReadAll(resp.Body) //nolint:govet
+				t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+				out, err := io.ReadAll(resp.Body)       //nolint:govet
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)

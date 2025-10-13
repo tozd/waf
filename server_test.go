@@ -187,8 +187,8 @@ func TestServer(t *testing.T) {
 	pipeR, pipeW, err := os.Pipe()
 	t.Cleanup(func() {
 		// We might double close but we do not care.
-		pipeR.Close()
-		pipeW.Close()
+		pipeR.Close() //nolint:errcheck,gosec
+		pipeW.Close() //nolint:errcheck,gosec
 	})
 	require.NoError(t, err)
 
@@ -233,9 +233,9 @@ func TestServer(t *testing.T) {
 	err = g.Wait()
 	require.NoError(t, err, "% -+#.1v", err)
 
-	pipeW.Close()
+	pipeW.Close() //nolint:errcheck,gosec
 	out, err := io.ReadAll(pipeR)
-	pipeR.Close()
+	pipeR.Close() //nolint:errcheck,gosec
 	require.NoError(t, err)
 
 	assert.Equal(
@@ -320,7 +320,7 @@ func TestServerConnection(t *testing.T) {
 
 	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
 	require.NoError(t, err)
-	t.Cleanup(func() { resp.Body.Close() })
+	t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
 	out, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -336,7 +336,7 @@ func getACMERootCAs(t *testing.T) *x509.CertPool {
 
 	resp, err := acmeClient.Get(fmt.Sprintf("https://%s/roots/0", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "15000"))) //nolint:noctx
 	require.NoError(t, err)
-	t.Cleanup(func() { resp.Body.Close() })
+	t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
 	acmeRootCAsData, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -417,8 +417,8 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 
 	resp, err := client.Get("https://site.test") //nolint:noctx
 	if assert.NoError(t, err) {
-		t.Cleanup(func() { resp.Body.Close() })
-		out, err := io.ReadAll(resp.Body) //nolint:govet
+		t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+		out, err := io.ReadAll(resp.Body)       //nolint:govet
 		if assert.NoError(t, err) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			assert.Equal(t, 2, resp.ProtoMajor)

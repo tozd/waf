@@ -78,7 +78,7 @@ func GetMetrics(ctx context.Context) (*Metrics, bool) {
 	return m, ok
 }
 
-// GetMetrics returns metrics from context ctx or panics
+// MustGetMetrics returns metrics from context ctx or panics
 // if the metrics are not stored in the context.
 //
 // Note, Waf service always stores the metrics in the request context.
@@ -101,7 +101,7 @@ func (s *Service[SiteT]) NotFound(w http.ResponseWriter, req *http.Request) {
 	Error(w, req, http.StatusNotFound)
 }
 
-// NotFound replies to the request with the 404 (not found) HTTP code and the corresponding
+// NotFoundWithError replies to the request with the 404 (not found) HTTP code and the corresponding
 // error message. Error err is logged to the canonical log line.
 //
 // As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it instead replies

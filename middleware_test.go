@@ -59,7 +59,7 @@ func TestRequestIDHandler(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, `{"request":"`+res.Header.Get("Request-Id")+`"}`+"\n", out.String())
 }
@@ -130,7 +130,7 @@ func TestAccessHandler(t *testing.T) {
 				assert.Equal(t, tt.expected+"\n", out.String())
 				res := w.Result()
 				t.Cleanup(func() {
-					res.Body.Close()
+					res.Body.Close() //nolint:errcheck,gosec
 				})
 			})
 		}
@@ -159,7 +159,7 @@ func TestLogMetadata(t *testing.T) {
 	h3.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, "foobar=1234", res.Header.Get("Test-Metadata"))
 	assert.Equal(t, `{"metadata":{"foobar":1234}}`+"\n", out.String()) //nolint:testifylint
@@ -183,7 +183,7 @@ func TestLogMetadata(t *testing.T) {
 	h3.ServeHTTP(w, r)
 	res = w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Empty(t, res.Header.Get("Test-Metadata"))
 	assert.Equal(t, "{}\n", out.String())
@@ -198,8 +198,8 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 	pipeR, pipeW, err := os.Pipe()
 	t.Cleanup(func() {
 		// We might double close but we do not care.
-		pipeR.Close()
-		pipeW.Close()
+		pipeR.Close() //nolint:errcheck,gosec
+		pipeW.Close() //nolint:errcheck,gosec
 	})
 	require.NoError(t, err)
 	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,13 +210,13 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 			return
 		}
 		defer func() {
-			netConn.Close()
+			netConn.Close() //nolint:errcheck,gosec
 			ts.Config.ConnState(netConn, http.StateClosed)
 		}()
 		_, _ = netConn.Write(response)
 	}))
 	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer pipeW.Close()
+		defer pipeW.Close() //nolint:errcheck
 		h.ServeHTTP(w, r)
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
@@ -227,9 +227,9 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 	t.Cleanup(ts.Close)
 	resp, err := ts.Client().Get(ts.URL) //nolint:noctx
 	require.NoError(t, err)
-	t.Cleanup(func() { resp.Body.Close() })
+	t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
 	out, err := io.ReadAll(pipeR)
-	pipeR.Close()
+	pipeR.Close() //nolint:errcheck,gosec
 	require.NoError(t, err)
 	assert.Equal(t, 232, resp.StatusCode)
 	assert.Equal(t, `{"wsFromClient":0,"wsToClient":`+strconv.Itoa(len(response))+`}`+"\n", string(out))
@@ -241,8 +241,8 @@ func TestWebsocketHandler(t *testing.T) {
 	pipeR, pipeW, err := os.Pipe()
 	t.Cleanup(func() {
 		// We might double close but we do not care.
-		pipeR.Close()
-		pipeW.Close()
+		pipeR.Close() //nolint:errcheck,gosec
+		pipeW.Close() //nolint:errcheck,gosec
 	})
 	require.NoError(t, err)
 	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -268,10 +268,10 @@ func TestWebsocketHandler(t *testing.T) {
 			return
 		}
 
-		c.Close(websocket.StatusNormalClosure, "")
+		c.Close(websocket.StatusNormalClosure, "") //nolint:errcheck,gosec
 	}))
 	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer pipeW.Close()
+		defer pipeW.Close() //nolint:errcheck
 		h.ServeHTTP(w, r)
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")
@@ -298,10 +298,10 @@ func TestWebsocketHandler(t *testing.T) {
 	assert.Equal(t, websocket.MessageText, typ)
 	assert.Equal(t, []byte("hi"), d)
 
-	c.Close(websocket.StatusNormalClosure, "")
+	c.Close(websocket.StatusNormalClosure, "") //nolint:errcheck,gosec
 
 	out, err := io.ReadAll(pipeR)
-	pipeR.Close()
+	pipeR.Close() //nolint:errcheck,gosec
 	require.NoError(t, err)
 	assert.Equal(t, `{"wsFromClient":16,"wsToClient":8}`+"\n", string(out))
 }
@@ -378,7 +378,7 @@ func TestParseForm(t *testing.T) {
 			h3.ServeHTTP(w, r)
 			res := w.Result()
 			t.Cleanup(func() {
-				res.Body.Close()
+				res.Body.Close() //nolint:errcheck,gosec
 			})
 			// logValues do not produce deterministic JSON, so we use JSONEq here.
 			assert.JSONEq(t, tt.expectedLog, strings.Split(out.String(), "\n")[0])
@@ -403,7 +403,7 @@ func TestParseFormRedirect(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 	assert.Equal(t, "/example?key1=value1&key2=value2", res.Header.Get("Location"))
@@ -438,7 +438,7 @@ func TestValidatePath(t *testing.T) {
 			h.ServeHTTP(w, r)
 			res := w.Result()
 			t.Cleanup(func() {
-				res.Body.Close()
+				res.Body.Close() //nolint:errcheck,gosec
 			})
 			assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 			assert.Equal(t, tt.Out, res.Header.Get("Location"))
@@ -450,7 +450,7 @@ func TestValidatePath(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 
@@ -459,7 +459,7 @@ func TestValidatePath(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res = w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
@@ -502,7 +502,7 @@ func TestValidateSite(t *testing.T) {
 			h.ServeHTTP(w, r)
 			res := w.Result()
 			t.Cleanup(func() {
-				res.Body.Close()
+				res.Body.Close() //nolint:errcheck,gosec
 			})
 			assert.Equal(t, tt.ExpectedStatus, res.StatusCode)
 		})
@@ -539,7 +539,7 @@ func TestAddNosniffHeader(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
@@ -553,7 +553,7 @@ func TestAddNosniffHeader(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res = w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Equal(t, http.StatusNotModified, res.StatusCode)
 	assert.Empty(t, res.Header.Get("X-Content-Type-Options"))
@@ -599,7 +599,7 @@ func TestRedirectToMainSite(t *testing.T) {
 			h.ServeHTTP(w, r)
 			res := w.Result()
 			t.Cleanup(func() {
-				res.Body.Close()
+				res.Body.Close() //nolint:errcheck,gosec
 			})
 			assert.Equal(t, tt.ExpectedStatus, res.StatusCode)
 			assert.Equal(t, tt.ExpectedLocation, res.Header.Get("Location"))
@@ -654,7 +654,7 @@ func TestMetricsMiddleware(t *testing.T) {
 	h.ServeHTTP(w, r)
 	res := w.Result()
 	t.Cleanup(func() {
-		res.Body.Close()
+		res.Body.Close() //nolint:errcheck,gosec
 	})
 	assert.Regexp(t, `\{"metrics":\{"counter":41,"dc":\{"count":44,"dur":[0-9]+,"rate":[0-9.]+\},"duration":[0-9]+,"durations":\{"avg":[0-9]+,"count":2,"dur":[0-9]+,"max":[0-9]+,"min":[0-9]+\},"trailer":[0-9]+\}\}`, out.String())
 	header := res.Header.Get(serverTimingHeader)
