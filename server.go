@@ -32,10 +32,10 @@ const (
 //nolint:lll
 type TLS struct {
 	// Default certificate for TLS, when not using Let's Encrypt.
-	CertFile string `group:"File certificate:" help:"Default certificate for TLS, when not using Let's Encrypt." name:"cert" placeholder:"PATH" short:"k" type:"existingfile" yaml:"cert"`
+	CertFile string `group:"File certificate:" help:"Default certificate for TLS, when not using Let's Encrypt. In PEM format." name:"cert" placeholder:"PATH" short:"k" type:"existingfile" yaml:"cert"`
 
 	// Default certificate's private key, when not using Let's Encrypt.
-	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
+	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt. In PEM format." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
 
 	// Contact e-mail to use with Let's Encrypt.
 	Email string `group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." short:"E" yaml:"email"`

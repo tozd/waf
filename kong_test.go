@@ -53,9 +53,9 @@ Flags:
 
 File certificate:
   -k, --tls.cert=PATH    Default certificate for TLS, when not using Let's
-                         Encrypt.
+                         Encrypt. In PEM format.
   -K, --tls.key=PATH     Default certificate's private key, when not using Let's
-                         Encrypt.
+                         Encrypt. In PEM format.
 
 Let's Encrypt:
   -E, --tls.email=STRING    Contact e-mail to use with Let's Encrypt.
