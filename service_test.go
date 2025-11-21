@@ -3147,7 +3147,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			resp, err := client.Get("https://site.test") //nolint:noctx
 			if assert.NoError(t, err) {
 				t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
-				out, err := io.ReadAll(resp.Body)       //nolint:govet
+				out, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
@@ -3177,7 +3177,7 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			resp, err = client.Get("https://site.test/context.json") //nolint:noctx
 			if assert.NoError(t, err) {
 				t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
-				out, err := io.ReadAll(resp.Body)       //nolint:govet
+				out, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
