@@ -216,7 +216,7 @@ type hasSite interface {
 // See: https://go.dev/play/p/j0GRRI96WMM
 // See: https://github.com/golang/go/issues/63708
 func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
-	typ := reflect.TypeOf((*SiteT)(nil)).Elem().Elem()
+	typ := reflect.TypeFor[SiteT]().Elem()
 	st := reflect.New(typ).Interface().(SiteT) //nolint:forcetypeassert,errcheck
 	site := st.GetSite()
 	return st, site
