@@ -816,31 +816,28 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 		return errE
 	}
 
-	singleHostDirector := httputil.NewSingleHostReverseProxy(target).Director
-	director := func(req *http.Request) {
-		singleHostDirector(req)
-
-		// We pass request ID through.
-		req.Header.Set("Request-Id", MustRequestID(req.Context()).String())
-
-		// We potentially parse PostForm in parseForm middleware. In that case
-		// the body is consumed and closed. We have to reconstruct it here.
-		if postFormParsed(req) {
-			encoded := req.PostForm.Encode()
-			req.Body = io.NopCloser(strings.NewReader(encoded))
-			if req.Header.Get("Content-Length") != "" {
-				// Our reconstruction might have a different length.
-				req.Header.Set("Content-Length", strconv.Itoa(len(encoded)))
-			}
-		}
-
-		// TODO: Map origin and other headers.
-	}
-
-	// TODO: Map response cookies, other headers which include origin, and redirect locations.
 	s.reverseProxy = &httputil.ReverseProxy{
-		Rewrite:        nil,
-		Director:       director,
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(target)
+			r.Out.Host = r.In.Host
+
+			// We pass request ID through.
+			r.Out.Header.Set("Request-Id", MustRequestID(r.In.Context()).String())
+
+			// We potentially parse PostForm in parseForm middleware. In that case
+			// the body is consumed and closed. We have to reconstruct it here.
+			if postFormParsed(r.In) {
+				encoded := r.In.PostForm.Encode()
+				r.Out.Body = io.NopCloser(strings.NewReader(encoded))
+				if r.Out.Header.Get("Content-Length") != "" {
+					// Our reconstruction might have a different length.
+					r.Out.Header.Set("Content-Length", strconv.Itoa(len(encoded)))
+				}
+			}
+
+			// TODO: Map response cookies, other headers which include origin, and redirect locations.
+		},
+		Director:       nil,
 		Transport:      cleanhttp.DefaultPooledTransport(),
 		FlushInterval:  -1,
 		ErrorLog:       log.New(s.Logger, "", 0),
