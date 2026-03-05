@@ -359,7 +359,6 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
 		TLS: TLS{
-			Email:                "user@example.com",
 			Cache:                tempDir,
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",

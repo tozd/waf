@@ -32,7 +32,6 @@ func TestKong(t *testing.T) {
 		),
 		kong.Vars{
 			"defaultProxyTo":      "http://localhost:5173",
-			"defaultTLSCache":     "letsencrypt",
 			"defaultTitle":        "test",
 			"developmentModeHelp": " Proxy unknown requests.",
 		},
@@ -58,9 +57,8 @@ File certificate:
                          Encrypt. In PEM format.
 
 Let's Encrypt:
-  -E, --tls.email=STRING    Contact e-mail to use with Let's Encrypt.
-  -C, --tls.cache=PATH      Let's Encrypt's cache directory. Default:
-                            letsencrypt.
+  -C, --tls.cache=PATH    Let's Encrypt's cache directory. Set it to enable
+                          Let's Encrypt.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

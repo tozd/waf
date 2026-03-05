@@ -71,7 +71,6 @@ func main() {
 	var app App
 	cli.Run(&app, kong.Vars{
 		"defaultProxyTo":      "http://localhost:5173",
-		"defaultTLSCache":     "letsencrypt",
 		"developmentModeHelp": " Proxy unknown requests.",
 	}, func(_ *kong.Context) errors.E {
 		// Routes come from a single source of truth, e.g., a file.

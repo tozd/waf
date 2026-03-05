@@ -37,11 +37,8 @@ type TLS struct {
 	// Default certificate's private key, when not using Let's Encrypt.
 	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt. In PEM format." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
 
-	// Contact e-mail to use with Let's Encrypt.
-	Email string `group:"Let's Encrypt:" help:"Contact e-mail to use with Let's Encrypt." short:"E" yaml:"email"`
-
 	// Let's Encrypt's cache directory.
-	Cache string `default:"${defaultTLSCache}" group:"Let's Encrypt:" help:"Let's Encrypt's cache directory." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
+	Cache string `group:"Let's Encrypt:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
@@ -57,10 +54,9 @@ func (t *TLS) Validate() error {
 		if t.KeyFile == "" {
 			return errors.New("missing file certificate's matching private key")
 		}
-	}
-
-	if t.Email != "" && t.Cache == "" {
-		return errors.New("cache directory is required for Let's Encrypt's certificate")
+		if t.Cache != "" {
+			return errors.New("Let's Encrypt's cannot be enabled together with default certificate set")
+		}
 	}
 
 	return nil
@@ -209,7 +205,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", site.CertFile)
 				}
-			} else if s.TLS.Email != "" && s.TLS.Cache != "" {
+			} else if s.TLS.Cache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
 			} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
 				manager := &certificateManager{
@@ -349,7 +345,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				DirectoryURL: directory,
 				HTTPClient:   client,
 			},
-			Email:                  s.TLS.Email,
+			Email:                  "",
 			ForceRSA:               false,
 			ExtraExtensions:        nil,
 			ExternalAccountBinding: nil,

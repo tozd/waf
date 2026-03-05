@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Remove `--tls.email` CLI flag. Now enable Let's Encrypt by setting `--tls.cache`.
+
 ## [0.21.0] - 2025-10-13
 
 ### Changed
@@ -61,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Change short CLI argument for development from `-d` to `-D`.
+- Change short CLI flag for development from `-d` to `-D`.
 
 ## [0.16.0] - 2024-03-19
 
@@ -194,7 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Remove `TLS.Domain` field and CLI argument.
+- Remove `TLS.Domain` field and CLI flag.
 
 ## [0.2.0] - 2023-11-24
 
