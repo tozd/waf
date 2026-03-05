@@ -17,11 +17,11 @@ test-ci: test
 
 lint:
 	golangci-lint run --output.text.colors --allow-parallel-runners --fix
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --output.text.colors --allow-parallel-runners --fix %
+	find _examples -name '*.go' -print0 | xargs -0 -I % golangci-lint run --output.text.colors --allow-parallel-runners --fix %
 
 lint-ci:
 	golangci-lint run --output.text.path=stdout --output.code-climate.path=codeclimate.json --issues-exit-code 0
-	find _examples -name '*.go' -print0 | xargs -0 -n1 -I % golangci-lint run --output.text.path=stdout --output.code-climate.path=%_codeclimate.json --issues-exit-code 0 %
+	find _examples -name '*.go' -print0 | xargs -0 -I % golangci-lint run --output.text.path=stdout --output.code-climate.path=%_codeclimate.json --issues-exit-code 0 %
 	jq -s 'add' codeclimate.json _examples/*_codeclimate.json > /tmp/codeclimate.json
 	mv /tmp/codeclimate.json codeclimate.json
 	rm -f _examples/*_codeclimate.json
