@@ -3,7 +3,7 @@ logging:
     type: json
   main:
     level: debug
-tls:
-  cache: /tmp/letsencrypt
+https:
+  letsencrypt: /tmp/letsencrypt
 domains:
   - site.test

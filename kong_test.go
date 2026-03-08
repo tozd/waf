@@ -51,14 +51,14 @@ Flags:
                         http://localhost:5173.
 
 File certificate:
-  -k, --tls.cert=PATH    Default certificate for TLS, when not using Let's
-                         Encrypt. In PEM format.
-  -K, --tls.key=PATH     Default certificate's private key, when not using Let's
-                         Encrypt. In PEM format.
+  -k, --https.cert=PATH    Default certificate for HTTPS, when not using Let's
+                           Encrypt. In PEM format.
+  -K, --https.key=PATH     Default certificate's private key, when not using
+                           Let's Encrypt. In PEM format.
 
 Let's Encrypt:
-  -C, --tls.cache=PATH    Let's Encrypt's cache directory. Set it to enable
-                          Let's Encrypt.
+  -L, --https.letsencrypt=PATH    Let's Encrypt's cache directory. Set it to
+                                  enable Let's Encrypt.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

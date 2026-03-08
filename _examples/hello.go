@@ -37,7 +37,7 @@ type App struct {
 func (a *App) Validate() error {
 	// We have to call Validate on kong-embedded structs ourselves.
 	// See: https://github.com/alecthomas/kong/issues/90
-	err := a.Server.TLS.Validate()
+	err := a.Server.HTTPS.Validate()
 	if err != nil {
 		return err //nolint:wrapcheck
 	}
@@ -73,8 +73,8 @@ func main() {
 
 		// Used for testing.
 		if os.Getenv("PEBBLE_HOST") != "" {
-			app.Server.TLS.ACMEDirectory = fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000"))
-			app.Server.TLS.ACMEDirectoryRootCAs = "../testdata/pebble.minica.pem"
+			app.Server.HTTPS.ACMEDirectory = fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000"))
+			app.Server.HTTPS.ACMEDirectoryRootCAs = "../testdata/pebble.minica.pem"
 			app.Server.Addr = ":5001"
 		}
 

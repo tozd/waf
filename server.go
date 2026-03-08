@@ -27,18 +27,18 @@ const (
 	idleTimeout       = 10 * time.Minute
 )
 
-// TLS configuration used by the server.
+// HTTPS configuration used by the server.
 //
 //nolint:lll
-type TLS struct {
-	// Default certificate for TLS, when not using Let's Encrypt.
-	CertFile string `group:"File certificate:" help:"Default certificate for TLS, when not using Let's Encrypt. In PEM format." name:"cert" placeholder:"PATH" short:"k" type:"existingfile" yaml:"cert"`
+type HTTPS struct {
+	// Default certificate for HTTPS, when not using Let's Encrypt.
+	CertFile string `group:"HTTPS:" help:"Default certificate for HTTPS, when not using Let's Encrypt. In PEM format." name:"cert" placeholder:"PATH" short:"k" type:"existingfile" yaml:"cert"`
 
 	// Default certificate's private key, when not using Let's Encrypt.
-	KeyFile string `group:"File certificate:" help:"Default certificate's private key, when not using Let's Encrypt. In PEM format." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
+	KeyFile string `group:"HTTPS:" help:"Default certificate's private key, when not using Let's Encrypt. In PEM format." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
 
 	// Let's Encrypt's cache directory.
-	Cache string `group:"Let's Encrypt:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." placeholder:"PATH" short:"C" type:"path" yaml:"cache"`
+	LetsEncryptCache string `group:"HTTPS:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." name:"letsencrypt" placeholder:"PATH" short:"L" type:"path" yaml:"letsencrypt"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
@@ -46,7 +46,7 @@ type TLS struct {
 }
 
 // Validate is used by Kong to validate the struct.
-func (t *TLS) Validate() error {
+func (t *HTTPS) Validate() error {
 	if t.CertFile != "" || t.KeyFile != "" {
 		if t.CertFile == "" {
 			return errors.New("missing file certificate for provided private key")
@@ -54,7 +54,7 @@ func (t *TLS) Validate() error {
 		if t.KeyFile == "" {
 			return errors.New("missing file certificate's matching private key")
 		}
-		if t.Cache != "" {
+		if t.LetsEncryptCache != "" {
 			return errors.New("Let's Encrypt's cannot be enabled together with default certificate set")
 		}
 	}
@@ -62,11 +62,11 @@ func (t *TLS) Validate() error {
 	return nil
 }
 
-// Server listens to HTTP/1.1 and HTTP2 requests on TLS enabled port 8080 and
+// Server listens to HTTP/1.1 and HTTP2 requests on HTTPS enabled port 8080 and
 // serves requests using the provided handler. Server is production ready and
 // can be exposed directly on open Internet.
 //
-// Certificates for TLS can be provided as files (which are daily reread to allow updating them)
+// Certificates for HTTPS can be provided as files (which are daily reread to allow updating them)
 // or can be automatically obtained (and updated) using [Let's Encrypt] (when running
 // accessible from the Internet).
 //
@@ -81,8 +81,8 @@ type Server[SiteT hasSite] struct {
 	// Base URL to proxy to in development mode.
 	ProxyTo string `default:"${defaultProxyTo}" help:"Base URL to proxy to in development mode." placeholder:"URL" short:"P" yaml:"proxyTo"`
 
-	// TLS configuration.
-	TLS TLS `embed:"" prefix:"tls." yaml:"tls"`
+	// HTTPS configuration.
+	HTTPS HTTPS `embed:"" prefix:"https." yaml:"https"`
 
 	// Exposed primarily for use in tests.
 	Addr string `json:"-" kong:"-" yaml:"-"`
@@ -98,11 +98,11 @@ type Server[SiteT hasSite] struct {
 	listenAddr *x.SyncVar[string]
 }
 
-// Init determines the set of sites based on TLS configuration and sites provided,
+// Init determines the set of sites based on HTTPS configuration and sites provided,
 // returning possibly updated and expanded set of sites.
 //
-// If sites parameter is empty, sites are determined from domain names found in TLS
-// certificates. If sites are provided and TLS certificates are not, their domains
+// If sites parameter is empty, sites are determined from domain names found in HTTPS
+// certificates. If sites are provided and HTTPS certificates are not, their domains
 // are used to obtain the necessary certificate from Let's Encrypt.
 //
 // Key in sites map must match site's domain.
@@ -205,12 +205,12 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				if err != nil {
 					return sites, errors.WithDetails(err, "certFile", site.CertFile)
 				}
-			} else if s.TLS.Cache != "" {
+			} else if s.HTTPS.LetsEncryptCache != "" {
 				letsEncryptDomainsList = append(letsEncryptDomainsList, site.Domain)
-			} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
+			} else if s.HTTPS.CertFile != "" && s.HTTPS.KeyFile != "" {
 				manager := &certificateManager{
-					CertFile:    s.TLS.CertFile,
-					KeyFile:     s.TLS.KeyFile,
+					CertFile:    s.HTTPS.CertFile,
+					KeyFile:     s.HTTPS.KeyFile,
 					Logger:      s.Logger,
 					certificate: nil,
 					mu:          sync.RWMutex{},
@@ -220,7 +220,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				err := manager.Init()
 				if err != nil {
-					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile, "domain", site.Domain)
+					return sites, errors.WithDetails(err, "certFile", s.HTTPS.CertFile, "domain", site.Domain)
 				}
 				s.managers = append(s.managers, manager)
 
@@ -228,7 +228,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 				err = manager.ValidForDomain(site.Domain)
 				if err != nil {
-					return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
+					return sites, errors.WithDetails(err, "certFile", s.HTTPS.CertFile)
 				}
 			} else {
 				err := errors.New("missing file or Let's Encrypt's certificate configuration")
@@ -260,10 +260,10 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 				return nil, nil //nolint:nilnil
 			}
 		}
-	} else if s.TLS.CertFile != "" && s.TLS.KeyFile != "" {
+	} else if s.HTTPS.CertFile != "" && s.HTTPS.KeyFile != "" {
 		manager := &certificateManager{
-			CertFile:    s.TLS.CertFile,
-			KeyFile:     s.TLS.KeyFile,
+			CertFile:    s.HTTPS.CertFile,
+			KeyFile:     s.HTTPS.KeyFile,
 			Logger:      s.Logger,
 			certificate: nil,
 			mu:          sync.RWMutex{},
@@ -273,7 +273,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 		errE := manager.Init()
 		if errE != nil {
-			return sites, errors.WithDetails(errE, "certFile", s.TLS.CertFile)
+			return sites, errors.WithDetails(errE, "certFile", s.HTTPS.CertFile)
 		}
 		s.managers = append(s.managers, manager)
 
@@ -282,13 +282,13 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		// We have to determine domain names this certificate is valid for.
 		certificate, err := manager.GetCertificate(nil)
 		if err != nil {
-			return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
+			return sites, errors.WithDetails(err, "certFile", s.HTTPS.CertFile)
 		}
 		// certificate.Leaf is nil, so we have to parse leaf ourselves.
 		// See: https://github.com/golang/go/issues/35504
 		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
 		if err != nil {
-			return sites, errors.WithDetails(err, "certFile", s.TLS.CertFile)
+			return sites, errors.WithDetails(err, "certFile", s.HTTPS.CertFile)
 		}
 
 		sites = map[string]SiteT{}
@@ -320,7 +320,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 		if len(sites) == 0 {
 			err := errors.New("certificate is not valid for any domain")
-			errors.Details(err)["certFile"] = s.TLS.CertFile
+			errors.Details(err)["certFile"] = s.HTTPS.CertFile
 			return sites, err
 		}
 	} else {
@@ -329,16 +329,16 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 	if len(letsEncryptDomainsList) > 0 {
 		directory := autocert.DefaultACMEDirectory
-		if s.TLS.ACMEDirectory != "" {
-			directory = s.TLS.ACMEDirectory
+		if s.HTTPS.ACMEDirectory != "" {
+			directory = s.HTTPS.ACMEDirectory
 		}
-		client, err := acmeClient(s.TLS.ACMEDirectoryRootCAs)
+		client, err := acmeClient(s.HTTPS.ACMEDirectoryRootCAs)
 		if err != nil {
 			return sites, err
 		}
 		manager := autocert.Manager{
 			Prompt:      autocert.AcceptTOS,
-			Cache:       autocert.DirCache(s.TLS.Cache),
+			Cache:       autocert.DirCache(s.HTTPS.LetsEncryptCache),
 			HostPolicy:  autocert.HostWhitelist(letsEncryptDomainsList...),
 			RenewBefore: 0,
 			Client: &acme.Client{ //nolint:exhaustruct

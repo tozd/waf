@@ -36,7 +36,7 @@ func TestServer(t *testing.T) {
 
 	server := &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -59,7 +59,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -76,7 +76,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -94,7 +94,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -157,7 +157,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -174,7 +174,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.Nop(),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -194,7 +194,7 @@ func TestServer(t *testing.T) {
 
 	server = &Server[*Site]{
 		Logger: zerolog.New(pipeW),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -264,7 +264,7 @@ func TestServerConnection(t *testing.T) {
 
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
-		TLS: TLS{
+		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
 		},
@@ -358,8 +358,8 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
-		TLS: TLS{
-			Cache:                tempDir,
+		HTTPS: HTTPS{
+			LetsEncryptCache:     tempDir,
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
 		},
