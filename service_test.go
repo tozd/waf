@@ -3122,6 +3122,30 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 				}, headerCleanup(t, resp.Header))
 			}
 
+			resp, err = client.Get("https://site.test/routes.json") //nolint:noctx
+			if assert.NoError(t, err) {
+				t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+				out, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.Equal(t, 2, resp.ProtoMajor)
+				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out)) //nolint:testifylint
+				assert.Equal(t, http.Header{
+					"Server-Timing": {"t;dur="},
+				}, headerCleanup(t, resp.Trailer))
+				assert.Equal(t, http.Header{
+					"Accept-Ranges":          {"bytes"},
+					"Cache-Control":          {"no-cache"},
+					"Content-Length":         {"43"},
+					"Content-Type":           {"application/json"},
+					"Date":                   {""},
+					"Etag":                   {`"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE"`},
+					"Request-Id":             {""},
+					"Vary":                   {"Accept-Encoding"},
+					"X-Content-Type-Options": {"nosniff"},
+				}, headerCleanup(t, resp.Header))
+			}
+
 			err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
 			assert.NoError(t, err) //nolint:testifylint
 
