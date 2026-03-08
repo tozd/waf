@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use a map with routes and handlers instead of inspecting the service for handlers.
+  [#11](https://gitlab.com/tozd/waf/-/issues/11)
+- Use route priority to match Vue Router 5.
+  [#13](https://gitlab.com/tozd/waf/-/issues/13)
 - Remove `--tls.email` CLI flag. Now enable Let's Encrypt by setting `--tls.cache`.
 
 ## [0.21.0] - 2025-10-13
