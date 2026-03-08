@@ -138,6 +138,11 @@ type Params map[string]string
 // has additional parameter with Params parsed from the request URL path.
 type Handler func(http.ResponseWriter, *http.Request, Params)
 
+// MarshalJSON implements json.Marshaler interface for Handler.
+func (h Handler) MarshalJSON() ([]byte, error) {
+	return []byte(`true`), nil
+}
+
 func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 	return func(w http.ResponseWriter, req *http.Request, _ Params) {
 		f(w, req)
