@@ -46,7 +46,7 @@ release:
 	npx --yes --package 'release-it@19.0.5' --package '@release-it/keep-a-changelog@7.0.0' -- release-it
 
 lint-docs:
-	npx --yes --package 'markdownlint-cli@~0.45.0' -- markdownlint --ignore-path .gitignore --ignore testdata/ --fix '**/*.md'
+	npx --yes --package 'markdownlint-cli@~0.45.0' -- markdownlint --ignore-path .gitignore --ignore testdata/ --ignore vue-router/ --fix '**/*.md'
 
 lint-docs-ci: lint-docs
 	git diff --exit-code --color=always
