@@ -176,15 +176,16 @@ func logValues(c zerolog.Context, field string, values map[string][]string) zero
 	return c.Object(field, valuesLogObjectMarshaler(values))
 }
 
-func logHandlerName(name string, h Handler) Handler {
-	if name == "" {
-		return h
+func logHandlerName(name, method string, api bool, h Handler) (Handler, string) {
+	handlerName := name + strings.Title(strings.ToLower(method)) //nolint:staticcheck
+	if api {
+		handlerName += "API"
 	}
 
 	return func(w http.ResponseWriter, req *http.Request, params Params) {
-		*canonicalLoggerMessage(req.Context()) = name
+		*canonicalLoggerMessage(req.Context()) = handlerName
 		h(w, req, params)
-	}
+	}, handlerName
 }
 
 func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {

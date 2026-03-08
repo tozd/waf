@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -78,26 +77,25 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 
 // RouteOptions describe options for the route.
 type RouteOptions struct {
+	// Handlers for the route. A map between a HTTP method and a handler.
+	Handlers map[string]Handler `json:"-"`
+
 	// Enable CORS on handler(s)?
 	CORS *CORSOptions `json:"cors,omitempty"`
 }
 
-// Route is a high-level route definition which is used by a service
-// to register handlers with the router. It can also be used by Vue Router
-// to register routes there.
+// Route is route definition which is used by a service to route to handlers
+// with the router. It can also be used by Vue Router to register routes there.
 type Route struct {
-	// Name of the route. It should be unique.
-	Name string `json:"name"`
+	// Does this route have a non-API handlers.
+	RouteOptions
 
 	// Path for the route. It can contain parameters.
 	Path string `json:"path"`
 
 	// Does this route support API handlers.
 	// API paths are automatically prefixed with /api.
-	API *RouteOptions `json:"api,omitempty"`
-
-	// Does this route have a non-API handler.
-	Get *RouteOptions `json:"get,omitempty"`
+	API RouteOptions `json:"api,omitzero"`
 }
 
 type staticFile struct {
@@ -175,7 +173,7 @@ func (s *Site) addStaticFile(path, mediaType string, data []byte) errors.E {
 
 	_, ok := s.staticFiles[compressionIdentity][path]
 	if ok {
-		errE := errors.New(`static file for path already exists`)
+		errE := errors.New("static file for path already exists")
 		errors.Details(errE)["path"] = path
 		return errE
 	}
@@ -226,12 +224,12 @@ func newSiteT[SiteT hasSite]() (SiteT, *Site) { //nolint:ireturn
 	return st, site
 }
 
-func newCORS(options *CORSOptions) *cors.Cors {
+func newCORS(options *CORSOptions) (*cors.Cors, func(http.ResponseWriter, *http.Request, Params)) {
 	if options == nil {
-		return nil
+		return nil, nil
 	}
 
-	return cors.New(cors.Options{ //nolint:exhaustruct
+	c := cors.New(cors.Options{ //nolint:exhaustruct
 		AllowedOrigins:       options.AllowedOrigins,
 		AllowedMethods:       options.GetAllowedMethods(),
 		AllowedHeaders:       options.AllowedHeaders,
@@ -244,33 +242,26 @@ func newCORS(options *CORSOptions) *cors.Cors {
 		// unless there is API OPTIONS handler which we then call instead.
 		OptionsPassthrough: true,
 	})
-}
 
-func wrapGetCORS(options *CORSOptions, h func(http.ResponseWriter, *http.Request, Params)) (
-	func(http.ResponseWriter, *http.Request, Params),
-	func(http.ResponseWriter, *http.Request, Params),
-) {
-	c := newCORS(options)
 	optionsSuccessStatus := options.OptionsSuccessStatus
 	if optionsSuccessStatus == 0 {
 		optionsSuccessStatus = http.StatusNoContent
 	}
-	return func(w http.ResponseWriter, r *http.Request, params Params) {
-			// Non-OPTIONS request.
-			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h(w, r, params)
-			})).ServeHTTP(w, r)
-		}, func(w http.ResponseWriter, r *http.Request, _ Params) {
-			// OPTIONS request.
-			c.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				// We do nothing after OPTIONS request has been handled,
-				// even if it was not a CORS OPTIONS request.
-				w.WriteHeader(optionsSuccessStatus)
-			})).ServeHTTP(w, r)
-		}
+
+	return c, func(w http.ResponseWriter, r *http.Request, _ Params) {
+		c.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// We do nothing after OPTIONS request has been handled,
+			// even if it was not a CORS OPTIONS request.
+			w.WriteHeader(optionsSuccessStatus)
+		})).ServeHTTP(w, r)
+	}
 }
 
 func wrapCORS(c *cors.Cors, h func(http.ResponseWriter, *http.Request, Params)) func(http.ResponseWriter, *http.Request, Params) {
+	if c == nil {
+		return h
+	}
+
 	return func(w http.ResponseWriter, r *http.Request, params Params) {
 		c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h(w, r, params)
@@ -322,8 +313,8 @@ type Service[SiteT hasSite] struct {
 	// with site struct as data. Other files are served as-is.
 	StaticFiles fs.ReadFileFS
 
-	// Routes to be handled by the service and mapped to its Handler methods.
-	Routes []Route
+	// Routes to be handled by the service. A map between route name and a route definition.
+	Routes map[string]Route
 
 	// Sites configured for the service. Key in the map must match site's domain.
 	// This should generally be set to sites returned from Server.Init method.
@@ -335,6 +326,9 @@ type Service[SiteT hasSite] struct {
 	// SiteContextPath is the path at which site context (JSON of site struct)
 	// should be added to static files.
 	SiteContextPath string `exhaustruct:"optional"`
+
+	// RoutesPath is the path at which routes JSON should be added to static files.
+	RoutesPath string `exhaustruct:"optional"`
 
 	// MetadataHeaderPrefix is an optional prefix to the Metadata response header.
 	MetadataHeaderPrefix string `exhaustruct:"optional"`
@@ -359,19 +353,13 @@ type Service[SiteT hasSite] struct {
 
 // RouteWith registers static files and handlers with the router based on Routes and service [Handler]
 // methods and returns a [http.Handler] to be used with the [Server].
-//
-// You should generally pass your service struct with embedded Service struct as service
-// parameter so that handler methods can be detected. Non-API handler methods should
-// have the same name as the route. While API handler methods should have the name
-// matching the route name with HTTP method name as suffix (e.g., "CommentPost" for
-// route with name "Comment" and POST HTTP method).
-func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Handler, errors.E) {
+func (s *Service[SiteT]) RouteWith(router *Router) (http.Handler, errors.E) {
 	if s.router != nil {
 		return nil, errors.New("RouteWith called more than once")
 	}
 	s.router = router
 
-	errE := s.configureRoutes(service)
+	errE := s.configureRoutes()
 	if errE != nil {
 		return nil, errE
 	}
@@ -379,6 +367,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	if s.ProxyStaticTo != "" {
 		s.Logger.Debug().Str("proxy", s.ProxyStaticTo).Msg("proxying static files")
 		errE := s.renderAndCompressSiteContext()
+		if errE != nil {
+			return nil, errE
+		}
+		errE = s.renderAndCompressRoutes()
 		if errE != nil {
 			return nil, errE
 		}
@@ -401,6 +393,10 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 			return nil, errE
 		}
 		errE = s.renderAndCompressSiteContext()
+		if errE != nil {
+			return nil, errE
+		}
+		errE = s.renderAndCompressRoutes()
 		if errE != nil {
 			return nil, errE
 		}
@@ -521,157 +517,77 @@ func (s *Service[SiteT]) RouteWith(service interface{}, router *Router) (http.Ha
 	return c.Then(s.router), nil
 }
 
-func (s *Service[SiteT]) configureRoutes(service interface{}) errors.E {
-	v := reflect.ValueOf(service)
+func (s *Service[SiteT]) registerRoutes(routeName, routePath string, api bool, options RouteOptions) errors.E {
+	c, optionsHandler := newCORS(options.CORS)
+	methods := []string{}
 
-	for _, route := range s.Routes {
-		if route.Get == nil && route.API == nil {
-			errE := errors.New(`at least one of "get" and "api" has to be set`)
-			errors.Details(errE)["route"] = route.Name
+	for method, handler := range options.Handlers {
+		handler = wrapCORS(c, handler)
+		handler, handlerName := logHandlerName(routeName, method, api, handler) //nolint:govet
+
+		errE := s.router.Handle(routeName, method, routePath, api, handler)
+		if errE != nil {
+			errors.Details(errE)["handler"] = handlerName
+			errors.Details(errE)["route"] = routeName
+			errors.Details(errE)["path"] = routePath
+			return errE
+		}
+		methods = append(methods, method)
+
+		// If no HEAD handler is defined, we reuse GET handler for it.
+		if _, ok := options.Handlers[http.MethodHead]; method == http.MethodGet && !ok {
+			errE := s.router.Handle(routeName, http.MethodHead, routePath, api, handler)
+			if errE != nil {
+				errors.Details(errE)["handler"] = handlerName
+				errors.Details(errE)["route"] = routeName
+				errors.Details(errE)["path"] = routePath
+				return errE
+			}
+			methods = append(methods, http.MethodHead)
+		}
+	}
+
+	if c != nil && len(methods) > 0 {
+		// We have CORS enabled and at least one handler. If options handler is not defined, we add it.
+		if _, ok := options.Handlers[http.MethodOptions]; !ok {
+			optionsHandler, handlerName := logHandlerName(routeName, http.MethodOptions, api, optionsHandler)
+			errE := s.router.Handle(routeName, http.MethodOptions, routePath, api, optionsHandler)
+			if errE != nil {
+				errors.Details(errE)["handler"] = handlerName
+				errors.Details(errE)["route"] = routeName
+				errors.Details(errE)["path"] = routePath
+				return errE
+			}
+		}
+
+		errE := methodsSubset(options.CORS, methods)
+		if errE != nil {
+			errors.Details(errE)["route"] = routeName
+			errors.Details(errE)["path"] = routePath
+			return errE
+		}
+	}
+
+	return nil
+}
+
+func (s *Service[SiteT]) configureRoutes() errors.E {
+	for routeName, route := range s.Routes {
+		if len(route.Handlers) == 0 && len(route.API.Handlers) == 0 {
+			errE := errors.New("at least one handler has to be set")
+			errors.Details(errE)["route"] = routeName
 			errors.Details(errE)["path"] = route.Path
 			return errE
 		}
 
-		if route.Get != nil {
-			handlerName := route.Name
-			m := v.MethodByName(handlerName)
-			if !m.IsValid() {
-				errE := errors.New("handler not found")
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["route"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-			s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: handler found")
-			// We cannot use Handler here because it is a named type.
-			h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
-			if !ok {
-				errE := errors.New("invalid handler type")
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["route"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
-				return errE
-			}
-			if route.Get.CORS != nil {
-				errE := methodsSubset(route.Get.CORS, []string{http.MethodGet, http.MethodHead})
-				if errE != nil {
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["route"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-				var optionsH func(http.ResponseWriter, *http.Request, Params)
-				h, optionsH = wrapGetCORS(route.Get.CORS, h)
-				optionsH = logHandlerName(handlerName, optionsH)
-				errE = s.router.Handle(route.Name, http.MethodOptions, route.Path, false, optionsH)
-				if errE != nil {
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["route"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-			}
-			h = logHandlerName(handlerName, h)
-			// HEAD method is already handled by the router for non-API requests.
-			errE := s.router.Handle(route.Name, http.MethodGet, route.Path, false, h)
-			if errE != nil {
-				errors.Details(errE)["handler"] = handlerName
-				errors.Details(errE)["route"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
+		errE := s.registerRoutes(routeName, route.Path, false, route.RouteOptions)
+		if errE != nil {
+			return errE
 		}
-		if route.API != nil { //nolint:nestif
-			c := newCORS(route.API.CORS)
-			foundAnyAPIHandler := false
-			foundOptionsHandler := false
-			foundMethods := []string{}
-			// MethodHead is handled by MethodGet handled.
-			for _, method := range []string{
-				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
-				http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace,
-			} {
-				handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(method))) //nolint:staticcheck
-				m := v.MethodByName(handlerName)
-				if !m.IsValid() {
-					s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: API handler not found")
-					continue
-				}
-				s.Logger.Debug().Str("handler", handlerName).Str("route", route.Name).Str("path", route.Path).Msg("route registration: API handler found")
-				foundAnyAPIHandler = true
-				// We cannot use Handler here because it is a named type.
-				h, ok := m.Interface().(func(http.ResponseWriter, *http.Request, Params))
-				if !ok {
-					errE := errors.New("invalid API handler type")
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["route"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					errors.Details(errE)["type"] = fmt.Sprintf("%T", m.Interface())
-					return errE
-				}
-				if c != nil {
-					h = wrapCORS(c, h)
-					if method == http.MethodOptions {
-						foundOptionsHandler = true
-					}
-				}
-				h = logHandlerName(handlerName, h)
-				errE := s.router.Handle(route.Name, method, route.Path, true, h)
-				if errE != nil {
-					errors.Details(errE)["handler"] = handlerName
-					errors.Details(errE)["route"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-				foundMethods = append(foundMethods, method)
-				if method == http.MethodGet {
-					errE := s.router.Handle(route.Name, http.MethodHead, route.Path, true, h)
-					if errE != nil {
-						errors.Details(errE)["handler"] = handlerName
-						errors.Details(errE)["route"] = route.Name
-						errors.Details(errE)["path"] = route.Path
-						return errE
-					}
-					foundMethods = append(foundMethods, http.MethodHead)
-				}
-			}
-			if !foundAnyAPIHandler {
-				errE := errors.New("no API handler found")
-				errors.Details(errE)["route"] = route.Name
-				errors.Details(errE)["path"] = route.Path
-				return errE
-			}
-			if c != nil {
-				if !foundOptionsHandler {
-					handlerName := fmt.Sprintf("%s%s", route.Name, strings.Title(strings.ToLower(http.MethodOptions))) //nolint:staticcheck
-					optionsSuccessStatus := route.API.CORS.OptionsSuccessStatus
-					if optionsSuccessStatus == 0 {
-						optionsSuccessStatus = http.StatusNoContent
-					}
-					h := func(w http.ResponseWriter, r *http.Request, _ Params) {
-						c.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-							// We do nothing after OPTIONS request has been handled,
-							// even if it was not a CORS OPTIONS request.
-							w.WriteHeader(optionsSuccessStatus)
-						})).ServeHTTP(w, r)
-					}
-					h = logHandlerName(handlerName, h)
-					errE := s.router.Handle(route.Name, http.MethodOptions, route.Path, true, h)
-					if errE != nil {
-						errors.Details(errE)["handler"] = handlerName
-						errors.Details(errE)["route"] = route.Name
-						errors.Details(errE)["path"] = route.Path
-						return errE
-					}
-				}
-				errE := methodsSubset(route.API.CORS, foundMethods)
-				if errE != nil {
-					errors.Details(errE)["route"] = route.Name
-					errors.Details(errE)["path"] = route.Path
-					return errE
-				}
-			}
+
+		errE = s.registerRoutes(routeName, route.Path, true, route.API)
+		if errE != nil {
+			return errE
 		}
 	}
 
@@ -808,6 +724,37 @@ func (s *Service[SiteT]) renderAndCompressSiteContext() errors.E {
 	return nil
 }
 
+func (s *Service[SiteT]) renderAndCompressRoutes() errors.E {
+	if s.RoutesPath == "" {
+		return nil
+	}
+
+	data, errE := x.MarshalWithoutEscapeHTML(s.Routes)
+	if errE != nil {
+		return errE
+	}
+
+	for _, siteT := range s.Sites {
+		site := siteT.GetSite()
+
+		// In development, this method could be called first and static files are not yet
+		// initialized (as requests for other static files are proxied), while in production
+		// static files has already been initialized and populated.
+		if site.staticFiles == nil {
+			site.initializeStaticFiles()
+		}
+
+		errE = site.addStaticFile(s.RoutesPath, "application/json", data)
+		if errE != nil {
+			return errE
+		}
+	}
+
+	s.Logger.Debug().Str("path", s.RoutesPath).Msg("added file to static files")
+
+	return nil
+}
+
 func (s *Service[SiteT]) makeReverseProxy() errors.E {
 	if s.reverseProxy != nil {
 		return errors.New("makeReverseProxy called more than once")
@@ -853,8 +800,8 @@ func (s *Service[SiteT]) makeReverseProxy() errors.E {
 }
 
 func (s *Service[SiteT]) serveStaticFiles() errors.E {
-	staticH := logHandlerName("StaticFile", toHandler(s.staticFile))
-	immutableH := logHandlerName("ImmutableFile", toHandler(s.immutableFile))
+	staticH, staticName := logHandlerName("StaticFile", http.MethodGet, false, toHandler(s.staticFile))
+	immutableH, immutableName := logHandlerName("ImmutableFile", http.MethodGet, false, toHandler(s.immutableFile))
 
 	for _, siteT := range s.Sites {
 		site := siteT.GetSite()
@@ -865,9 +812,11 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 				continue
 			}
 
+			isImmutable := s.IsImmutableFile != nil && s.IsImmutableFile(path)
+
 			var n string
 			var h Handler
-			if s.IsImmutableFile != nil && s.IsImmutableFile(path) {
+			if isImmutable {
 				n = "ImmutableFile:" + path
 				h = immutableH
 			} else {
@@ -875,9 +824,19 @@ func (s *Service[SiteT]) serveStaticFiles() errors.E {
 				h = staticH
 			}
 
-			err := s.router.Handle(n, http.MethodGet, path, false, h)
-			if err != nil {
-				return errors.WithDetails(err, "path", path)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				errE := s.router.Handle(n, method, path, false, h)
+				if errE != nil {
+					if isImmutable {
+						errors.Details(errE)["handler"] = immutableName
+						errors.Details(errE)["route"] = "ImmutableFile"
+					} else {
+						errors.Details(errE)["handler"] = staticName
+						errors.Details(errE)["route"] = "StaticFile"
+					}
+					errors.Details(errE)["path"] = path
+					return errE
+				}
 			}
 		}
 

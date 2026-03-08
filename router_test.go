@@ -303,7 +303,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "non-API GET handler already exists",
+			expectedError: "non-API handler already exists",
 		},
 		{
 			description: "Adding duplicate non-API OPTIONS routes",
@@ -321,7 +321,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "non-API OPTIONS handler already exists",
+			expectedError: "non-API handler already exists",
 		},
 		{
 			description: "Allow non-API GET and OPTIONS routes",
@@ -369,7 +369,7 @@ func TestRouterHandle(t *testing.T) {
 					api:       false,
 				},
 			},
-			expectedError: "non-API handler must use GET or OPTIONS HTTP method",
+			expectedError: "",
 		},
 		{
 			description: "Adding a handler with an invalid path",
@@ -625,7 +625,7 @@ func TestRouterReverse(t *testing.T) {
 			inputAPI:      false,
 			encodeQuery:   nil,
 			expectedPath:  "",
-			expectedError: "route has no GET or OPTIONS handler",
+			expectedError: "route has no non-API handlers",
 		},
 		{
 			description: "Path with custom query string",
@@ -856,7 +856,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
-			expectedAllowHeader:  "GET, HEAD",
+			expectedAllowHeader:  "GET",
 			expectPanic:          "",
 		},
 		{
@@ -907,7 +907,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			request:              httptest.NewRequest(http.MethodPost, "/users/123/posts", nil),
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedResponseBody: "Method Not Allowed\n",
-			expectedAllowHeader:  "GET, HEAD",
+			expectedAllowHeader:  "GET",
 			expectPanic:          "",
 		},
 		{
@@ -1020,7 +1020,7 @@ func TestRouterGet(t *testing.T) {
 	_, errE = r.Get("/foobar/123", http.MethodPost)
 	var e *MethodNotAllowedError
 	assert.ErrorAs(t, errE, &e)
-	assert.Equal(t, []string{http.MethodGet, http.MethodHead}, e.Allow)
+	assert.Equal(t, []string{http.MethodGet}, e.Allow)
 	_, errE = r.Get("/none", http.MethodGet)
 	assert.ErrorIs(t, errE, ErrNotFound)
 	route, errE := r.Get("/foobar/123", http.MethodGet)
