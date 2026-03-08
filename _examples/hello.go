@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net"
@@ -21,9 +20,6 @@ import (
 
 	"gitlab.com/tozd/waf"
 )
-
-//go:embed routes.json
-var routesConfiguration []byte
 
 //go:embed files
 var files embed.FS
@@ -73,15 +69,6 @@ func main() {
 		"defaultProxyTo":      "http://localhost:5173",
 		"developmentModeHelp": " Proxy unknown requests.",
 	}, func(_ *kong.Context) errors.E {
-		// Routes come from a single source of truth, e.g., a file.
-		var routesConfig struct {
-			Routes []waf.Route `json:"routes"`
-		}
-		err := json.Unmarshal(routesConfiguration, &routesConfig)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
 		app.Server.Logger = app.Logger
 
 		// Used for testing.
@@ -126,9 +113,10 @@ func main() {
 				CanonicalLogger: app.Logger,
 				WithContext:     app.WithContext,
 				StaticFiles:     f.(fs.ReadFileFS), //nolint:errcheck
-				Routes:          routesConfig.Routes,
+				Routes:          nil,
 				Sites:           sites,
 				SiteContextPath: "/context.json",
+				RoutesPath:      "/routes.json",
 				ProxyStaticTo:   app.Server.ProxyToInDevelopment(),
 				SkipServingFile: func(path string) bool {
 					// We want the file to be served by Home route at / and not be
@@ -138,8 +126,21 @@ func main() {
 			},
 		}
 
+		service.Routes = map[string]waf.Route{
+			"Home": {
+				RouteOptions: waf.RouteOptions{
+					Handlers: map[string]waf.Handler{
+						http.MethodGet: service.Home,
+					},
+					CORS: nil,
+				},
+				Path: "/",
+				API:  waf.RouteOptions{},
+			},
+		}
+
 		// Construct the main handler for the service using the router.
-		handler, errE := service.RouteWith(service, &waf.Router{})
+		handler, errE := service.RouteWith(&waf.Router{})
 		if errE != nil {
 			return errE
 		}
