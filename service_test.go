@@ -711,7 +711,7 @@ func TestService(t *testing.T) {
 			},
 			"",
 			http.StatusNotFound,
-			[]byte(`Not Found.`),
+			[]byte(`Not Found` + "\n"),
 			`{"level":"warn","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/index.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":},"message":"NotFound"}` + "\n",
 			http.Header{
 				"Extra":                  {"1234"},
