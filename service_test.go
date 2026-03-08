@@ -255,6 +255,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 				},
 			},
 			SiteContextPath:      "/index.json",
+			RoutesPath:           "/routes.json",
 			MetadataHeaderPrefix: "Test-",
 			ProxyStaticTo:        proxyStaticTo,
 			IsImmutableFile: func(path string) bool {
@@ -596,6 +597,7 @@ func TestServiceReverse(t *testing.T) {
 {"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for static file"}
 {"level":"debug","path":"/semicompressible.foobar","message":"added file to static files"}
 {"level":"debug","path":"/index.json","message":"added file to static files"}
+{"level":"debug","path":"/routes.json","message":"added file to static files"}
 `, out.String())
 }
 
@@ -681,6 +683,54 @@ func TestService(t *testing.T) {
 				req := newRequest(t, http.MethodGet, "https://example.com/data.txt", nil)
 				req.Header.Set("Referer", "https://example.com/")
 				return req
+			},
+			"",
+			http.StatusOK,
+			[]byte(`test data`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","referer":"https://example.com/","connection":"","request":"","proto":"2.0","host":"example.com","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","code":200,"responseBody":9,"requestBody":0,"metrics":{"t":},"message":"StaticFileGet"}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"9"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/context.json", nil)
+			},
+			"",
+			http.StatusOK,
+			[]byte(`test data`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","referer":"https://example.com/","connection":"","request":"","proto":"2.0","host":"example.com","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","code":200,"responseBody":9,"requestBody":0,"metrics":{"t":},"message":"StaticFileGet"}` + "\n",
+			http.Header{
+				"Extra":                  {"1234"},
+				"Accept-Ranges":          {"bytes"},
+				"Cache-Control":          {"no-cache"},
+				"Content-Length":         {"9"},
+				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Date":                   {""},
+				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
+				"Request-Id":             {""},
+				"Vary":                   {"Accept-Encoding"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			http.Header{
+				"Server-Timing": {"t;dur="},
+			},
+		},
+		{
+			func() *http.Request {
+				return newRequest(t, http.MethodGet, "https://example.com/routes.json", nil)
 			},
 			"",
 			http.StatusOK,
