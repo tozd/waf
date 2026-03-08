@@ -56,9 +56,9 @@ HTTPS:
                                   Let's Encrypt. In PEM format.
   -K, --https.key=PATH            Default certificate's private key, when not
                                   using Let's Encrypt. In PEM format.
-  -L, --https.letsencrypt=PATH    Let's Encrypt's cache directory. Set it to
+  -C, --https.letsencrypt=PATH    Let's Encrypt's cache directory. Set it to
                                   enable Let's Encrypt.
-  -l, --https.listen=HOST:PORT    TCP address for the HTTPS server to listen on.
+  -L, --https.listen=HOST:PORT    TCP address for the HTTPS server to listen on.
                                   Default: :8080.
 
 Sites:

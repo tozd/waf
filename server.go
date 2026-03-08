@@ -37,10 +37,10 @@ type HTTPS struct {
 	KeyFile string `group:"HTTPS:" help:"Default certificate's private key, when not using Let's Encrypt. In PEM format." name:"key" placeholder:"PATH" short:"K" type:"existingfile" yaml:"key"`
 
 	// Let's Encrypt's cache directory.
-	LetsEncryptCache string `group:"HTTPS:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." name:"letsencrypt" placeholder:"PATH" short:"L" type:"path" yaml:"letsencrypt"`
+	LetsEncryptCache string `group:"HTTPS:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." name:"letsencrypt" placeholder:"PATH" short:"C" type:"path" yaml:"letsencrypt"`
 
 	// Listen on which TCP address.
-	Listen string `default:"${defaultListen}" group:"HTTPS:" help:"TCP address for the HTTPS server to listen on." placeholder:"HOST:PORT" short:"l" yaml:"listen"`
+	Listen string `default:"${defaultListen}" group:"HTTPS:" help:"TCP address for the HTTPS server to listen on." placeholder:"HOST:PORT" short:"L" yaml:"listen"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
