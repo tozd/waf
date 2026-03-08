@@ -3129,17 +3129,17 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 				require.NoError(t, err)
 				assert.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, 2, resp.ProtoMajor)
-				assert.Equal(t, `{"domain":"site.test","title":"Hello site"}`, string(out)) //nolint:testifylint
+				assert.Equal(t, `{"Home":{"handlers":{"GET":true},"path":"/"}}`, string(out)) //nolint:testifylint
 				assert.Equal(t, http.Header{
 					"Server-Timing": {"t;dur="},
 				}, headerCleanup(t, resp.Trailer))
 				assert.Equal(t, http.Header{
 					"Accept-Ranges":          {"bytes"},
 					"Cache-Control":          {"no-cache"},
-					"Content-Length":         {"43"},
+					"Content-Length":         {"45"},
 					"Content-Type":           {"application/json"},
 					"Date":                   {""},
-					"Etag":                   {`"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE"`},
+					"Etag":                   {`"KwxdKPyvPn9rzrPLFSPvokRhvVPm7S943P493VlISaU"`},
 					"Request-Id":             {""},
 					"Vary":                   {"Accept-Encoding"},
 					"X-Content-Type-Options": {"nosniff"},
@@ -3162,14 +3162,14 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			}
 
 			//nolint:testifylint
-			assert.Equal(t, `{"level":"debug","handler":"Home","route":"Home","path":"/","time":"","message":"route registration: handler found"}
-{"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
+			assert.Equal(t, `{"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
 {"level":"debug","path":"/context.json","time":"","message":"added file to static files"}
 {"level":"debug","path":"/routes.json","time":"","message":"added file to static files"}
 {"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":"","message":"HomeGet"}
 {"level":"info","method":"GET","path":"/context.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":"","message":"StaticFileGet"}
+{"level":"info","method":"GET","path":"/routes.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"KwxdKPyvPn9rzrPLFSPvokRhvVPm7S943P493VlISaU","code":200,"responseBody":45,"requestBody":0,"metrics":{"t":},"time":"","message":"StaticFileGet"}
 {"level":"info","time":"","message":"server stopping"}
 `, logCleanup(t, true, output.String()))
 		})
