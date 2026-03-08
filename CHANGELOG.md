@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename `--tls.*` CLI flags to `--https.*`.
   Rename `--tls.cache` CLI flag to `--https.letsencrypt`.
   Remove `--tls.email` CLI flag. Now enable Let's Encrypt by setting `--https.letsencrypt`.
+- Support setting listen address for HTTPS server using `--https.listen`.
+  [#9](https://gitlab.com/tozd/waf/-/issues/9)
 
 ## [0.21.0] - 2025-10-13
 

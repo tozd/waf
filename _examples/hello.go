@@ -66,6 +66,7 @@ func main() {
 	// We use Kong to populate App struct with config (based on CLI arguments or a config file).
 	var app App
 	cli.Run(&app, kong.Vars{
+		"defaultListen":       ":8080",
 		"defaultProxyTo":      "http://localhost:5173",
 		"developmentModeHelp": " Proxy unknown requests.",
 	}, func(_ *kong.Context) errors.E {
@@ -75,7 +76,7 @@ func main() {
 		if os.Getenv("PEBBLE_HOST") != "" {
 			app.Server.HTTPS.ACMEDirectory = fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000"))
 			app.Server.HTTPS.ACMEDirectoryRootCAs = "../testdata/pebble.minica.pem"
-			app.Server.Addr = ":5001"
+			app.Server.HTTPS.Listen = ":5001"
 		}
 
 		sites := map[string]*Site{}

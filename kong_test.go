@@ -31,6 +31,7 @@ func TestKong(t *testing.T) {
 			buf,
 		),
 		kong.Vars{
+			"defaultListen":       ":8080",
 			"defaultProxyTo":      "http://localhost:5173",
 			"defaultTitle":        "test",
 			"developmentModeHelp": " Proxy unknown requests.",
@@ -50,15 +51,15 @@ Flags:
   -P, --proxy-to=URL    Base URL to proxy to in development mode. Default:
                         http://localhost:5173.
 
-File certificate:
-  -k, --https.cert=PATH    Default certificate for HTTPS, when not using Let's
-                           Encrypt. In PEM format.
-  -K, --https.key=PATH     Default certificate's private key, when not using
-                           Let's Encrypt. In PEM format.
-
-Let's Encrypt:
+HTTPS:
+  -k, --https.cert=PATH           Default certificate for HTTPS, when not using
+                                  Let's Encrypt. In PEM format.
+  -K, --https.key=PATH            Default certificate's private key, when not
+                                  using Let's Encrypt. In PEM format.
   -L, --https.letsencrypt=PATH    Let's Encrypt's cache directory. Set it to
                                   enable Let's Encrypt.
+  -l, --https.listen=HOST:PORT    TCP address for the HTTPS server to listen on.
+                                  Default: :8080.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

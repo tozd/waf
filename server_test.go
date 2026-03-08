@@ -197,9 +197,9 @@ func TestServer(t *testing.T) {
 		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
+			// We bind the server to any localhost port.
+			Listen: "localhost:0",
 		},
-		// We bind the server to any localhost port.
-		Addr: "localhost:0",
 	}
 	sites, errE = server.Init(nil)
 	require.NoError(t, errE, "% -+#.1v", errE)
@@ -359,12 +359,12 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	server := &Server[*Site]{
 		Logger: zerolog.New(zerolog.NewTestWriter(t)),
 		HTTPS: HTTPS{
-			LetsEncryptCache:     tempDir,
+			LetsEncryptCache: tempDir,
+			// Pebble uses this port by default for the TLS-ALPN-01 challenge.
+			Listen:               ":5001",
 			ACMEDirectory:        fmt.Sprintf("https://%s/dir", net.JoinHostPort(os.Getenv("PEBBLE_HOST"), "14000")),
 			ACMEDirectoryRootCAs: "testdata/pebble.minica.pem",
 		},
-		// Pebble uses this port by default for the TLS-ALPN-01 challenge.
-		Addr: ":5001",
 	}
 	sites, errE := server.Init(map[string]*Site{
 		"site.test": {Domain: "site.test"},

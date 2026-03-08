@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	defaultListenAddr = ":8080"
 	readHeaderTimeout = 10 * time.Second
 	idleTimeout       = 10 * time.Minute
 )
@@ -39,6 +38,9 @@ type HTTPS struct {
 
 	// Let's Encrypt's cache directory.
 	LetsEncryptCache string `group:"HTTPS:" help:"Let's Encrypt's cache directory. Set it to enable Let's Encrypt." name:"letsencrypt" placeholder:"PATH" short:"L" type:"path" yaml:"letsencrypt"`
+
+	// Listen on which TCP address.
+	Listen string `default:"${defaultListen}" group:"HTTPS:" help:"TCP address for the HTTPS server to listen on." placeholder:"HOST:PORT" short:"l" yaml:"listen"`
 
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
@@ -85,9 +87,6 @@ type Server[SiteT hasSite] struct {
 	HTTPS HTTPS `embed:"" prefix:"https." yaml:"https"`
 
 	// Exposed primarily for use in tests.
-	Addr string `json:"-" kong:"-" yaml:"-"`
-
-	// Exposed primarily for use in tests.
 	HTTPServer *http.Server `json:"-" kong:"-" yaml:"-"`
 
 	// Autocert managers do not have to be stopped, but certificate managers do.
@@ -107,10 +106,6 @@ type Server[SiteT hasSite] struct {
 //
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
-	if s.Addr == "" {
-		s.Addr = defaultListenAddr
-	}
-
 	// TODO: How to shutdown websocket connections?
 
 	// TODO: Add limits on max idle time and min speed for writing the whole response.
@@ -119,7 +114,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	//       See: https://github.com/golang/go/issues/21389
 	//       See: https://github.com/golang/go/issues/59602
 	server := &http.Server{ //nolint:exhaustruct
-		Addr:                         s.Addr,
+		Addr:                         s.HTTPS.Listen,
 		Handler:                      nil,
 		DisableGeneralOptionsHandler: false,
 		TLSConfig: &tls.Config{ //nolint:exhaustruct
