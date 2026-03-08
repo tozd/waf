@@ -1007,6 +1007,75 @@ func TestRouterServeHTTP(t *testing.T) {
 	}
 }
 
+func TestRouterMatchPriority(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		description string
+		// routes are registered in this order; sorting must place them correctly.
+		routes  []string
+		request string
+		want    string
+	}{
+		{
+			description: "static wins over param (registered in reverse priority order)",
+			routes:      []string{"/:w", "/a"},
+			request:     "/a",
+			want:        "/a",
+		},
+		{
+			description: "param acts as fallback when static does not match",
+			routes:      []string{"/:w", "/a"},
+			request:     "/b",
+			want:        "/:w",
+		},
+		{
+			description: "fully static multi-segment wins over param variant",
+			routes:      []string{"/a/:b", "/a/b"},
+			request:     "/a/b",
+			want:        "/a/b",
+		},
+		{
+			description: "param multi-segment acts as fallback",
+			routes:      []string{"/a/:b", "/a/b"},
+			request:     "/a/c",
+			want:        "/a/:b",
+		},
+		{
+			description: "longer static path wins over shorter static path",
+			routes:      []string{"/a/:b/c", "/a/b/c"},
+			request:     "/a/b/c",
+			want:        "/a/b/c",
+		},
+		{
+			description: "three-way: static beats mixed beats all-param",
+			routes:      []string{"/:x/:y", "/a/:y", "/a/b"},
+			request:     "/a/b",
+			want:        "/a/b",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			t.Parallel()
+
+			r := &Router{}
+			for _, route := range tt.routes {
+				errE := r.Handle(route, http.MethodGet, route, false, func(http.ResponseWriter, *http.Request, Params) {})
+				require.NoError(t, errE, "% -+#.1v", errE)
+			}
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tt.request, nil))
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			resolved, errE := r.Get(tt.request, http.MethodGet)
+			require.NoError(t, errE, "% -+#.1v", errE)
+			assert.Equal(t, tt.want, resolved.Name)
+		})
+	}
+}
+
 func TestRouterGet(t *testing.T) {
 	t.Parallel()
 

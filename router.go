@@ -107,6 +107,7 @@ type matcher struct {
 	Regexp    *regexp.Regexp
 	GetParams func([]string) Params
 	Route     *route
+	Score     [][]float64
 }
 
 type route struct {
@@ -209,19 +210,19 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 	}
 	ro, ok := r.routes[name]
 	if !ok {
-		segments, err := parsePath(path)
-		if err != nil {
-			err = errors.WithMessage(err, "parsing path failed")
-			errors.Details(err)["path"] = path
-			errors.Details(err)["route"] = name
-			return err
+		segments, errE := parsePath(path)
+		if errE != nil {
+			errE = errors.WithMessage(errE, "parsing path failed")
+			errors.Details(errE)["path"] = path
+			errors.Details(errE)["route"] = name
+			return errE
 		}
-		re, get, err := compileRegexp(segments)
-		if err != nil {
-			err = errors.WithMessage(err, "compiling regexp failed")
-			errors.Details(err)["path"] = path
-			errors.Details(err)["route"] = name
-			return err
+		re, get, errE := compileRegexp(segments)
+		if errE != nil {
+			errE = errors.WithMessage(errE, "compiling regexp failed")
+			errors.Details(errE)["path"] = path
+			errors.Details(errE)["route"] = name
+			return errE
 		}
 		parameters := mapset.NewThreadUnsafeSet[string]()
 		for _, segment := range segments {
@@ -247,11 +248,24 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 			r.routes = make(map[string]*route)
 		}
 		r.routes[name] = ro
-		r.matchers = append(r.matchers, matcher{
+		score, errE := scoreFromPath(path)
+		if errE != nil {
+			errE = errors.WithMessage(errE, "computing path score failed")
+			errors.Details(errE)["path"] = path
+			errors.Details(errE)["route"] = name
+			return errE
+		}
+		m := matcher{
 			Regexp:    re,
 			GetParams: get,
 			Route:     ro,
+			Score:     score,
+		}
+		// Insert in sorted order (highest priority first) to match Vue Router's route matching.
+		insertAt := sort.Search(len(r.matchers), func(i int) bool {
+			return comparePathParserScore(r.matchers[i].Score, score) > 0
 		})
+		r.matchers = slices.Insert(r.matchers, insertAt, m)
 	}
 
 	if ro.Path != path {
