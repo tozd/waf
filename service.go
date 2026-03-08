@@ -136,10 +136,14 @@ type Site struct {
 func (s *Site) Validate() error {
 	if s.CertFile != "" || s.KeyFile != "" {
 		if s.CertFile == "" {
-			return errors.Errorf(`missing file certificate for provided private key for site "%s"`, s.Domain)
+			errE := errors.New("missing file certificate for provided private key")
+			errors.Details(errE)["domain"] = s.Domain
+			return errE
 		}
 		if s.KeyFile == "" {
-			return errors.Errorf(`missing file certificate's matching private key for site "%s"`, s.Domain)
+			errE := errors.New("missing file certificate's matching private key")
+			errors.Details(errE)["domain"] = s.Domain
+			return errE
 		}
 	}
 
