@@ -706,7 +706,7 @@ func TestService(t *testing.T) {
 		},
 		{
 			func() *http.Request {
-				return newRequest(t, http.MethodGet, "https://example.com/context.json", nil)
+				return newRequest(t, http.MethodGet, "https://example.com/index.json", nil)
 			},
 			"",
 			http.StatusOK,
@@ -734,16 +734,16 @@ func TestService(t *testing.T) {
 			},
 			"",
 			http.StatusOK,
-			[]byte(`test data`),
-			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/data.txt","client":"127.0.0.1","agent":"Go-http-client/2.0","referer":"https://example.com/","connection":"","request":"","proto":"2.0","host":"example.com","etag":"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk","code":200,"responseBody":9,"requestBody":0,"metrics":{"t":},"message":"StaticFileGet"}` + "\n",
+			[]byte(`{"CORS":{"handles":{"GET":true},"path":"/cors","api":{"handlers":{"GET":true,"OPTIONS":true,"PATCH":true,"POST":true}}},"CORSNoOptions":{"path":"/corsNoOptions","api":{"handlers":{"PATCH":true}}},"Helper":{"handlers":{"GET":true},"path":"/helper/:name"},"Home":{"handlers":{"GET":true},"path":"/","api":{"handlers":{"GET":true}}},"JSON":{"path":"/json","api":{"handlers":{"GET":true,"POST":true}}},"Large":{"path":"/large","api":{"handlers":{"GET":true}}},"NonCompressibleJSON":{"path":"/noncompressible","api":{"handlers":{"GET":true}}},"Panic":{"path":"/panic","api":{"handlers":{"GET":true}}}}`),
+			`{"level":"info","build":{"r":"abcde","t":"2023-11-03T00:51:07Z","v":"vTEST"},"method":"GET","path":"/routes.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"example.com","etag":"pEuoU9BluxFx_mYFLBTHI2R5iGSE5OvaTZPDdSeIP30","code":200,"responseBody":597,"requestBody":0,"metrics":{"t":},"message":"StaticFileGet"}` + "\n",
 			http.Header{
 				"Extra":                  {"1234"},
 				"Accept-Ranges":          {"bytes"},
 				"Cache-Control":          {"no-cache"},
-				"Content-Length":         {"9"},
-				"Content-Type":           {"text/plain; charset=utf-8"},
+				"Content-Length":         {"597"},
+				"Content-Type":           {"application/json"},
 				"Date":                   {""},
-				"Etag":                   {`"kW8AJ6V1B0znKjMXd8NHjWUT94alkb2JLaGld78jNfk"`},
+				"Etag":                   {`"pEuoU9BluxFx_mYFLBTHI2R5iGSE5OvaTZPDdSeIP30"`},
 				"Request-Id":             {""},
 				"Vary":                   {"Accept-Encoding"},
 				"X-Content-Type-Options": {"nosniff"},
