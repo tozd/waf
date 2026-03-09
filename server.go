@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"slices"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -42,6 +45,9 @@ type HTTPS struct {
 	// Listen on which TCP address.
 	Listen string `default:"${defaultListen}" group:"HTTPS:" help:"TCP address for the HTTPS server to listen on." placeholder:"HOST:PORT" short:"L" yaml:"listen"`
 
+	// External port can be different.
+	ExternalPort int `group:"HTTPS:" help:"Port on which HTTPS server is accessible when it is different from the port on which the HTTPS server listens." placeholder:"INT" yaml:"externalPort"`
+
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
 	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
@@ -62,6 +68,12 @@ func (t *HTTPS) Validate() error {
 	}
 
 	return nil
+}
+
+// HTTP configuration used by the server.
+type HTTP struct {
+	// Listen on which TCP address.
+	Listen string `group:"HTTP:" help:"TCP address for the HTTP server to listen on. Setting it enables HTTP redirect to HTTPS." placeholder:"HOST:PORT" yaml:"listen"`
 }
 
 // Server listens to HTTP/1.1 and HTTP2 requests on HTTPS enabled port 8080 and
@@ -86,15 +98,20 @@ type Server[SiteT hasSite] struct {
 	// HTTPS configuration.
 	HTTPS HTTPS `embed:"" prefix:"https." yaml:"https"`
 
+	// HTTP configuration.
+	HTTP HTTP `embed:"" prefix:"http." yaml:"http"`
+
 	// Exposed primarily for use in tests.
-	HTTPServer *http.Server `json:"-" kong:"-" yaml:"-"`
+	HTTPSServer *http.Server `json:"-" kong:"-" yaml:"-"`
+	HTTPServer  *http.Server `json:"-" kong:"-" yaml:"-"`
 
 	// Autocert managers do not have to be stopped, but certificate managers do.
 	managers []*certificateManager
 
 	domains []string
 
-	listenAddr *x.SyncVar[string]
+	listenAddrHTTPS *x.SyncVar[string]
+	listenAddrHTTP  *x.SyncVar[string]
 }
 
 // Init determines the set of sites based on HTTPS configuration and sites provided,
@@ -113,7 +130,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	//       See: https://github.com/golang/go/issues/16100
 	//       See: https://github.com/golang/go/issues/21389
 	//       See: https://github.com/golang/go/issues/59602
-	server := &http.Server{ //nolint:exhaustruct
+	httpsServer := &http.Server{ //nolint:exhaustruct
 		Addr:                         s.HTTPS.Listen,
 		Handler:                      nil,
 		DisableGeneralOptionsHandler: false,
@@ -142,7 +159,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		MaxHeaderBytes:    0,
 		ErrorLog:          log.New(s.Logger, "", 0),
 		BaseContext: func(l net.Listener) context.Context {
-			errE := s.listenAddr.Store(l.Addr().String())
+			errE := s.listenAddrHTTPS.Store(l.Addr().String())
 			if errE != nil {
 				panic(errE)
 			}
@@ -351,7 +368,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	}
 
 	if fileGetCertificate != nil && letsEncryptGetCertificate != nil {
-		server.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		httpsServer.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			c, err := fileGetCertificate(hello)
 			if err != nil {
 				return c, err
@@ -361,22 +378,55 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 			return letsEncryptGetCertificate(hello)
 		}
-		server.TLSConfig.NextProtos = nextProtos
+		httpsServer.TLSConfig.NextProtos = nextProtos
 	} else if fileGetCertificate != nil {
-		server.TLSConfig.GetCertificate = fileGetCertificate
+		httpsServer.TLSConfig.GetCertificate = fileGetCertificate
 	} else if letsEncryptGetCertificate != nil {
-		server.TLSConfig.GetCertificate = letsEncryptGetCertificate
-		server.TLSConfig.NextProtos = nextProtos
+		httpsServer.TLSConfig.GetCertificate = letsEncryptGetCertificate
+		httpsServer.TLSConfig.NextProtos = nextProtos
 	} else {
 		panic(errors.New("not possible"))
 	}
 
-	s.HTTPServer = server
+	s.HTTPSServer = httpsServer
 
 	sort.Strings(domains)
 	s.domains = domains
 
-	s.listenAddr = x.NewSyncVar[string]()
+	s.listenAddrHTTPS = x.NewSyncVar[string]()
+	s.listenAddrHTTP = x.NewSyncVar[string]()
+
+	if s.HTTP.Listen != "" {
+		// TODO: Add limits on max idle time and min speed for writing the whole response.
+		//       If a limit is reached, context should be canceled.
+		//       See: https://github.com/golang/go/issues/16100
+		//       See: https://github.com/golang/go/issues/21389
+		//       See: https://github.com/golang/go/issues/59602
+		s.HTTPServer = &http.Server{ //nolint:exhaustruct
+			Addr:                         s.HTTP.Listen,
+			Handler:                      http.HandlerFunc(s.httpRedirectHandler),
+			DisableGeneralOptionsHandler: false,
+			TLSConfig:                    nil,
+			ReadTimeout:                  0,
+			ReadHeaderTimeout:            readHeaderTimeout,
+			WriteTimeout:                 0,
+			IdleTimeout:                  idleTimeout,
+			MaxHeaderBytes:               0,
+			ErrorLog:                     log.New(s.Logger, "", 0),
+			BaseContext: func(l net.Listener) context.Context {
+				errE := s.listenAddrHTTP.Store(l.Addr().String())
+				if errE != nil {
+					panic(errE)
+				}
+				return context.Background()
+			},
+			ConnContext: nil,
+		}
+	} else {
+		s.HTTPServer = nil
+		// This cannot error.
+		_ = s.listenAddrHTTP.Store("")
+	}
 
 	return sites, nil
 }
@@ -395,14 +445,14 @@ func (s *Server[SiteT]) ProxyToInDevelopment() string {
 //
 // It returns only on error or if the server is gracefully shut down
 // when the context is canceled.
-func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E {
-	if s.HTTPServer == nil {
+func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) errors.E {
+	if s.HTTPSServer == nil {
 		return errors.New("server not configured")
 	}
-	if s.HTTPServer.Handler != nil {
+	if s.HTTPSServer.Handler != nil {
 		return errors.New("run already called")
 	}
-	s.HTTPServer.Handler = handler
+	s.HTTPSServer.Handler = httpsHandler
 
 	for _, manager := range s.managers {
 		err := manager.Start()
@@ -419,13 +469,13 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 	g.Go(func() error {
 		c, cancel := context.WithCancel(errCtx)
 		go func() {
-			addr, err := s.listenAddr.LoadContext(c)
+			addr, err := s.listenAddrHTTPS.LoadContext(c)
 			if err != nil {
 				// Context is cancelled, we just return.
 				return
 			}
 
-			s.Logger.Info().Str("listenAddr", addr).Strs("domains", s.domains).Msg("server starting")
+			s.Logger.Info().Str("listenAddr", addr).Strs("domains", s.domains).Msg("HTTPS server starting")
 		}()
 
 		// If ListenAndServeTLS returns we return from this goroutine and cancel
@@ -434,9 +484,9 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 
 		// We make sure we store something to unblock everyone waiting on the address.
 		// This might return an error if the value is already stored, but we ignore it.
-		defer s.listenAddr.Store("") //nolint:errcheck
+		defer s.listenAddrHTTPS.Store("") //nolint:errcheck
 
-		err := s.HTTPServer.ListenAndServeTLS("", "")
+		err := s.HTTPSServer.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return errors.WithStack(err)
 		}
@@ -454,12 +504,59 @@ func (s *Server[SiteT]) Run(ctx context.Context, handler http.Handler) errors.E 
 			return nil
 		}
 
-		s.Logger.Info().Msg("server stopping")
+		s.Logger.Info().Msg("HTTPS server stopping")
 
 		// We wait indefinitely for the server to shut down cleanly.
 		// The whole process will be killed anyway if we wait too long.
-		return errors.WithStack(s.HTTPServer.Shutdown(context.Background())) //nolint:contextcheck
+		return errors.WithStack(s.HTTPSServer.Shutdown(context.Background())) //nolint:contextcheck
 	})
+
+	if s.HTTPServer != nil {
+		g.Go(func() error {
+			c, cancel := context.WithCancel(errCtx)
+			go func() {
+				addr, err := s.listenAddrHTTP.LoadContext(c)
+				if err != nil {
+					// Context is cancelled, we just return.
+					return
+				}
+
+				s.Logger.Info().Str("listenAddr", addr).Strs("domains", s.domains).Msg("HTTP server starting")
+			}()
+
+			// If ListenAndServe returns we return from this goroutine and cancel
+			// the context which in turn gets the goroutine above to exit.
+			defer cancel()
+
+			// We make sure we store something to unblock everyone waiting on the address.
+			// This might return an error if the value is already stored, but we ignore it.
+			defer s.listenAddrHTTP.Store("") //nolint:errcheck
+
+			err := s.HTTPServer.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return errors.WithStack(err)
+			}
+
+			return nil
+		})
+
+		g.Go(func() error {
+			<-errCtx.Done()
+
+			// Parent context was not canceled (is nil) or the error is different,
+			// which both means the server's goroutine exited with an error.
+			// We do not have to do anything.
+			if ctx.Err() != errCtx.Err() { //nolint:errorlint,err113
+				return nil
+			}
+
+			s.Logger.Info().Msg("HTTP server stopping")
+
+			// We wait indefinitely for the server to shut down cleanly.
+			// The whole process will be killed anyway if we wait too long.
+			return errors.WithStack(s.HTTPServer.Shutdown(context.Background())) //nolint:contextcheck
+		})
+	}
 
 	return errors.WithStack(g.Wait())
 }
@@ -468,11 +565,72 @@ func (s *Server[SiteT]) connContext(ctx context.Context, _ net.Conn) context.Con
 	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
 }
 
-// ListenAddr returns the address on which the server is listening.
+// ListenAddrHTTPS returns the address on which the HTTPS server is listening.
 //
 // Available only after the server runs. It blocks until the server runs
 // if called before. If server fails to start before the address is obtained,
 // it unblocks and returns an empty string.
-func (s *Server[SiteT]) ListenAddr() string {
-	return s.listenAddr.Load()
+func (s *Server[SiteT]) ListenAddrHTTPS() string {
+	return s.listenAddrHTTPS.Load()
+}
+
+// ListenAddrHTTP returns the address on which the HTTP server is listening.
+//
+// Available only after the server runs. It blocks until the server runs
+// if called before. If server fails to start before the address is obtained,
+// it unblocks and returns an empty string. If HTTP server is not enabled,
+// it returns an empty string.
+func (s *Server[SiteT]) ListenAddrHTTP() string {
+	return s.listenAddrHTTP.Load()
+}
+
+func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Body != nil {
+		io.Copy(io.Discard, req.Body) //nolint:errcheck,gosec
+		req.Body.Close()              //nolint:errcheck,gosec
+	}
+
+	host, errE := getHost(req.Host)
+	if errE != nil || !slices.Contains(s.domains, host) {
+		Error(w, req, http.StatusNotFound)
+		return
+	}
+
+	externalPort := strconv.Itoa(s.HTTPS.ExternalPort)
+
+	// If port is not explicitly provided.
+	if externalPort == "0" {
+		_, port, err := net.SplitHostPort(s.HTTPS.Listen)
+		if err != nil {
+			Error(w, req, http.StatusInternalServerError)
+			return
+		} else if port == "" {
+			Error(w, req, http.StatusInternalServerError)
+			return
+		}
+		externalPort = port
+	}
+
+	// If port is not known in advance.
+	if externalPort == "0" {
+		_, port, err := net.SplitHostPort(s.ListenAddrHTTPS())
+		if err != nil {
+			Error(w, req, http.StatusInternalServerError)
+			return
+		} else if port == "" {
+			Error(w, req, http.StatusInternalServerError)
+			return
+		}
+		externalPort = port
+	}
+
+	if externalPort != "443" {
+		host = net.JoinHostPort(host, externalPort)
+	}
+
+	req.URL.Scheme = "https"
+	req.URL.Host = host
+
+	w.Header().Set("Cache-Control", "max-age=31536000")
+	http.Redirect(w, req, req.URL.String(), http.StatusPermanentRedirect)
 }

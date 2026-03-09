@@ -52,14 +52,21 @@ Flags:
                         http://localhost:5173.
 
 HTTPS:
-  -k, --https.cert=PATH           Default certificate for HTTPS, when not using
-                                  Let's Encrypt. In PEM format.
-  -K, --https.key=PATH            Default certificate's private key, when not
-                                  using Let's Encrypt. In PEM format.
-  -C, --https.letsencrypt=PATH    Let's Encrypt's cache directory. Set it to
-                                  enable Let's Encrypt.
-  -L, --https.listen=HOST:PORT    TCP address for the HTTPS server to listen on.
-                                  Default: :8080.
+  -k, --https.cert=PATH            Default certificate for HTTPS, when not using
+                                   Let's Encrypt. In PEM format.
+  -K, --https.key=PATH             Default certificate's private key, when not
+                                   using Let's Encrypt. In PEM format.
+  -C, --https.letsencrypt=PATH     Let's Encrypt's cache directory. Set it to
+                                   enable Let's Encrypt.
+  -L, --https.listen=HOST:PORT     TCP address for the HTTPS server to listen
+                                   on. Default: :8080.
+      --https.external-port=INT    Port on which HTTPS server is accessible when
+                                   it is different from the port on which the
+                                   HTTPS server listens.
+
+HTTP:
+  --http.listen=HOST:PORT    TCP address for the HTTP server to listen on.
+                             Setting it enables HTTP redirect to HTTPS.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

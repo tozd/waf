@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"gitlab.com/tozd/go/errors"
+	"golang.org/x/net/idna"
 )
 
 const (
@@ -349,15 +350,21 @@ func computeEtag(data ...[]byte) string {
 	return `"` + base64.RawURLEncoding.EncodeToString(hash.Sum(nil)) + `"`
 }
 
-// Same as in zerolog/hlog/hlog.go.
-func getHost(hostPort string) string {
+// Based on zerolog/hlog/hlog.go, but with idna.ToUnicode.
+func getHost(hostPort string) (string, errors.E) {
 	if hostPort == "" {
-		return ""
+		return "", nil
 	}
 
 	host, _, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		return hostPort
+		host = hostPort
 	}
-	return host
+	unicodeHost, err := idna.ToUnicode(host)
+	if err != nil {
+		errE := errors.WithStack(err)
+		errors.Details(errE)["host"] = host
+		return "", errE
+	}
+	return unicodeHost, nil
 }

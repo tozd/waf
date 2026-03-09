@@ -197,7 +197,11 @@ func TestServer(t *testing.T) {
 		HTTPS: HTTPS{
 			CertFile: certPath,
 			KeyFile:  keyPath,
-			// We bind the server to any localhost port.
+			// We bind the HTTPS server to any localhost port.
+			Listen: "localhost:0",
+		},
+		HTTP: HTTP{
+			// We bind the HTTP server to any localhost port.
 			Listen: "localhost:0",
 		},
 	}
@@ -223,10 +227,63 @@ func TestServer(t *testing.T) {
 	})
 
 	// We wait for the server to start.
-	assert.NotEmpty(t, server.ListenAddr())
+	assert.NotEmpty(t, server.ListenAddrHTTPS())
+	assert.NotEmpty(t, server.ListenAddrHTTP())
 
 	// For "server starting" to be logged.
 	time.Sleep(time.Second)
+
+	_, httpsPort, err := net.SplitHostPort(server.ListenAddrHTTPS())
+	require.NoError(t, err)
+	_, httpPort, err := net.SplitHostPort(server.ListenAddrHTTP())
+	require.NoError(t, err)
+
+	transport := cleanhttp.DefaultTransport()
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// We map everything to localhost.
+		_, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		addr = "localhost:" + port
+		return (&net.Dialer{}).DialContext(ctx, network, addr)
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+		// We do not follow redirects automatically.
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	for _, tt := range []struct {
+		From string
+		To   string
+	}{{
+		From: "http://example.com:" + httpPort + "/test.html",
+		To:   "https://example.com:" + httpsPort + "/test.html",
+	}, {
+		From: "http://localhost:" + httpPort + "/test.html",
+		To:   "https://localhost:" + httpsPort + "/test.html",
+	}} {
+		resp, err := httpClient.Get(tt.From) //nolint:noctx
+		require.NoError(t, err)
+		t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusPermanentRedirect, resp.StatusCode)
+		assert.Equal(t, 1, resp.ProtoMajor)
+		assert.Equal(t, tt.To, resp.Header.Get("Location"))
+	}
+
+	// It redirects only for domains we have configured.
+	resp, err := httpClient.Get("http://something.com:" + httpPort) //nolint:noctx
+	require.NoError(t, err)
+	t.Cleanup(func() { resp.Body.Close() }) //nolint:errcheck,gosec
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.Equal(t, 1, resp.ProtoMajor)
 
 	cancel()
 
@@ -238,11 +295,18 @@ func TestServer(t *testing.T) {
 	pipeR.Close() //nolint:errcheck,gosec
 	require.NoError(t, err)
 
-	assert.Equal(
+	// Order of log lines is not deterministic.
+	assert.ElementsMatch(
 		t,
-		`{"level":"info","listenAddr":"`+server.ListenAddr()+`","domains":["example.com","localhost"],"message":"server starting"}`+"\n"+
-			`{"level":"info","message":"server stopping"}`+"\n",
-		string(out),
+		[]string{
+			`{"level":"info","listenAddr":"` + server.ListenAddrHTTP() + `","domains":["example.com","localhost"],"message":"HTTP server starting"}`,
+			`{"level":"info","listenAddr":"` + server.ListenAddrHTTPS() + `","domains":["example.com","localhost"],"message":"HTTPS server starting"}`,
+			`{"level":"info","message":"HTTP server stopping"}`,
+			`{"level":"info","message":"HTTPS server stopping"}`,
+			// There is one extra empty string because we use strings.Split to split.
+			``,
+		},
+		strings.Split(string(out), "\n"),
 	)
 }
 
@@ -285,14 +349,14 @@ func TestServerConnection(t *testing.T) {
 	ts.EnableHTTP2 = true
 	t.Cleanup(ts.Close)
 
-	ts.Config = server.HTTPServer
+	ts.Config = server.HTTPSServer
 	ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := r.Context().Value(connectionIDContextKey).(identifier.Identifier)
 		assert.True(t, ok)
 		_, _ = w.Write([]byte("test"))
 		w.WriteHeader(http.StatusOK)
 	})
-	ts.TLS = server.HTTPServer.TLSConfig.Clone()
+	ts.TLS = server.HTTPSServer.TLSConfig.Clone()
 	// We have to call GetCertificate ourselves.
 	// See: https://github.com/golang/go/issues/63812
 	cert, err := ts.TLS.GetCertificate(&tls.ClientHelloInfo{
@@ -376,8 +440,8 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 
 	assert.Empty(t, server.ProxyToInDevelopment())
 
-	getCertificate := server.HTTPServer.TLSConfig.GetCertificate
-	server.HTTPServer.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	getCertificate := server.HTTPSServer.TLSConfig.GetCertificate
+	server.HTTPSServer.TLSConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 		t.Logf("clientHelloInfo: %+v", hello)
 		return getCertificate(hello)
 	}
@@ -395,14 +459,14 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	})
 
 	// We wait for the server to start.
-	require.NotEmpty(t, server.ListenAddr())
-	t.Logf("ListenAddress: %s", server.ListenAddr())
+	require.NotEmpty(t, server.ListenAddrHTTPS())
+	t.Logf("ListenAddress: %s", server.ListenAddrHTTPS())
 
 	transport := cleanhttp.DefaultTransport()
 	transport.ForceAttemptHTTP2 = true
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if addr == "site.test:443" {
-			addr = server.ListenAddr()
+			addr = server.ListenAddrHTTPS()
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}

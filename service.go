@@ -997,7 +997,10 @@ func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, dat
 }
 
 func (s *Service[SiteT]) site(req *http.Request) (SiteT, errors.E) { //nolint:ireturn
-	host := getHost(req.Host)
+	host, errE := getHost(req.Host)
+	if errE != nil {
+		return *new(SiteT), errE
+	}
 	if host != "" {
 		if site, ok := s.Sites[host]; ok {
 			return site, nil

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Same as in zerolog/hlog/hlog_test.go.
+// Based on zerolog/hlog/hlog_test.go, but with a punycode test case.
 func TestGetHost(t *testing.T) {
 	t.Parallel()
 
@@ -25,13 +25,15 @@ func TestGetHost(t *testing.T) {
 		{"192.168.0.1:8080", "192.168.0.1"},
 		{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
 		{"こんにちは.com:8080", "こんにちは.com"},
+		{"xn--28j2a3ar1p.com:8000", "こんにちは.com"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			result := getHost(tt.input)
+			result, errE := getHost(tt.input)
+			require.NoError(t, errE, "% -+#.1v", errE)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
