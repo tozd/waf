@@ -1100,3 +1100,10 @@ func TestRouterGet(t *testing.T) {
 	route.Handler(nil, nil, nil)
 	assert.True(t, hRan)
 }
+
+func TestMethodNotAllowedError(t *testing.T) {
+	t.Parallel()
+
+	e := &MethodNotAllowedError{Allow: []string{http.MethodGet, http.MethodPost}}
+	assert.Equal(t, "method not allowed", e.Error())
+}

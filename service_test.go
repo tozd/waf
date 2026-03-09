@@ -465,6 +465,239 @@ func headerCleanup(t *testing.T, header http.Header) http.Header {
 	return header
 }
 
+func TestServeStaticFileErrors(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	// "no etag" error: inject a static file with empty Etag.
+	t.Run("no etag", func(t *testing.T) {
+		t.Parallel()
+		site := &testSite{Site: Site{Domain: "example.com"}}
+		site.initializeStaticFiles()
+		site.staticFiles[compressionIdentity]["/noetag.txt"] = staticFile{
+			Data:      []byte("content"),
+			Etag:      "",
+			MediaType: "text/plain",
+		}
+		r := httptest.NewRequest(http.MethodGet, "/noetag.txt", nil)
+		r = r.WithContext(context.WithValue(r.Context(), siteContextKey, site))
+		w := httptest.NewRecorder()
+		h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			s.ServeStaticFile(w, req, "/noetag.txt")
+		}))
+		h.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	// "no content type" error: inject a static file with empty MediaType.
+	t.Run("no content type", func(t *testing.T) {
+		t.Parallel()
+		site := &testSite{Site: Site{Domain: "example.com"}}
+		site.initializeStaticFiles()
+		site.staticFiles[compressionIdentity]["/nomtype.txt"] = staticFile{
+			Data:      []byte("content"),
+			Etag:      `"abc"`,
+			MediaType: "",
+		}
+		r := httptest.NewRequest(http.MethodGet, "/nomtype.txt", nil)
+		r = r.WithContext(context.WithValue(r.Context(), siteContextKey, site))
+		w := httptest.NewRecorder()
+		h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			s.ServeStaticFile(w, req, "/nomtype.txt")
+		}))
+		h.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+}
+
+func TestServeStaticFileMissing(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+	site := &testSite{Site: Site{Domain: "example.com"}}
+	site.initializeStaticFiles()
+
+	r := httptest.NewRequest(http.MethodGet, "/missing.txt", nil)
+	r = r.WithContext(context.WithValue(r.Context(), siteContextKey, site))
+	w := httptest.NewRecorder()
+	h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		s.ServeStaticFile(w, req, "/missing.txt")
+	}))
+	h.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestServeStaticFileImmutable(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{
+		router:          new(Router),
+		IsImmutableFile: func(_ string) bool { return true },
+	}}
+	site := &testSite{Site: Site{Domain: "example.com"}}
+	site.initializeStaticFiles()
+	// Large enough data (>1024 bytes) so compression is attempted.
+	errE := site.addStaticFile("/asset.js", "application/javascript", bytes.Repeat([]byte("x"), 1100))
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	r := httptest.NewRequest(http.MethodGet, "/asset.js", nil)
+	r = r.WithContext(context.WithValue(r.Context(), siteContextKey, site))
+	w := httptest.NewRecorder()
+	h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		s.ServeStaticFile(w, req, "/asset.js")
+	}))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Contains(t, res.Header.Get("Cache-Control"), "immutable")
+}
+
+func TestHandlePanic(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	// Panic with a string value — covers the case string: branch.
+	t.Run("string", func(t *testing.T) {
+		t.Parallel()
+		w := httptest.NewRecorder()
+		h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			s.handlePanic(w, req, "string panic message")
+		}))
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	// Panic with a non-error, non-string type — covers the c.Interface("panic", ...) branch.
+	// Inject a real (non-disabled) logger so UpdateContext actually invokes the closure.
+	t.Run("unknown type", func(t *testing.T) {
+		t.Parallel()
+		logger := zerolog.New(io.Discard)
+		ctx := logger.WithContext(context.Background())
+		req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+		w := httptest.NewRecorder()
+		h := setCanonicalLogger(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			s.handlePanic(w, req, 42)
+		}))
+		h.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+}
+
+func TestGetAllowedMethodsWithHEAD(t *testing.T) {
+	t.Parallel()
+
+	// HEAD explicitly in AllowedMethods — covers hasHead = true branch.
+	opts := &CORSOptions{AllowedMethods: []string{http.MethodHead, http.MethodPost}}
+	methods := opts.GetAllowedMethods()
+	assert.Contains(t, methods, http.MethodHead)
+	assert.Contains(t, methods, http.MethodPost)
+	// HEAD was explicit, so it should not be added again.
+	count := 0
+	for _, m := range methods {
+		if m == http.MethodHead {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count)
+}
+
+func TestAddMetadataNoContext(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	// Plain request without metadataContextKey — covers the ok=false path.
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	b, errE := s.AddMetadata(w, r, map[string]interface{}{"key": 42})
+	require.NoError(t, errE, "% -+#.1v", errE)
+	assert.NotNil(t, b)
+	assert.NotEmpty(t, w.Header().Get("Metadata"))
+}
+
+func TestRegisterRoutesErrors(t *testing.T) {
+	t.Parallel()
+
+	// HEAD auto-generation fails when HEAD is already registered.
+	t.Run("HEAD conflict", func(t *testing.T) {
+		t.Parallel()
+
+		s := &testService{Service: Service[*testSite]{router: &Router{}}}
+		errE := s.router.Handle("TestRoute", http.MethodHead, "/test", false, func(_ http.ResponseWriter, _ *http.Request, _ Params) {})
+		require.NoError(t, errE, "% -+#.1v", errE)
+		errE = s.registerRoutes("TestRoute", "/test", false, RouteOptions{
+			Handlers: map[string]Handler{
+				http.MethodGet: func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
+			},
+		})
+		assert.Error(t, errE)
+	})
+
+	// OPTIONS auto-generation fails when OPTIONS is already registered.
+	t.Run("OPTIONS conflict", func(t *testing.T) {
+		t.Parallel()
+
+		s := &testService{Service: Service[*testSite]{router: &Router{}}}
+		errE := s.router.Handle("TestRoute2", http.MethodOptions, "/test2", false, func(_ http.ResponseWriter, _ *http.Request, _ Params) {})
+		require.NoError(t, errE, "% -+#.1v", errE)
+		errE = s.registerRoutes("TestRoute2", "/test2", false, RouteOptions{
+			Handlers: map[string]Handler{
+				http.MethodGet: func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
+			},
+			CORS: &CORSOptions{},
+		})
+		assert.Error(t, errE)
+	})
+}
+
+func TestAddMetadataEncodeError(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	// Invalid key causes encodeMetadata to fail.
+	_, errE := s.AddMetadata(w, r, map[string]interface{}{"1invalid": 42})
+	assert.EqualError(t, errE, "unsupported dictionary key")
+}
+
+func TestRenderErrors(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{}
+
+	// Invalid template syntax returns a parse error.
+	_, errE := s.render("/test.html", []byte("{{invalid"), &testSite{})
+	assert.Error(t, errE)
+
+	// Template accessing non-existent nested field returns an execute error.
+	_, errE = s.render("/test.html", []byte("{{.NonExistentField.Sub}}"), &testSite{})
+	assert.Error(t, errE)
+}
+
+func TestWriteJSONMarshalError(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	w := httptest.NewRecorder()
+	// metricsMiddleware sets up the metrics context that WriteJSON requires.
+	// setCanonicalLogger sets up the canonical logger for error logging.
+	h := metricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Channels cannot be marshaled to JSON — PrepareJSON returns nil.
+		s.WriteJSON(w, req, make(chan int), nil)
+	}))
+	h = setCanonicalLogger(h)
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+}
+
 func TestRouteWith(t *testing.T) {
 	t.Parallel()
 
@@ -533,6 +766,21 @@ func TestServiceConfigureRoutes(t *testing.T) {
 				},
 			},
 			`CORS allowed methods contain methods without handlers`,
+		},
+		{
+			// Invalid path (no leading "/") causes router.Handle to fail.
+			map[string]Route{
+				"BadPath": {
+					Path: "invalid-no-slash",
+					RouteOptions: RouteOptions{
+						Handlers: map[string]Handler{
+							http.MethodGet: func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
+						},
+					},
+					API: RouteOptions{},
+				},
+			},
+			`parsing path failed: path does not start with "/"`,
 		},
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/hlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/tozd/go/errors"
 	"gitlab.com/tozd/identifier"
 )
 
@@ -386,6 +387,31 @@ func TestParseForm(t *testing.T) {
 	}
 }
 
+func TestParseFormEncodeQuery(t *testing.T) {
+	t.Parallel()
+
+	w := httptest.NewRecorder()
+	r := &Router{
+		EncodeQuery: func(qs url.Values) string {
+			return "custom=" + qs.Get("key1")
+		},
+	}
+	s := Service[*Site]{router: r}
+	req := httptest.NewRequest(http.MethodGet, "/example?key1=value1", nil)
+	h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	h = setCanonicalLogger(h)
+	h = hlog.NewHandler(zerolog.New(zerolog.NewTestWriter(t)))(h)
+	h.ServeHTTP(w, req)
+	res := w.Result()
+	t.Cleanup(func() {
+		res.Body.Close() //nolint:errcheck,gosec
+	})
+	assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+	assert.Equal(t, "/example?custom=value1", res.Header.Get("Location"))
+}
+
 func TestParseFormRedirect(t *testing.T) {
 	t.Parallel()
 
@@ -661,4 +687,152 @@ func TestMetricsMiddleware(t *testing.T) {
 	assert.Empty(t, header)
 	trailer := res.Trailer.Get(serverTimingHeader)
 	assert.Equal(t, `dc;dur=,duration;dur=,trailer;dur=`, headerCleanupRegexp.ReplaceAllString(trailer, ""))
+}
+
+func TestMustRequestIDPanic(t *testing.T) {
+	t.Parallel()
+
+	assert.Panics(t, func() {
+		MustRequestID(context.Background())
+	})
+}
+
+func TestMustGetSitePanic(t *testing.T) {
+	t.Parallel()
+
+	assert.Panics(t, func() {
+		MustGetSite[*Site](context.Background())
+	})
+}
+
+func TestMustGetMetricsPanic(t *testing.T) {
+	t.Parallel()
+
+	assert.Panics(t, func() {
+		MustGetMetrics(context.Background())
+	})
+}
+
+func TestNotFoundWithErrorContext(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{router: new(Router)}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	w := httptest.NewRecorder()
+	s.NotFoundWithError(w, r, errors.WithStack(context.Canceled))
+	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+
+	w = httptest.NewRecorder()
+	s.NotFoundWithError(w, r, errors.WithStack(context.DeadlineExceeded))
+	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+}
+
+func TestBadRequestWithErrorContext(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{router: new(Router)}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	w := httptest.NewRecorder()
+	s.BadRequestWithError(w, r, errors.WithStack(context.Canceled))
+	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+
+	w = httptest.NewRecorder()
+	s.BadRequestWithError(w, r, errors.WithStack(context.DeadlineExceeded))
+	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+}
+
+func TestTemporaryRedirectGetMethod(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/original", nil)
+	s.TemporaryRedirectGetMethod(w, r, "/new-location")
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, http.StatusSeeOther, res.StatusCode)
+	assert.Equal(t, "/new-location", res.Header.Get("Location"))
+}
+
+func TestRequestIDHandlerNotModified(t *testing.T) {
+	t.Parallel()
+
+	// 304 response: ID header should NOT be set (not-modified branch).
+	w := httptest.NewRecorder()
+	r := &http.Request{}
+	h := requestIDHandler("request", "Request-Id")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotModified)
+	}))
+	h = setCanonicalLogger(h)
+	h = hlog.NewHandler(zerolog.New(zerolog.Nop()))(h)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, http.StatusNotModified, res.StatusCode)
+	assert.Empty(t, res.Header.Get("Request-Id"))
+}
+
+func TestRequestIDHandlerWriteWithoutWriteHeader(t *testing.T) {
+	t.Parallel()
+
+	// Handler calls Write without WriteHeader first — triggers the Write hook.
+	w := httptest.NewRecorder()
+	r := &http.Request{}
+	h := requestIDHandler("request", "Request-Id")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("hello"))
+	}))
+	h = setCanonicalLogger(h)
+	h = hlog.NewHandler(zerolog.New(zerolog.Nop()))(h)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.NotEmpty(t, res.Header.Get("Request-Id"))
+}
+
+func TestAddNosniffHeaderDefer(t *testing.T) {
+	t.Parallel()
+
+	// Handler does nothing — the defer sets the header.
+	h := addNosniffHeader(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+}
+
+func TestAddNosniffHeaderWrite(t *testing.T) {
+	t.Parallel()
+
+	// Handler calls Write without WriteHeader — triggers the Write hook.
+	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("hello"))
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+}
+
+func TestServiceGetRoute(t *testing.T) {
+	t.Parallel()
+
+	s := Service[*Site]{
+		router: new(Router),
+	}
+	errE := s.router.Handle("TestRoute", http.MethodGet, "/test/:id", false, func(_ http.ResponseWriter, _ *http.Request, _ Params) {})
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	route, errE := s.GetRoute("/test/123", http.MethodGet)
+	require.NoError(t, errE, "% -+#.1v", errE)
+	assert.Equal(t, "TestRoute", route.Name)
+
+	_, errE = s.GetRoute("/notfound", http.MethodGet)
+	assert.ErrorIs(t, errE, ErrNotFound)
 }

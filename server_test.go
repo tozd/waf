@@ -494,3 +494,68 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 	err = g.Wait()
 	require.NoError(t, err, "% -+#.1v", err)
 }
+
+func TestHTTPRedirectHandler(t *testing.T) {
+	t.Parallel()
+
+	// Host not in domains (with body) → 404 and body drained.
+	t.Run("unknown host", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{domains: []string{"example.com"}}
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("body"))
+		r.Host = "unknown.com"
+		s.httpRedirectHandler(w, r)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	// ExternalPort=443: redirects without port in URL.
+	t.Run("port 443", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{
+			domains: []string{"example.com"},
+			HTTPS:   HTTPS{ExternalPort: 443},
+		}
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+		r.Host = "example.com"
+		s.httpRedirectHandler(w, r)
+		res := w.Result()
+		t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+		assert.Equal(t, http.StatusPermanentRedirect, res.StatusCode)
+		assert.Equal(t, "https://example.com/path", res.Header.Get("Location"))
+	})
+
+	// ExternalPort=0, Listen has no port → internal server error.
+	t.Run("listen no port", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{
+			domains: []string{"example.com"},
+			HTTPS:   HTTPS{Listen: "example.com"},
+		}
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/path", nil)
+		r.Host = "example.com"
+		s.httpRedirectHandler(w, r)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	// ExternalPort=0, Listen has empty port → internal server error.
+	t.Run("listen empty port", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{
+			domains: []string{"example.com"},
+			HTTPS:   HTTPS{Listen: "example.com:"},
+		}
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/path", nil)
+		r.Host = "example.com"
+		s.httpRedirectHandler(w, r)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+}
+

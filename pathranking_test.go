@@ -332,3 +332,89 @@ func TestPathRankingOrder(t *testing.T) {
 		})
 	})
 }
+
+func TestCompareScoreArrayEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	const staticSegment = pathScoreStatic + pathScoreSegment // 80.
+
+	// a is shorter, elements match up to a's length, and a[0]==staticSegment → return -1.
+	assert.Equal(t, float64(-1), compareScoreArray(
+		[]float64{staticSegment},
+		[]float64{staticSegment, 40},
+	))
+
+	// b is shorter and b[0]==staticSegment → return 1.
+	assert.Equal(t, float64(1), compareScoreArray(
+		[]float64{staticSegment, 40},
+		[]float64{staticSegment},
+	))
+}
+
+func TestComparePathParserScoreEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// When a is longer than b (diff < 0 → abs(diff)).
+	a := [][]float64{{80}, {40}}
+	b := [][]float64{{80}}
+	result := comparePathParserScore(a, b)
+	// a has 2 segments vs b's 1, diff=1-2=-1, abs=1, check isLastScoreNegative
+	assert.NotEqual(t, float64(0), result) // just verify it runs
+
+	// isLastScoreNegative(a) true: a has a negative last score with diff==1.
+	aNeg := [][]float64{{40}, {pathScoreBonusWildcard}}
+	bShort := [][]float64{{40}}
+	result2 := comparePathParserScore(aNeg, bShort)
+	assert.Equal(t, float64(1), result2) // a has negative last → lower priority
+}
+
+func TestScoreFromPathError(t *testing.T) {
+	t.Parallel()
+
+	// Path without a leading slash triggers tokenizePath error.
+	_, errE := scoreFromPath("no-leading-slash")
+	assert.EqualError(t, errE, "route path should start with a slash")
+}
+
+func TestTokenizePathErrors(t *testing.T) {
+	t.Parallel()
+
+	// Path without leading slash.
+	_, errE := tokenizePath("no-slash")
+	assert.EqualError(t, errE, "route path should start with a slash")
+}
+
+func TestTokenizePathEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// Param char followed by non-validParam, non-modifier: re-processes char in Static state.
+	tokens, errE := tokenizePath("/:a/b")
+	require.NoError(t, errE, "% -+#.1v", errE)
+	assert.NotNil(t, tokens)
+}
+
+func TestTokenizePathSpecialCases(t *testing.T) {
+	t.Parallel()
+
+	// Escape sequence in static segment (backslash before "/").
+	tokens, errE := tokenizePath("/a\\/b")
+	require.NoError(t, errE, "% -+#.1v", errE)
+	assert.NotNil(t, tokens)
+
+	// Escaped ")" inside a regexp — the ")" is part of the regexp, not the closing delimiter.
+	tokens, errE = tokenizePath("/:id(a\\)b)")
+	require.NoError(t, errE, "% -+#.1v", errE)
+	assert.NotNil(t, tokens)
+
+	// Unclosed regexp — "unfinished custom regexp for param".
+	_, errE = tokenizePath("/:id(\\d")
+	assert.EqualError(t, errE, "unfinished custom regexp for param")
+
+	// Path ending with backslash — "invalid tokenizer state".
+	_, errE = tokenizePath("/foo\\")
+	assert.EqualError(t, errE, "invalid tokenizer state")
+
+	// Repeatable param must be alone in its segment (segment already has other tokens).
+	_, errE = tokenizePath("/:a-:b+")
+	assert.EqualError(t, errE, "repeatable param must be alone in its segment")
+}

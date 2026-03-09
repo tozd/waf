@@ -281,6 +281,41 @@ func TestEncodeMetadataItem(t *testing.T) {
 			value: struct{}{},
 			err:   "unsupported data type",
 		},
+		{
+			name:     "Int8Value",
+			value:    int8(42),
+			expected: "42",
+		},
+		{
+			name:     "Int16Value",
+			value:    int16(42),
+			expected: "42",
+		},
+		{
+			name:     "Int32Value",
+			value:    int32(42),
+			expected: "42",
+		},
+		{
+			name:     "Uint8Value",
+			value:    uint8(42),
+			expected: "42",
+		},
+		{
+			name:     "Uint16Value",
+			value:    uint16(42),
+			expected: "42",
+		},
+		{
+			name:     "Uint32Value",
+			value:    uint32(42),
+			expected: "42",
+		},
+		{
+			name:     "Float32Value",
+			value:    float32(3.14),
+			expected: "3.14",
+		},
 	}
 
 	for _, tt := range tests {
@@ -318,6 +353,11 @@ func TestEncodeMetadataInnerList(t *testing.T) {
 			value:    []interface{}{},
 			expected: `()`,
 			err:      "",
+		},
+		{
+			name:  "ListWithUnsupportedItem",
+			value: []interface{}{struct{}{}},
+			err:   "unsupported data type",
 		},
 	}
 
@@ -362,6 +402,12 @@ func TestEncodeMetadata(t *testing.T) {
 			metadata: map[string]interface{}{"key1": struct{}{}},
 			expected: "",
 			err:      "unsupported data type",
+		},
+		{
+			name:     "InvalidKey",
+			metadata: map[string]interface{}{"1invalid": 42},
+			expected: "",
+			err:      "unsupported dictionary key",
 		},
 	}
 

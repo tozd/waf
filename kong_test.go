@@ -95,3 +95,64 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, "desc", site.Description)
 	assert.Equal(t, "example.com", site.Domain)
 }
+
+func TestHTTPSValidate(t *testing.T) {
+	t.Parallel()
+
+	// No cert or key — valid.
+	h := HTTPS{}
+	assert.NoError(t, h.Validate())
+
+	// Only key file — missing cert error.
+	h = HTTPS{KeyFile: "key.pem"}
+	assert.EqualError(t, h.Validate(), "missing file certificate for provided private key")
+
+	// Only cert file — missing key error.
+	h = HTTPS{CertFile: "cert.pem"}
+	assert.EqualError(t, h.Validate(), "missing file certificate's matching private key")
+
+	// Both cert and key — valid.
+	h = HTTPS{CertFile: "cert.pem", KeyFile: "key.pem"}
+	assert.NoError(t, h.Validate())
+
+	// Both cert/key plus Let's Encrypt — conflict error.
+	h = HTTPS{CertFile: "cert.pem", KeyFile: "key.pem", LetsEncryptCache: "/cache"}
+	assert.EqualError(t, h.Validate(), "Let's Encrypt's cannot be enabled together with default certificate set")
+}
+
+func TestSiteValidate(t *testing.T) {
+	t.Parallel()
+
+	// No cert or key — valid.
+	s := Site{Domain: "example.com"}
+	assert.NoError(t, s.Validate())
+
+	// Only key file — missing cert error.
+	s = Site{Domain: "example.com", KeyFile: "key.pem"}
+	assert.EqualError(t, s.Validate(), "missing file certificate for provided private key")
+
+	// Only cert file — missing key error.
+	s = Site{Domain: "example.com", CertFile: "cert.pem"}
+	assert.EqualError(t, s.Validate(), "missing file certificate's matching private key")
+
+	// Both cert and key — valid.
+	s = Site{Domain: "example.com", CertFile: "cert.pem", KeyFile: "key.pem"}
+	assert.NoError(t, s.Validate())
+}
+
+func TestAddStaticFileErrors(t *testing.T) {
+	t.Parallel()
+
+	site := &Site{Domain: "example.com"}
+	site.initializeStaticFiles()
+
+	// Path not starting with "/" returns an error.
+	errE := site.addStaticFile("no-slash", "text/plain", []byte("data"))
+	assert.EqualError(t, errE, `path does not start with "/"`)
+
+	// Adding the same path twice returns "already exists" on the second call.
+	errE = site.addStaticFile("/first", "text/plain", []byte("data"))
+	require.NoError(t, errE)
+	errE = site.addStaticFile("/first", "text/plain", []byte("data"))
+	assert.EqualError(t, errE, "static file for path already exists")
+}
