@@ -114,9 +114,10 @@ func TestValidForDomainCommonName(t *testing.T) {
 	certPath, keyPath := createCNOnlyCert(t, "cn.example.com")
 
 	certManager := certificateManager{
-		CertFile: certPath,
-		KeyFile:  keyPath,
-		Logger:   zerolog.Nop(),
+		CertFile:       certPath,
+		KeyFile:        keyPath,
+		Logger:         zerolog.Nop(),
+		reloadInterval: time.Millisecond,
 	}
 	errE := certManager.Init()
 	require.NoError(t, errE, "% -+#.1v", errE)
@@ -132,11 +133,9 @@ func TestValidForDomainCommonName(t *testing.T) {
 	// Verify that Start goroutine stop path is exercised.
 	errE = certManager.Start()
 	require.NoError(t, errE, "% -+#.1v", errE)
-	// Trigger the ticker channel by replacing ticker with a short-interval one
-	// to cover the error log path.
-	certManager.ticker.Stop()
-	certManager.ticker = time.NewTicker(time.Millisecond)
-	certManager.CertFile = filepath.Join(t.TempDir(), "missing.pem")
+	// Delete the cert file to cause the reload goroutine to log an error,
+	// covering the error log path.
+	require.NoError(t, os.Remove(certPath))
 	time.Sleep(10 * time.Millisecond)
 	certManager.Stop()
 }

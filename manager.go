@@ -27,6 +27,8 @@ type certificateManager struct {
 	mu          sync.RWMutex
 	ticker      *time.Ticker
 	done        chan struct{}
+	// Zero means certificateReloadInterval. For testing only.
+	reloadInterval time.Duration
 }
 
 func (c *certificateManager) Init() errors.E {
@@ -37,7 +39,11 @@ func (c *certificateManager) Start() errors.E {
 	if c.certificate == nil {
 		return errors.New("manager not configured")
 	}
-	c.ticker = time.NewTicker(certificateReloadInterval)
+	interval := c.reloadInterval
+	if interval == 0 {
+		interval = certificateReloadInterval
+	}
+	c.ticker = time.NewTicker(interval)
 	c.done = make(chan struct{})
 	go func(d chan struct{}) {
 		for {
