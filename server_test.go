@@ -303,7 +303,7 @@ func TestServer(t *testing.T) {
 			`{"level":"info","listenAddr":"` + server.ListenAddrHTTPS() + `","domains":["example.com","localhost"],"message":"HTTPS server starting"}`,
 			`{"level":"info","method":"GET","path":"/test.html","client":"127.0.0.1","agent":"Go-http-client/1.1","request":"","proto":"1.1","host":"example.com","code":308,"responseBody":71,"requestBody":0,"metrics":{"t":},"message":"HTTP2HTTPSRedirect"}`,
 			`{"level":"info","method":"GET","path":"/test.html","client":"127.0.0.1","agent":"Go-http-client/1.1","request":"","proto":"1.1","host":"localhost","code":308,"responseBody":69,"requestBody":0,"metrics":{"t":},"message":"HTTP2HTTPSRedirect"}`,
-			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","request":"","proto":"1.1","host":"something.com","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":},"message":"HTTP2HTTPSRedirect"}`,
+			`{"level":"warn","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/1.1","request":"","proto":"1.1","host":"something.com","error":"host not found in domains","code":404,"responseBody":10,"requestBody":0,"metrics":{"t":},"message":"HTTP2HTTPSRedirect"}`,
 			`{"level":"info","message":"HTTP server stopping"}`,
 			`{"level":"info","message":"HTTPS server stopping"}`,
 			// There is one extra empty string because we use strings.Split to split.

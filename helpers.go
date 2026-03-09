@@ -216,22 +216,7 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 // As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it logs to the
 // canonical log line that the context has been canceled or that deadline exceeded, respectively.
 func (s *Service[SiteT]) WithError(ctx context.Context, err errors.E) {
-	logger := canonicalLogger(ctx)
-
-	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
-	if errors.Is(err, context.Canceled) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "canceled")
-		})
-	} else if errors.Is(err, context.DeadlineExceeded) {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("context", "deadline exceeded")
-		})
-	} else {
-		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Err(err)
-		})
-	}
+	canonicalLoggerWithError(ctx, err)
 }
 
 // Proxy proxies request to the development backend (e.g., Vite).

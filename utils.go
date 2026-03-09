@@ -91,6 +91,25 @@ func canonicalLoggerMessage(ctx context.Context) *string {
 	panic(errors.New("canonical logger message not found in context"))
 }
 
+func canonicalLoggerWithError(ctx context.Context, err errors.E) {
+	logger := canonicalLogger(ctx)
+
+	// TODO: Extract cause from context and log it. See: https://github.com/golang/go/issues/51365
+	if errors.Is(err, context.Canceled) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "canceled")
+		})
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("context", "deadline exceeded")
+		})
+	} else {
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Err(err)
+		})
+	}
+}
+
 func negotiateContentEncoding(w http.ResponseWriter, req *http.Request, offers []string) string {
 	if offers == nil {
 		offers = allCompressions

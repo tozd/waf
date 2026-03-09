@@ -585,13 +585,20 @@ func (s *Server[SiteT]) ListenAddrHTTP() string {
 }
 
 func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
 	if req.Body != nil {
 		io.Copy(io.Discard, req.Body) //nolint:errcheck,gosec
 		req.Body.Close()              //nolint:errcheck,gosec
 	}
 
 	host, errE := getHost(req.Host)
-	if errE != nil || !slices.Contains(s.domains, host) {
+	if errE != nil {
+		canonicalLoggerWithError(ctx, errors.WithMessage(errE, "unable to get host"))
+		Error(w, req, http.StatusNotFound)
+		return
+	} else if !slices.Contains(s.domains, host) {
+		canonicalLoggerWithError(ctx, errors.New("host not found in domains"))
 		Error(w, req, http.StatusNotFound)
 		return
 	}
@@ -602,9 +609,11 @@ func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Req
 	if externalPort == "0" {
 		_, port, err := net.SplitHostPort(s.HTTPS.Listen)
 		if err != nil {
+			canonicalLoggerWithError(ctx, errors.WithMessage(err, "unable to split host port"))
 			Error(w, req, http.StatusInternalServerError)
 			return
 		} else if port == "" {
+			canonicalLoggerWithError(ctx, errors.New("port empty"))
 			Error(w, req, http.StatusInternalServerError)
 			return
 		}
@@ -615,9 +624,11 @@ func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Req
 	if externalPort == "0" {
 		_, port, err := net.SplitHostPort(s.ListenAddrHTTPS())
 		if err != nil {
+			canonicalLoggerWithError(ctx, errors.WithMessage(err, "unable to split host port"))
 			Error(w, req, http.StatusInternalServerError)
 			return
 		} else if port == "" {
+			canonicalLoggerWithError(ctx, errors.New("port empty"))
 			Error(w, req, http.StatusInternalServerError)
 			return
 		}
