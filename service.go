@@ -427,6 +427,8 @@ func (s *Service[SiteT]) RouteWith(router *Router) (http.Handler, errors.E) {
 
 	c := newMiddlewareStack(s.CanonicalLogger, s.MetadataHeaderPrefix)
 
+	c = c.Append(addHSTSHeader)
+
 	// parseForm should be towards the end because it can fail or redirect
 	// and we want other fields to be logged. It also logs query string and
 	// redirects to canonical query strings.

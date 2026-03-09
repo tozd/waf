@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#9](https://gitlab.com/tozd/waf/-/issues/9)
 - Support redirect from HTTP to HTTPS using `--http.listen`.
   [#8](https://gitlab.com/tozd/waf/-/work_items/8)
+- Automatically add
+  [HSTS header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security)
+  to responses.
+  [#8](https://gitlab.com/tozd/waf/-/work_items/8)
 
 ### Changed
 

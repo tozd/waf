@@ -553,36 +553,54 @@ func TestSetCanonicalLogger(t *testing.T) {
 	assert.Equal(t, `{"message":"test1"}`+"\n", out2.String()) //nolint:testifylint
 }
 
-func TestAddNosniffHeader(t *testing.T) {
+func TestAddNosniffHSTSHeader(t *testing.T) {
 	t.Parallel()
 
-	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	for _, tt := range []struct {
+		Middleware func(http.Handler) http.Handler
+		Header     string
+		Value      string
+	}{{
+		Middleware: addNosniffHeader,
+		Header:     "X-Content-Type-Options",
+		Value:      "nosniff",
+	}, {
+		Middleware: addHSTSHeader,
+		Header:     "Strict-Transport-Security",
+		Value:      "max-age=31536000",
+	}} {
+		t.Run(tt.Header, func(t *testing.T) {
+			t.Parallel()
 
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	h.ServeHTTP(w, r)
-	res := w.Result()
-	t.Cleanup(func() {
-		res.Body.Close() //nolint:errcheck,gosec
-	})
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+			h := tt.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
 
-	h = addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotModified)
-	}))
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() {
+				res.Body.Close() //nolint:errcheck,gosec
+			})
+			assert.Equal(t, http.StatusOK, res.StatusCode)
+			assert.Equal(t, tt.Value, res.Header.Get(tt.Header))
 
-	w = httptest.NewRecorder()
-	r = httptest.NewRequest(http.MethodGet, "/", nil)
-	h.ServeHTTP(w, r)
-	res = w.Result()
-	t.Cleanup(func() {
-		res.Body.Close() //nolint:errcheck,gosec
-	})
-	assert.Equal(t, http.StatusNotModified, res.StatusCode)
-	assert.Empty(t, res.Header.Get("X-Content-Type-Options"))
+			h = tt.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotModified)
+			}))
+
+			w = httptest.NewRecorder()
+			r = httptest.NewRequest(http.MethodGet, "/", nil)
+			h.ServeHTTP(w, r)
+			res = w.Result()
+			t.Cleanup(func() {
+				res.Body.Close() //nolint:errcheck,gosec
+			})
+			assert.Equal(t, http.StatusNotModified, res.StatusCode)
+			assert.Empty(t, res.Header.Get(tt.Header))
+		})
+	}
 }
 
 func TestRedirectToMainSite(t *testing.T) {
@@ -794,30 +812,66 @@ func TestRequestIDHandlerWriteWithoutWriteHeader(t *testing.T) {
 func TestAddNosniffHeaderDefer(t *testing.T) {
 	t.Parallel()
 
-	// Handler does nothing - the defer sets the header.
-	h := addNosniffHeader(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	h.ServeHTTP(w, r)
-	res := w.Result()
-	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
-	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+	for _, tt := range []struct {
+		Middleware func(http.Handler) http.Handler
+		Header     string
+		Value      string
+	}{{
+		Middleware: addNosniffHeader,
+		Header:     "X-Content-Type-Options",
+		Value:      "nosniff",
+	}, {
+		Middleware: addHSTSHeader,
+		Header:     "Strict-Transport-Security",
+		Value:      "max-age=31536000",
+	}} {
+		t.Run(tt.Header, func(t *testing.T) {
+			t.Parallel()
+
+			// Handler does nothing - the defer sets the header.
+			h := tt.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+			assert.Equal(t, tt.Value, res.Header.Get(tt.Header))
+		})
+	}
 }
 
 func TestAddNosniffHeaderWrite(t *testing.T) {
 	t.Parallel()
 
-	// Handler calls Write without WriteHeader - triggers the Write hook.
-	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("hello"))
-	}))
+	for _, tt := range []struct {
+		Middleware func(http.Handler) http.Handler
+		Header     string
+		Value      string
+	}{{
+		Middleware: addNosniffHeader,
+		Header:     "X-Content-Type-Options",
+		Value:      "nosniff",
+	}, {
+		Middleware: addHSTSHeader,
+		Header:     "Strict-Transport-Security",
+		Value:      "max-age=31536000",
+	}} {
+		t.Run(tt.Header, func(t *testing.T) {
+			t.Parallel()
 
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	h.ServeHTTP(w, r)
-	res := w.Result()
-	t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
-	assert.Equal(t, "nosniff", res.Header.Get("X-Content-Type-Options"))
+			// Handler calls Write without WriteHeader - triggers the Write hook.
+			h := tt.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte("hello"))
+			}))
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+			assert.Equal(t, tt.Value, res.Header.Get(tt.Header))
+		})
+	}
 }
 
 func TestServiceGetRoute(t *testing.T) {

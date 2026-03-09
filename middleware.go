@@ -410,6 +410,41 @@ func addNosniffHeader(next http.Handler) http.Handler {
 	})
 }
 
+// addHSTSHeader sets HSTS header on all responses except 304 responses.
+func addHSTSHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		headerWritten := false
+		defer func() {
+			if !headerWritten {
+				headerWritten = true
+				w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+			}
+		}()
+		next.ServeHTTP(httpsnoop.Wrap(w, httpsnoop.Hooks{ //nolint:exhaustruct
+			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+				return func(code int) {
+					headerWritten = true
+					if code != http.StatusNotModified {
+						w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+					}
+					next(code)
+				}
+			},
+			Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
+				return func(b []byte) (int, error) {
+					if !headerWritten {
+						// Calling Write without WriteHeader is the same as first
+						// calling WriteHeader(http.StatusOK), so we set the header.
+						headerWritten = true
+						w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+					}
+					return next(b)
+				}
+			},
+		}), req)
+	})
+}
+
 // RedirectToMainSite is a middleware which redirects all requests to the site with mainDomain
 // if they are made for another site on non-main domain.
 func (s *Service[SiteT]) RedirectToMainSite(mainDomain string) func(next http.Handler) http.Handler {
