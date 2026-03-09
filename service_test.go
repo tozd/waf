@@ -3461,12 +3461,12 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			assert.Equal(t, `{"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
 {"level":"debug","path":"/context.json","time":"","message":"added file to static files"}
 {"level":"debug","path":"/routes.json","time":"","message":"added file to static files"}
-{"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"server starting"}
+{"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"HTTPS server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":"","message":"HomeGet"}
 {"level":"info","method":"GET","path":"/context.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"j4ddcndeVVi9jvW5UpoBerhfZojNaRKhVcRnLmJdALE","code":200,"responseBody":43,"requestBody":0,"metrics":{"t":},"time":"","message":"StaticFileGet"}
 {"level":"info","method":"GET","path":"/routes.json","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"KwxdKPyvPn9rzrPLFSPvokRhvVPm7S943P493VlISaU","code":200,"responseBody":45,"requestBody":0,"metrics":{"t":},"time":"","message":"StaticFileGet"}
-{"level":"info","time":"","message":"server stopping"}
+{"level":"info","time":"","message":"HTTPS server stopping"}
 `, logCleanup(t, true, output.String()))
 		})
 	}
