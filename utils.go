@@ -178,7 +178,10 @@ func logValues(c zerolog.Context, field string, values map[string][]string) zero
 }
 
 func logHandlerName(name, method string, api bool, h Handler) (Handler, string) {
-	handlerName := name + strings.Title(strings.ToLower(method)) //nolint:staticcheck
+	handlerName := name
+	if method != "" {
+		handlerName += strings.Title(strings.ToLower(method)) //nolint:staticcheck
+	}
 	if api {
 		handlerName += "API"
 	}

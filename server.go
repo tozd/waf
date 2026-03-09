@@ -404,7 +404,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 		//       See: https://github.com/golang/go/issues/59602
 		s.HTTPServer = &http.Server{ //nolint:exhaustruct
 			Addr:                         s.HTTP.Listen,
-			Handler:                      http.HandlerFunc(s.httpRedirectHandler),
+			Handler:                      s.newHTTPRedirectHandler(),
 			DisableGeneralOptionsHandler: false,
 			TLSConfig:                    nil,
 			ReadTimeout:                  0,
@@ -633,4 +633,14 @@ func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Req
 
 	w.Header().Set("Cache-Control", "max-age=31536000")
 	http.Redirect(w, req, req.URL.String(), http.StatusPermanentRedirect)
+}
+
+func (s *Server[SiteT]) newHTTPRedirectHandler() http.Handler {
+	// We use global logger as canonical logger here.
+	c := newMiddlewareStack(s.Logger, "")
+
+	h := http.HandlerFunc(s.httpRedirectHandler)
+	h = logHandlerFuncName("HTTP2HTTPSRedirect", h)
+
+	return c.Then(h)
 }
