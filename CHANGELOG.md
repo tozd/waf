@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Support setting listen address for HTTPS server using `--https.listen`.
+  There is now new CLI default variable `defaultListen`.
   [#9](https://gitlab.com/tozd/waf/-/issues/9)
 - Support redirect from HTTP to HTTPS using `--http.listen`.
   [#8](https://gitlab.com/tozd/waf/-/work_items/8)
