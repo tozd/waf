@@ -35,7 +35,7 @@ This is a Go package. You can add it to your project using `go get`:
 go get gitlab.com/tozd/waf
 ```
 
-It requires Go 1.23 or newer.
+It requires Go 1.24 or newer.
 
 Automatic media type detection uses file extensions and a file extension database has to be available
 on the system.
@@ -52,7 +52,7 @@ See [examples](./_examples/) to see how can components combine together into an 
 
 To run apps locally, you need a HTTPS TLS certificate (as required by HTTP2). When running locally
 you can use [mkcert](https://github.com/FiloSottile/mkcert), a tool to create a local CA
-keypair which is then used to create a TLS certificate. Use Go 1.19 or newer.
+keypair which is then used to create a TLS certificate.
 
 ```sh
 go install filippo.io/mkcert@latest
@@ -61,24 +61,23 @@ mkcert localhost 127.0.0.1 ::1
 ```
 
 This creates two files, `localhost+2.pem` and l`ocalhost+2-key.pem`, which you can then pass in
-TLS configuration to Waf.
+HTTPS configuration to Waf.
 
 ### Vite integration
 
 During development you might want to use [Vite](https://vitejs.dev/).
 Vite compiles frontend files and serves them. It also watches for changes in frontend files,
-recompiles them, and hot-reloads the frontend as necessary. Node 16 or newer is required.
+recompiles them, and hot-reloads the frontend as necessary.
 
 After installing dependencies and running `vite serve`, Vite listens on `http://localhost:5173`.
-Pass that to [Service's Development](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field.
 Open [https://localhost:8080/](https://localhost:8080/) in your browser, which will connect
 you to the backend which then proxies unknown requests (non-API requests) to Vite, the frontend.
 
 If you want your handler to proxy to Vite during development, you can do something like:
 
 ```go
-func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ Params) {
-  if s.Development != "" {
+func (s *Service) HomeGet(w http.ResponseWriter, req *http.Request, _ waf.Params) {
+  if s.ProxyStaticTo != "" {
     s.Proxy(w, req)
     return
   }
@@ -89,75 +88,74 @@ func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ Params) {
 
 ### Vue Router integration
 
-You can create JSON with routes in your repository, e.g., `routes.json` which you can then
-use both in your Go code and Vue Router as a single source of truth for routes:
-
-```json
-{
-  "routes": [
-    {
-      "name": "Home",
-      "path": "/",
-      "api": null,
-      "get": {}
-    }
-  ]
-}
-```
-
-To populate [Service's Routes](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field:
+You configure routes and their handlers through
+[Service's Routes](https://pkg.go.dev/gitlab.com/tozd/waf#Service) field:
 
 ```go
-import _ "embed"
-import "encoding/json"
-
 import "gitlab.com/tozd/waf"
 
-//go:embed routes.json
-var routesConfiguration []byte
+func newService() *Service {
+  service := &Service{
+    waf.Service[*waf.Site]{
+      Routes: nil,
+      RoutesPath: "/routes.json",
+      // ... the rest ...
+    },
+  }
 
-func newService() (*waf.Service, err) {
-  var config struct {
-    Routes []waf.Route `json:"routes"`
+  service.Routes = map[string]waf.Route{
+    "Home": {
+      RouteOptions: waf.RouteOptions{
+        Handlers: map[string]waf.Handler{
+          http.MethodGet: service.HomeGet,
+        },
+      },
+      Path: "/",
+    },
   }
-  err := json.Unmarshal(routesConfiguration, &config)
-  if err != nil {
-    return err
-  }
-  return &waf.Service[*waf.Site]{
-    Routes: config.Routes,
-    // ... the rest ...
-  }
+
+  return service
 }
 ```
 
+Because we configured `RoutesPath`, you can use then use same routes
+in Vue Router as a single source of truth for routes.
 On the frontend:
 
 ```ts
 import { createRouter, createWebHistory } from "vue-router";
-import { routes } from "@/../routes.json";
+
+const routesMap = await fetch("/routes.json", {
+  method: "GET",
+  mode: "cors",
+  credentials: "same-origin",
+  referrer: document.location.href,
+  referrerPolicy: "strict-origin-when-cross-origin",
+}).then((response) => response.json());
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: routes
-    .filter((route) => route.get)
-    .map((route) => ({
+  routes: Object.entries(routesMap)
+    .filter(([, route]) => route.handlers)
+    .map(([name, route]) => ({
       path: route.path,
-      name: route.name,
-      component: () => import(`./views/${route.name}.vue`),
+      name,
+      component: () => import(`./views/${name}.vue`),
       props: true,
+      strict: true,
     })),
 });
 
 const apiRouter = createRouter({
   history: createWebHistory(),
-  routes: routes
-    .filter((route) => route.api)
-    .map((route) => ({
-      path: route.path == "/" ? "/api" : `/api${route.path}`,
-      name: route.name,
+  routes: Object.entries(routesMap)
+    .filter(([, route]) => route.api)
+    .map(([name, route]) => ({
+      path: route.path === "/" ? "/api" : `/api${route.path}`,
+      name,
       component: () => null,
       props: true,
+      strict: true,
     })),
 });
 

@@ -56,7 +56,7 @@ type Service struct {
 	waf.Service[*Site]
 }
 
-func (s *Service) Home(w http.ResponseWriter, req *http.Request, _ waf.Params) {
+func (s *Service) HomeGet(w http.ResponseWriter, req *http.Request, _ waf.Params) {
 	zerolog.Ctx(req.Context()).Info().Msg("hello from Home handler")
 
 	s.ServeStaticFile(w, req, "/index.html")
@@ -131,7 +131,7 @@ func main() {
 			"Home": {
 				RouteOptions: waf.RouteOptions{
 					Handlers: map[string]waf.Handler{
-						http.MethodGet: service.Home,
+						http.MethodGet: service.HomeGet,
 					},
 				},
 				Path: "/",
