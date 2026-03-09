@@ -658,7 +658,7 @@ func (s *Server[SiteT]) newHTTPRedirectHandler() http.Handler {
 	c := newMiddlewareStack(s.Logger, "")
 
 	h := http.HandlerFunc(s.httpRedirectHandler)
-	h = logHandlerFuncName("HTTP2HTTPSRedirect", h)
+	h = logHandlerFuncName("RedirectHTTP", h)
 
 	return c.Then(h)
 }
