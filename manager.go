@@ -57,7 +57,7 @@ func (c *certificateManager) Start() errors.E {
 				}
 			}
 		}
-	}(c.done) // We make a copy of c.done so that we can nil c.done in Close in this goroutine.
+	}(c.done) // We make a copy of c.done so that we can nil c.done in Stop in this goroutine.
 	return nil
 }
 
