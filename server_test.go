@@ -510,7 +510,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("body"))
 		r.Host = "unknown.com"
-		s.httpRedirectHandler(w, r)
+		s.redirectHTTPHandler(w, r)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 
@@ -525,7 +525,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
 		r.Host = "example.com"
-		s.httpRedirectHandler(w, r)
+		s.redirectHTTPHandler(w, r)
 		res := w.Result()
 		t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
 		assert.Equal(t, http.StatusPermanentRedirect, res.StatusCode)
@@ -543,7 +543,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/path", nil)
 		r.Host = "example.com"
-		s.httpRedirectHandler(w, r)
+		s.redirectHTTPHandler(w, r)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
@@ -558,7 +558,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/path", nil)
 		r.Host = "example.com"
-		s.httpRedirectHandler(w, r)
+		s.redirectHTTPHandler(w, r)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
