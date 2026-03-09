@@ -558,4 +558,3 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
-
