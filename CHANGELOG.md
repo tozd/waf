@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Added
+
+- Support setting listen address for HTTPS server using `--https.listen`.
+  [#9](https://gitlab.com/tozd/waf/-/issues/9)
+- Support redirect from HTTP to HTTPS using `--http.listen`.
+  [#8](https://gitlab.com/tozd/waf/-/work_items/8)
+
 ### Changed
 
 - Use a map with routes and handlers instead of inspecting the service for handlers.
@@ -15,9 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#13](https://gitlab.com/tozd/waf/-/issues/13)
 - Rename `--tls.*` CLI flags to `--https.*`.
   Rename `--tls.cache` CLI flag to `--https.letsencrypt`.
-  Remove `--tls.email` CLI flag. Now enable Let's Encrypt by setting `--https.letsencrypt`.
-- Support setting listen address for HTTPS server using `--https.listen`.
-  [#9](https://gitlab.com/tozd/waf/-/issues/9)
+
+### Removed
+
+- Remove `--tls.email` CLI flag. Now enable Let's Encrypt by setting `--https.letsencrypt`.
 
 ## [0.21.0] - 2025-10-13
 
