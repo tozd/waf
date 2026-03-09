@@ -273,14 +273,12 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 				Handlers: map[string]Handler{
 					http.MethodGet: service.Home,
 				},
-				CORS: nil,
 			},
 			Path: "/",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodGet: service.HomeGet,
 				},
-				CORS: nil,
 			},
 		},
 		"Helper": {
@@ -288,50 +286,40 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 				Handlers: map[string]Handler{
 					http.MethodGet: service.Helper,
 				},
-				CORS: nil,
 			},
 			Path: "/helper/:name",
-			API:  RouteOptions{},
 		},
 		"Panic": {
-			RouteOptions: RouteOptions{},
-			Path:         "/panic",
+			Path: "/panic",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodGet: service.PanicGet,
 				},
-				CORS: nil,
 			},
 		},
 		"JSON": {
-			RouteOptions: RouteOptions{},
-			Path:         "/json",
+			Path: "/json",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodGet:  service.JSONGet,
 					http.MethodPost: service.JSONPost,
 				},
-				CORS: nil,
 			},
 		},
 		"Large": {
-			RouteOptions: RouteOptions{},
-			Path:         "/large",
+			Path: "/large",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodGet: service.LargeGet,
 				},
-				CORS: nil,
 			},
 		},
 		"NonCompressibleJSON": {
-			RouteOptions: RouteOptions{},
-			Path:         "/noncompressible",
+			Path: "/noncompressible",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodGet: service.NonCompressibleJSONGet,
 				},
-				CORS: nil,
 			},
 		},
 		"CORS": {
@@ -371,8 +359,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 			},
 		},
 		"CORSNoOptions": {
-			RouteOptions: RouteOptions{},
-			Path:         "/corsNoOptions",
+			Path: "/corsNoOptions",
 			API: RouteOptions{
 				Handlers: map[string]Handler{
 					http.MethodPatch: service.CORSNoOptionsPatch,
@@ -723,9 +710,7 @@ func TestServiceConfigureRoutes(t *testing.T) {
 		{
 			map[string]Route{
 				"Home": {
-					Path:         "/",
-					RouteOptions: RouteOptions{},
-					API:          RouteOptions{},
+					Path: "/",
 				},
 			},
 			"at least one handler has to be set",
@@ -742,7 +727,6 @@ func TestServiceConfigureRoutes(t *testing.T) {
 							AllowedMethods: []string{http.MethodPatch},
 						},
 					},
-					API: RouteOptions{},
 				},
 			},
 			`CORS allowed methods contain methods without handlers`,
@@ -750,8 +734,7 @@ func TestServiceConfigureRoutes(t *testing.T) {
 		{
 			map[string]Route{
 				"CORS": {
-					Path:         "/ors",
-					RouteOptions: RouteOptions{},
+					Path: "/ors",
 					API: RouteOptions{
 						Handlers: map[string]Handler{
 							http.MethodGet:     nil,
@@ -777,7 +760,6 @@ func TestServiceConfigureRoutes(t *testing.T) {
 							http.MethodGet: func(_ http.ResponseWriter, _ *http.Request, _ Params) {},
 						},
 					},
-					API: RouteOptions{},
 				},
 			},
 			`parsing path failed: path does not start with "/"`,

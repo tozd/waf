@@ -133,10 +133,8 @@ func main() {
 					Handlers: map[string]waf.Handler{
 						http.MethodGet: service.Home,
 					},
-					CORS: nil,
 				},
 				Path: "/",
-				API:  waf.RouteOptions{},
 			},
 		}
 

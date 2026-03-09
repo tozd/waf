@@ -77,24 +77,24 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 // RouteOptions describe options for the route.
 type RouteOptions struct {
 	// Handlers for the route. A map between a HTTP method and a handler.
-	Handlers map[string]Handler `json:"handlers,omitempty"`
+	Handlers map[string]Handler `exhaustruct:"optional" json:"handlers"`
 
 	// Enable CORS on handler(s)?
-	CORS *CORSOptions `json:"-"`
+	CORS *CORSOptions `exhaustruct:"optional" json:"-"`
 }
 
 // Route is route definition which is used by a service to route to handlers
 // with the router. It can also be used by Vue Router to register routes there.
 type Route struct {
 	// Does this route have a non-API handlers.
-	RouteOptions
+	RouteOptions `exhaustruct:"optional"`
 
 	// Path for the route. It can contain parameters.
 	Path string `json:"path"`
 
 	// Does this route support API handlers.
 	// API paths are automatically prefixed with /api.
-	API RouteOptions `json:"api,omitzero"`
+	API RouteOptions `exhaustruct:"optional" json:"api,omitzero"`
 }
 
 type staticFile struct {
