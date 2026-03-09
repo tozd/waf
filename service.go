@@ -77,7 +77,7 @@ func (c *CORSOptions) GetAllowedMethods() []string {
 // RouteOptions describe options for the route.
 type RouteOptions struct {
 	// Handlers for the route. A map between a HTTP method and a handler.
-	Handlers map[string]Handler `exhaustruct:"optional" json:"handlers"`
+	Handlers map[string]Handler `exhaustruct:"optional" json:"handlers,omitempty"`
 
 	// Enable CORS on handler(s)?
 	CORS *CORSOptions `exhaustruct:"optional" json:"-"`
