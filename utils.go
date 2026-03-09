@@ -110,6 +110,23 @@ func canonicalLoggerWithError(ctx context.Context, err errors.E) {
 	}
 }
 
+func canonicalLoggerWithPanic(ctx context.Context, err interface{}) {
+	logger := canonicalLogger(ctx)
+	var e error
+	switch ee := err.(type) {
+	case error:
+		e = errors.WithStack(ee)
+	case string:
+		e = errors.New(ee)
+	}
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		if e != nil {
+			return c.Bool("panic", true).Err(e)
+		}
+		return c.Interface("panic", err)
+	})
+}
+
 func negotiateContentEncoding(w http.ResponseWriter, req *http.Request, offers []string) string {
 	if offers == nil {
 		offers = allCompressions

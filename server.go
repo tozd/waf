@@ -587,6 +587,13 @@ func (s *Server[SiteT]) ListenAddrHTTP() string {
 func (s *Server[SiteT]) httpRedirectHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
+	defer func() {
+		if err := recover(); err != nil {
+			canonicalLoggerWithPanic(ctx, err)
+			Error(w, req, http.StatusInternalServerError)
+		}
+	}()
+
 	if req.Body != nil {
 		io.Copy(io.Discard, req.Body) //nolint:errcheck,gosec
 		req.Body.Close()              //nolint:errcheck,gosec

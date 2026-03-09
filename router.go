@@ -323,8 +323,8 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 }
 
 func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
-	if rcv := recover(); rcv != nil {
-		r.Panic(w, req, rcv)
+	if err := recover(); err != nil {
+		r.Panic(w, req, err)
 	}
 }
 

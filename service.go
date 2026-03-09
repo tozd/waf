@@ -1057,20 +1057,6 @@ func (s *Service[SiteT]) immutableFile(w http.ResponseWriter, req *http.Request)
 }
 
 func (s *Service[SiteT]) handlePanic(w http.ResponseWriter, req *http.Request, err interface{}) {
-	logger := canonicalLogger(req.Context())
-	var e error
-	switch ee := err.(type) {
-	case error:
-		e = errors.WithStack(ee)
-	case string:
-		e = errors.New(ee)
-	}
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		if e != nil {
-			return c.Bool("panic", true).Err(e)
-		}
-		return c.Interface("panic", err)
-	})
-
+	canonicalLoggerWithPanic(req.Context(), err)
 	s.InternalServerError(w, req)
 }
