@@ -553,7 +553,7 @@ func TestSetCanonicalLogger(t *testing.T) {
 	assert.Equal(t, `{"message":"test1"}`+"\n", out2.String()) //nolint:testifylint
 }
 
-func TestAddNosniffHSTSHeader(t *testing.T) {
+func TestAddResponseHeader(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
@@ -561,11 +561,11 @@ func TestAddNosniffHSTSHeader(t *testing.T) {
 		Header     string
 		Value      string
 	}{{
-		Middleware: addNosniffHeader,
+		Middleware: addResponseHeader("X-Content-Type-Options", "nosniff"),
 		Header:     "X-Content-Type-Options",
 		Value:      "nosniff",
 	}, {
-		Middleware: addHSTSHeader,
+		Middleware: addResponseHeader("Strict-Transport-Security", "max-age=31536000"),
 		Header:     "Strict-Transport-Security",
 		Value:      "max-age=31536000",
 	}} {
@@ -809,7 +809,7 @@ func TestRequestIDHandlerWriteWithoutWriteHeader(t *testing.T) {
 	assert.NotEmpty(t, res.Header.Get("Request-Id"))
 }
 
-func TestAddNosniffHeaderDefer(t *testing.T) {
+func TestAddResponseHeaderDefer(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
@@ -817,11 +817,11 @@ func TestAddNosniffHeaderDefer(t *testing.T) {
 		Header     string
 		Value      string
 	}{{
-		Middleware: addNosniffHeader,
+		Middleware: addResponseHeader("X-Content-Type-Options", "nosniff"),
 		Header:     "X-Content-Type-Options",
 		Value:      "nosniff",
 	}, {
-		Middleware: addHSTSHeader,
+		Middleware: addResponseHeader("Strict-Transport-Security", "max-age=31536000"),
 		Header:     "Strict-Transport-Security",
 		Value:      "max-age=31536000",
 	}} {
@@ -840,7 +840,7 @@ func TestAddNosniffHeaderDefer(t *testing.T) {
 	}
 }
 
-func TestAddNosniffHeaderWrite(t *testing.T) {
+func TestAddResponseHeaderWrite(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
@@ -848,11 +848,11 @@ func TestAddNosniffHeaderWrite(t *testing.T) {
 		Header     string
 		Value      string
 	}{{
-		Middleware: addNosniffHeader,
+		Middleware: addResponseHeader("X-Content-Type-Options", "nosniff"),
 		Header:     "X-Content-Type-Options",
 		Value:      "nosniff",
 	}, {
-		Middleware: addHSTSHeader,
+		Middleware: addResponseHeader("Strict-Transport-Security", "max-age=31536000"),
 		Header:     "Strict-Transport-Security",
 		Value:      "max-age=31536000",
 	}} {

@@ -76,7 +76,7 @@ func newMiddlewareStack(canonicalLogger zerolog.Logger, metadataHeaderPrefix str
 		c = c.Append(requestIDHandler("", "Request-Id"))
 	}
 
-	c = c.Append(addNosniffHeader)
+	c = c.Append(addResponseHeader("X-Content-Type-Options", "nosniff"))
 
 	return c
 }
