@@ -559,7 +559,7 @@ func TestHandlePanic(t *testing.T) {
 
 	s := &testService{Service: Service[*testSite]{router: new(Router)}}
 
-	// Panic with a string value — covers the case string: branch.
+	// Panic with a string value - covers the case string: branch.
 	t.Run("string", func(t *testing.T) {
 		t.Parallel()
 		w := httptest.NewRecorder()
@@ -570,7 +570,7 @@ func TestHandlePanic(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
-	// Panic with a non-error, non-string type — covers the c.Interface("panic", ...) branch.
+	// Panic with a non-error, non-string type - covers the c.Interface("panic", ...) branch.
 	// Inject a real (non-disabled) logger so UpdateContext actually invokes the closure.
 	t.Run("unknown type", func(t *testing.T) {
 		t.Parallel()
@@ -589,7 +589,7 @@ func TestHandlePanic(t *testing.T) {
 func TestGetAllowedMethodsWithHEAD(t *testing.T) {
 	t.Parallel()
 
-	// HEAD explicitly in AllowedMethods — covers hasHead = true branch.
+	// HEAD explicitly in AllowedMethods - covers hasHead = true branch.
 	opts := &CORSOptions{AllowedMethods: []string{http.MethodHead, http.MethodPost}}
 	methods := opts.GetAllowedMethods()
 	assert.Contains(t, methods, http.MethodHead)
@@ -609,7 +609,7 @@ func TestAddMetadataNoContext(t *testing.T) {
 
 	s := &testService{Service: Service[*testSite]{router: new(Router)}}
 
-	// Plain request without metadataContextKey — covers the ok=false path.
+	// Plain request without metadataContextKey - covers the ok=false path.
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	b, errE := s.AddMetadata(w, r, map[string]interface{}{"key": 42})
@@ -688,7 +688,7 @@ func TestWriteJSONMarshalError(t *testing.T) {
 	// metricsMiddleware sets up the metrics context that WriteJSON requires.
 	// setCanonicalLogger sets up the canonical logger for error logging.
 	h := metricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Channels cannot be marshaled to JSON — PrepareJSON returns nil.
+		// Channels cannot be marshaled to JSON - PrepareJSON returns nil.
 		s.WriteJSON(w, req, make(chan int), nil)
 	}))
 	h = setCanonicalLogger(h)

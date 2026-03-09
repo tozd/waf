@@ -502,7 +502,7 @@ func TestServerACME(t *testing.T) { //nolint:paralleltest
 func TestHTTPRedirectHandler(t *testing.T) {
 	t.Parallel()
 
-	// Host not in domains (with body) → 404 and body drained.
+	// Host not in domains (with body) -> 404 and body drained.
 	t.Run("unknown host", func(t *testing.T) {
 		t.Parallel()
 
@@ -532,7 +532,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		assert.Equal(t, "https://example.com/path", res.Header.Get("Location"))
 	})
 
-	// ExternalPort=0, Listen has no port → internal server error.
+	// ExternalPort=0, Listen has no port -> internal server error.
 	t.Run("listen no port", func(t *testing.T) {
 		t.Parallel()
 
@@ -547,7 +547,7 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
-	// ExternalPort=0, Listen has empty port → internal server error.
+	// ExternalPort=0, Listen has empty port -> internal server error.
 	t.Run("listen empty port", func(t *testing.T) {
 		t.Parallel()
 

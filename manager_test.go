@@ -73,7 +73,7 @@ func TestCertificateManager(t *testing.T) {
 }
 
 // createCNOnlyCert creates a self-signed certificate with CommonName but no SAN.
-func createCNOnlyCert(t *testing.T, cn string) (certPath, keyPath string) {
+func createCNOnlyCert(t *testing.T, cn string) (string, string) {
 	t.Helper()
 
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -84,14 +84,14 @@ func createCNOnlyCert(t *testing.T, cn string) (certPath, keyPath string) {
 		Subject:      pkix.Name{CommonName: cn},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(time.Hour),
-		// No DNSNames — relies on CommonName only.
+		// No DNSNames - relies on CommonName only.
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	require.NoError(t, err)
 
 	tmpDir := t.TempDir()
-	certPath = filepath.Join(tmpDir, "cn-cert.pem")
-	keyPath = filepath.Join(tmpDir, "cn-key.pem")
+	certPath := filepath.Join(tmpDir, "cn-cert.pem")
+	keyPath := filepath.Join(tmpDir, "cn-key.pem")
 
 	certFile, err := os.Create(certPath) //nolint:gosec
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestValidForDomainCommonName(t *testing.T) {
 	errE := certManager.Init()
 	require.NoError(t, errE, "% -+#.1v", errE)
 
-	// Verify with CommonName (no SAN) — covers the CommonName path.
+	// Verify with CommonName (no SAN) - covers the CommonName path.
 	errE = certManager.ValidForDomain("cn.example.com")
 	assert.NoError(t, errE, "% -+#.1v", errE) //nolint:testifylint
 

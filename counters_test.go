@@ -428,7 +428,7 @@ func (*eofWriterConnWriterToReaderFrom) ReadFrom(_ io.Reader) (int64, error) {
 func TestCounterConnEOF(t *testing.T) {
 	t.Parallel()
 
-	// Read returns io.EOF when buffer is empty — all counterConn variants.
+	// Read returns io.EOF when buffer is empty - all counterConn variants.
 	for _, c := range []net.Conn{
 		&MockConn{buffer: bytes.NewBufferString("")},
 		&MockConnWriterTo{buffer: bytes.NewBufferString("")},

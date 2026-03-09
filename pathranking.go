@@ -43,7 +43,7 @@ const (
 	pathScoreStatic            float64 = 4 * pathScoreMultiplier // 40: /static.
 	pathScoreDynamic           float64 = 2 * pathScoreMultiplier // 20: /:someId.
 	pathScoreBonusCustomRegexp float64 = 1 * pathScoreMultiplier // 10: /:someId(\d+).
-	// /:namedWildcard(.*) — we subtract the bonus added by the custom regexp.
+	// /:namedWildcard(.*) - we subtract the bonus added by the custom regexp.
 	pathScoreBonusWildcard   float64 = -4*pathScoreMultiplier - pathScoreBonusCustomRegexp // -50.
 	pathScoreBonusRepeatable float64 = -2 * pathScoreMultiplier                            // -20: /:w+ or /:w*.
 	pathScoreBonusOptional   float64 = -0.8 * pathScoreMultiplier                          // -8: /:w? or /:w*.

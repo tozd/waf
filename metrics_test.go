@@ -42,10 +42,10 @@ func TestMetricNames(t *testing.T) {
 	t.Parallel()
 
 	// Nil receivers return empty string.
-	assert.Equal(t, "", (*waf.DurationMetric)(nil).Name())
-	assert.Equal(t, "", (*waf.CounterMetric)(nil).Name())
-	assert.Equal(t, "", (*waf.DurationsMetric)(nil).Name())
-	assert.Equal(t, "", (*waf.DurationCounterMetric)(nil).Name())
+	assert.Empty(t, (*waf.DurationMetric)(nil).Name())
+	assert.Empty(t, (*waf.CounterMetric)(nil).Name())
+	assert.Empty(t, (*waf.DurationsMetric)(nil).Name())
+	assert.Empty(t, (*waf.DurationCounterMetric)(nil).Name())
 
 	// Named metrics return their name.
 	m := waf.NewMetrics()
@@ -88,10 +88,10 @@ func TestMetricsAdd(t *testing.T) {
 	// Add a new metric.
 	assert.NotPanics(t, func() { m.Add(dm) })
 
-	// Add the same pointer again — no-op.
+	// Add the same pointer again - no-op.
 	assert.NotPanics(t, func() { m.Add(dm) })
 
-	// Add a different pointer with the same name — panics.
+	// Add a different pointer with the same name - panics.
 	dm2 := &waf.DurationMetric{}
 	assert.Panics(t, func() { m.Add(dm2) })
 }
@@ -134,12 +134,12 @@ func TestMetricsServerTimingStringEmpty(t *testing.T) {
 
 	// Non-nil but empty Metrics returns empty string.
 	m := waf.NewMetrics()
-	assert.Equal(t, "", m.ServerTimingString())
+	assert.Empty(t, m.ServerTimingString())
 
 	// Counter-only Metrics: ServerTimingString always returns "" for counters.
 	m2 := waf.NewMetrics()
 	m2.Counter("cnt").Inc()
-	assert.Equal(t, "", m2.ServerTimingString())
+	assert.Empty(t, m2.ServerTimingString())
 }
 
 func TestDurationMeasurementPanics(t *testing.T) {
@@ -151,7 +151,7 @@ func TestDurationMeasurementPanics(t *testing.T) {
 	// Start twice panics.
 	measurement := ds.Start()
 	assert.Panics(t, func() { measurement.Start() })
-	measurement.Stop() //nolint:errcheck
+	measurement.Stop()
 
 	// Stop without start panics.
 	m2 := &waf.DurationMeasurement{}
@@ -160,7 +160,7 @@ func TestDurationMeasurementPanics(t *testing.T) {
 	// Stop twice panics.
 	m3 := &waf.DurationMeasurement{}
 	m3.Start()
-	m3.Stop() //nolint:errcheck
+	m3.Stop()
 	assert.Panics(t, func() { m3.Stop() })
 }
 
@@ -178,7 +178,7 @@ func TestDurationMetricPanics(t *testing.T) {
 	// Stop twice panics.
 	d2 := waf.NewMetrics().Duration("d")
 	d2.Start()
-	d2.Stop() //nolint:errcheck
+	d2.Stop()
 	assert.Panics(t, func() { d2.Stop() })
 }
 
@@ -200,7 +200,7 @@ func TestDurationCounterMetricPanics(t *testing.T) {
 	// Stop twice panics.
 	dc2 := newDC()
 	dc2.Start()
-	dc2.Stop() //nolint:errcheck
+	dc2.Stop()
 	assert.Panics(t, func() { dc2.Stop() })
 
 	// Inc without start panics.
@@ -212,13 +212,13 @@ func TestDurationCounterMetricPanics(t *testing.T) {
 	// Inc after stop panics.
 	dc3 := newDC()
 	dc3.Start()
-	dc3.Stop() //nolint:errcheck
+	dc3.Stop()
 	assert.Panics(t, func() { dc3.Inc() })
 
 	// Add after stop panics.
 	dc4 := newDC()
 	dc4.Start()
-	dc4.Stop() //nolint:errcheck
+	dc4.Stop()
 	assert.Panics(t, func() { dc4.Add(1) })
 }
 
@@ -254,5 +254,5 @@ func TestMetricsMarshalZerologObjectEmpty(t *testing.T) {
 	buf := &bytes.Buffer{}
 	l := zerolog.New(buf)
 	l.Log().Object("m", m).Msg("")
-	assert.Equal(t, `{"m":{}}`+"\n", buf.String())
+	assert.Equal(t, `{"m":{}}`+"\n", buf.String()) //nolint:testifylint
 }

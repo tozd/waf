@@ -777,7 +777,7 @@ func TestRequestIDHandlerNotModified(t *testing.T) {
 func TestRequestIDHandlerWriteWithoutWriteHeader(t *testing.T) {
 	t.Parallel()
 
-	// Handler calls Write without WriteHeader first — triggers the Write hook.
+	// Handler calls Write without WriteHeader first - triggers the Write hook.
 	w := httptest.NewRecorder()
 	r := &http.Request{}
 	h := requestIDHandler("request", "Request-Id")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -794,7 +794,7 @@ func TestRequestIDHandlerWriteWithoutWriteHeader(t *testing.T) {
 func TestAddNosniffHeaderDefer(t *testing.T) {
 	t.Parallel()
 
-	// Handler does nothing — the defer sets the header.
+	// Handler does nothing - the defer sets the header.
 	h := addNosniffHeader(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -807,7 +807,7 @@ func TestAddNosniffHeaderDefer(t *testing.T) {
 func TestAddNosniffHeaderWrite(t *testing.T) {
 	t.Parallel()
 
-	// Handler calls Write without WriteHeader — triggers the Write hook.
+	// Handler calls Write without WriteHeader - triggers the Write hook.
 	h := addNosniffHeader(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("hello"))
 	}))

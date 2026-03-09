@@ -99,23 +99,23 @@ func TestConfig(t *testing.T) {
 func TestHTTPSValidate(t *testing.T) {
 	t.Parallel()
 
-	// No cert or key — valid.
+	// No cert or key - valid.
 	h := HTTPS{}
-	assert.NoError(t, h.Validate())
+	require.NoError(t, h.Validate())
 
-	// Only key file — missing cert error.
+	// Only key file - missing cert error.
 	h = HTTPS{KeyFile: "key.pem"}
 	assert.EqualError(t, h.Validate(), "missing file certificate for provided private key")
 
-	// Only cert file — missing key error.
+	// Only cert file - missing key error.
 	h = HTTPS{CertFile: "cert.pem"}
 	assert.EqualError(t, h.Validate(), "missing file certificate's matching private key")
 
-	// Both cert and key — valid.
+	// Both cert and key - valid.
 	h = HTTPS{CertFile: "cert.pem", KeyFile: "key.pem"}
-	assert.NoError(t, h.Validate())
+	require.NoError(t, h.Validate())
 
-	// Both cert/key plus Let's Encrypt — conflict error.
+	// Both cert/key plus Let's Encrypt - conflict error.
 	h = HTTPS{CertFile: "cert.pem", KeyFile: "key.pem", LetsEncryptCache: "/cache"}
 	assert.EqualError(t, h.Validate(), "Let's Encrypt's cannot be enabled together with default certificate set")
 }
@@ -123,19 +123,19 @@ func TestHTTPSValidate(t *testing.T) {
 func TestSiteValidate(t *testing.T) {
 	t.Parallel()
 
-	// No cert or key — valid.
+	// No cert or key - valid.
 	s := Site{Domain: "example.com"}
-	assert.NoError(t, s.Validate())
+	require.NoError(t, s.Validate())
 
-	// Only key file — missing cert error.
+	// Only key file - missing cert error.
 	s = Site{Domain: "example.com", KeyFile: "key.pem"}
 	assert.EqualError(t, s.Validate(), "missing file certificate for provided private key")
 
-	// Only cert file — missing key error.
+	// Only cert file - missing key error.
 	s = Site{Domain: "example.com", CertFile: "cert.pem"}
 	assert.EqualError(t, s.Validate(), "missing file certificate's matching private key")
 
-	// Both cert and key — valid.
+	// Both cert and key - valid.
 	s = Site{Domain: "example.com", CertFile: "cert.pem", KeyFile: "key.pem"}
 	assert.NoError(t, s.Validate())
 }

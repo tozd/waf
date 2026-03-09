@@ -28,7 +28,7 @@ type certificateManager struct {
 	ticker      *time.Ticker
 	done        chan struct{}
 	// Zero means certificateReloadInterval. For testing only.
-	reloadInterval time.Duration
+	reloadInterval time.Duration `exhaustruct:"optional"`
 }
 
 func (c *certificateManager) Init() errors.E {

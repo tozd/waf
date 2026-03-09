@@ -109,10 +109,10 @@ func TestParsePostFormAlreadyParsed(t *testing.T) {
 func TestGetQueryFormAlreadyParsed(t *testing.T) {
 	t.Parallel()
 
-	// Form non-nil AND PostForm empty → early return with Form as-is.
+	// Form non-nil AND PostForm empty -> early return with Form as-is.
 	req := httptest.NewRequest(http.MethodGet, "/example?q=1", nil)
 	req.Form = url.Values{"q": {"1"}}
-	// PostForm is nil (len==0) → satisfies the short-circuit condition.
+	// PostForm is nil (len==0) -> satisfies the short-circuit condition.
 
 	queryForm, errE := getQueryForm(req)
 	require.NoError(t, errE)
@@ -214,12 +214,12 @@ func TestParseCertPoolFrom(t *testing.T) {
 func TestAcmeClient(t *testing.T) {
 	t.Parallel()
 
-	// Empty cert path — success, no custom cert pool.
+	// Empty cert path - success, no custom cert pool.
 	client, errE := acmeClient("")
 	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.NotNil(t, client)
 
-	// Valid cert file — success.
+	// Valid cert file - success.
 	tempDir := t.TempDir()
 	certPath := filepath.Join(tempDir, "cert.pem")
 	keyPath := filepath.Join(tempDir, "key.pem")
@@ -229,7 +229,7 @@ func TestAcmeClient(t *testing.T) {
 	require.NoError(t, errE, "% -+#.1v", errE)
 	assert.NotNil(t, client)
 
-	// Non-existent file — error.
+	// Non-existent file - error.
 	_, errE = acmeClient(filepath.Join(tempDir, "nonexistent.pem"))
 	assert.Error(t, errE)
 }
