@@ -657,8 +657,8 @@ func (s *Server[SiteT]) newRedirectHTTPHandler() http.Handler {
 	// We use global logger as canonical logger here.
 	c := newMiddlewareStack(s.Logger, "")
 
-	h := http.HandlerFunc(s.redirectHTTPHandler)
-	h = logHandlerFuncName("RedirectHTTP", h)
+	var h http.Handler = http.HandlerFunc(s.redirectHTTPHandler)
+	h = logHTTPHandlerName("RedirectHTTP", h)
 
 	return c.Then(h)
 }

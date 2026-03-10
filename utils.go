@@ -228,15 +228,15 @@ func logHandlerName(name, method string, api bool, h Handler) (Handler, string) 
 	}, handlerName
 }
 
-func logHandlerFuncName(name string, h func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func logHTTPHandlerName(name string, h http.Handler) http.Handler {
 	if name == "" {
 		return h
 	}
 
-	return func(w http.ResponseWriter, req *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		*canonicalLoggerMessage(req.Context()) = name
-		h(w, req)
-	}
+		h.ServeHTTP(w, req)
+	})
 }
 
 // parsePostForm parses and sets only PostForm on http.Request.

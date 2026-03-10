@@ -666,7 +666,7 @@ func TestRouterReverse(t *testing.T) {
 			t.Parallel()
 
 			r := &Router{
-				EncodeQuery: tt.encodeQuery,
+				encodeQuery: tt.encodeQuery,
 			}
 
 			errE := r.Handle("PathName", http.MethodGet, tt.path, tt.api, func(http.ResponseWriter, *http.Request, Params) {})
@@ -703,10 +703,10 @@ func TestRouterErrorHandlers(t *testing.T) {
 	t.Parallel()
 
 	r := &Router{
-		NotFound: func(w http.ResponseWriter, _ *http.Request) {
+		notFound: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(480)
-		},
-		MethodNotAllowed: func(w http.ResponseWriter, _ *http.Request, _ Params, _ []string) {
+		}),
+		methodNotAllowed: func(w http.ResponseWriter, _ *http.Request, _ Params, _ []string) {
 			w.WriteHeader(490)
 		},
 	}
@@ -986,7 +986,7 @@ func TestRouterServeHTTP(t *testing.T) {
 			var panicked interface{}
 
 			r := &Router{
-				Panic: func(w http.ResponseWriter, _ *http.Request, err interface{}) {
+				panic: func(w http.ResponseWriter, _ *http.Request, err interface{}) {
 					panicked = err
 					w.WriteHeader(http.StatusInternalServerError)
 				},

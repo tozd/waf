@@ -161,27 +161,63 @@ func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 //
 // [Vue Router]: https://router.vuejs.org/
 type Router struct {
-	// NotFound is called if no route matches URL path.
-	// If not defined, the request is replied with the 404 (not found) HTTP code error.
-	NotFound func(http.ResponseWriter, *http.Request)
+	notFound         http.Handler
+	methodNotAllowed func(http.ResponseWriter, *http.Request, Params, []string)
+	panic            func(w http.ResponseWriter, req *http.Request, err interface{})
 
-	// MethodNotAllowed is called the route does not support used HTTP method.
-	// If not defined, the request is replied with the 405 (method not allowed) HTTP code error.
-	MethodNotAllowed func(http.ResponseWriter, *http.Request, Params, []string)
-
-	// Panic is called if handler panics instead of returning.
-	// If not defined, panics propagate.
-	Panic func(w http.ResponseWriter, req *http.Request, err interface{})
-
-	// EncodeQuery allows customization of how query strings are encoded
-	// when reversing a route in Reverse and ReverseAPI methods. If not
-	// set, standard url.Values.Encode is used.
-	EncodeQuery func(qs url.Values) string
+	encodeQuery func(qs url.Values) string
 
 	// A map between route name and routes.
 	routes   map[string]*route
 	matchers []matcher
 }
+
+// NotFound returns the handler which is called if no route matches URL path.
+// If not defined, the request is replied with the 404 (not found) HTTP code error.
+func (r *Router) NotFound() http.Handler {
+	return r.notFound
+}
+
+// SetNotFound sets the NotFound handler.
+func (r *Router) SetNotFound(h http.Handler) {
+	r.notFound = h
+}
+
+// MethodNotAllowed returns the handler which is called the route does not support used HTTP method.
+// If not defined, the request is replied with the 405 (method not allowed) HTTP code error.
+func (r *Router) MethodNotAllowed() func(http.ResponseWriter, *http.Request, Params, []string) {
+	return r.methodNotAllowed
+}
+
+// SetMethodNotAllowed sets the MethodNotAllowed handler.
+func (r *Router) SetMethodNotAllowed(h func(http.ResponseWriter, *http.Request, Params, []string)) {
+	r.methodNotAllowed = h
+}
+
+// Panic returns the handler which is called if handler panics instead of returning.
+// If not defined, panics propagate.
+func (r *Router) Panic() func(w http.ResponseWriter, req *http.Request, err interface{}) {
+	return r.panic
+}
+
+// SetPanic sets the Panic handler.
+func (r *Router) SetPanic(h func(w http.ResponseWriter, req *http.Request, err interface{})) {
+	r.panic = h
+}
+
+// EncodeQuery allows customization of how query strings are encoded
+// when reversing a route in Reverse and ReverseAPI methods. If not
+// set, standard url.Values.Encode is used.
+func (r *Router) EncodeQuery() func(qs url.Values) string {
+	return r.encodeQuery
+}
+
+// SetEncodeQuery sets the EncodeQuery handler.
+func (r *Router) SetEncodeQuery(h func(qs url.Values) string) {
+	r.encodeQuery = h
+}
+
+var _ RouterInterface = (*Router)(nil)
 
 // Handle registers the route handler with route name at path and with HTTP method.
 //
@@ -324,7 +360,7 @@ func (r *Router) Handle(name, method, path string, api bool, handler Handler) er
 
 func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 	if err := recover(); err != nil {
-		r.Panic(w, req, err)
+		r.panic(w, req, err)
 	}
 }
 
@@ -341,22 +377,22 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 // is called, if defined, or the request is replied with the
 // 405 (method not allowed) HTTP code error.
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if r.Panic != nil {
+	if r.panic != nil {
 		defer r.recv(w, req)
 	}
 
 	_, handler, params, errE := r.get(req.URL.Path, req.Method)
 	var e *MethodNotAllowedError
 	if errors.Is(errE, ErrNotFound) {
-		if r.NotFound != nil {
-			r.NotFound(w, req)
+		if r.notFound != nil {
+			r.notFound.ServeHTTP(w, req)
 		} else {
 			Error(w, req, http.StatusNotFound)
 		}
 		return
 	} else if errors.As(errE, &e) {
-		if r.MethodNotAllowed != nil {
-			r.MethodNotAllowed(w, req, params, e.Allow)
+		if r.methodNotAllowed != nil {
+			r.methodNotAllowed(w, req, params, e.Allow)
 		} else {
 			w.Header().Add("Allow", strings.Join(e.Allow, ", "))
 			Error(w, req, http.StatusMethodNotAllowed)
@@ -500,8 +536,8 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 
 	if len(qs) > 0 {
 		var encoded string
-		if r.EncodeQuery != nil {
-			encoded = r.EncodeQuery(qs)
+		if r.encodeQuery != nil {
+			encoded = r.encodeQuery(qs)
 		} else {
 			encoded = qs.Encode()
 		}

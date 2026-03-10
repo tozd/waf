@@ -210,6 +210,26 @@ type hasSite interface {
 	GetSite() *Site
 }
 
+// RouterInterface is an interface for a router which can be used with the [Server].
+type RouterInterface interface { //nolint:interfacebloat
+	http.Handler
+
+	Handle(name, method, path string, api bool, handler Handler) errors.E
+
+	Get(path, method string) (ResolvedRoute, errors.E)
+	Reverse(name string, params Params, qs url.Values) (string, errors.E)
+	ReverseAPI(name string, params Params, qs url.Values) (string, errors.E)
+
+	NotFound() http.Handler
+	SetNotFound(h http.Handler)
+	MethodNotAllowed() func(http.ResponseWriter, *http.Request, Params, []string)
+	SetMethodNotAllowed(h func(http.ResponseWriter, *http.Request, Params, []string))
+	Panic() func(w http.ResponseWriter, req *http.Request, err interface{})
+	SetPanic(h func(w http.ResponseWriter, req *http.Request, err interface{}))
+
+	EncodeQuery() func(qs url.Values) string
+}
+
 // We use a helper to create SiteT and a pointer to its internal Site
 // to make it work with current Go type system limitations. Because we
 // do not use this in critical paths, use of reflect seems reasonable.
@@ -346,13 +366,13 @@ type Service[SiteT hasSite] struct {
 	// registered with the router to be served. It can still be served using ServeStaticFile.
 	SkipServingFile func(path string) bool `exhaustruct:"optional"`
 
-	router       *Router                `exhaustruct:"optional"`
+	router       RouterInterface        `exhaustruct:"optional"`
 	reverseProxy *httputil.ReverseProxy `exhaustruct:"optional"`
 }
 
 // RouteWith registers static files and handlers with the router based on Routes and service [Handler]
 // methods and returns a [http.Handler] to be used with the [Server].
-func (s *Service[SiteT]) RouteWith(router *Router) (http.Handler, errors.E) {
+func (s *Service[SiteT]) RouteWith(router RouterInterface) (http.Handler, errors.E) {
 	if s.router != nil {
 		return nil, errors.New("RouteWith called more than once")
 	}
@@ -381,11 +401,11 @@ func (s *Service[SiteT]) RouteWith(router *Router) (http.Handler, errors.E) {
 		if errE != nil {
 			return nil, errE
 		}
-		p := logHandlerFuncName("Proxy", s.Proxy)
-		s.router.NotFound = p
-		s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, _ []string) {
-			p(w, req)
-		}
+		p := logHTTPHandlerName("Proxy", http.HandlerFunc(s.Proxy))
+		s.router.SetNotFound(p)
+		s.router.SetMethodNotAllowed(func(w http.ResponseWriter, req *http.Request, _ Params, _ []string) {
+			p.ServeHTTP(w, req)
+		})
 	} else {
 		errE := s.renderAndCompressStaticFiles()
 		if errE != nil {
@@ -403,26 +423,26 @@ func (s *Service[SiteT]) RouteWith(router *Router) (http.Handler, errors.E) {
 		if errE != nil {
 			return nil, errE
 		}
-		if s.router.NotFound == nil {
-			s.router.NotFound = logHandlerFuncName("NotFound", s.NotFound)
+		if s.router.NotFound() == nil {
+			s.router.SetNotFound(logHTTPHandlerName("NotFound", http.HandlerFunc(s.NotFound)))
 		} else {
-			s.router.NotFound = logHandlerFuncName("NotFound", s.router.NotFound)
+			s.router.SetNotFound(logHTTPHandlerName("NotFound", s.router.NotFound()))
 		}
-		if s.router.MethodNotAllowed == nil {
-			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
+		if s.router.MethodNotAllowed() == nil {
+			s.router.SetMethodNotAllowed(func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
 				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed" //nolint:goconst
 				s.MethodNotAllowed(w, req, allow)
-			}
+			})
 		} else {
-			m := s.router.MethodNotAllowed
-			s.router.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
+			m := s.router.MethodNotAllowed()
+			s.router.SetMethodNotAllowed(func(w http.ResponseWriter, req *http.Request, params Params, allow []string) {
 				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed"
 				m(w, req, params, allow)
-			}
+			})
 		}
 	}
-	if s.router.Panic == nil {
-		s.router.Panic = s.handlePanic
+	if s.router.Panic() == nil {
+		s.router.SetPanic(s.handlePanic)
 	}
 
 	c := newMiddlewareStack(s.CanonicalLogger, s.MetadataHeaderPrefix)

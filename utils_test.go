@@ -124,11 +124,11 @@ func TestLogHandlerFuncNameEmpty(t *testing.T) {
 
 	// Empty name returns the handler unchanged.
 	called := false
-	h := func(_ http.ResponseWriter, _ *http.Request) { called = true }
-	result := logHandlerFuncName("", h)
+	h := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
+	result := logHTTPHandlerName("", h)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	result(w, r)
+	result.ServeHTTP(w, r)
 	assert.True(t, called)
 }
 

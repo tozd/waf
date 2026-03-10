@@ -392,7 +392,7 @@ func TestParseFormEncodeQuery(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := &Router{
-		EncodeQuery: func(qs url.Values) string {
+		encodeQuery: func(qs url.Values) string {
 			return "custom=" + qs.Get("key1")
 		},
 	}

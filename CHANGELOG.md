@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [HSTS header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security)
   to responses.
   [#8](https://gitlab.com/tozd/waf/-/work_items/8)
+- Define `RouterInterface` to define a router which can be used with the `Server`.
 
 ### Changed
 
