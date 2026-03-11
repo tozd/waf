@@ -35,14 +35,14 @@ import (
 //
 // See: https://github.com/rs/cors/pull/164
 type CORSOptions struct {
-	AllowedOrigins       []string `json:"allowedOrigins,omitempty"`
-	AllowedMethods       []string `json:"allowedMethods,omitempty"`
-	AllowedHeaders       []string `json:"allowedHeaders,omitempty"`
-	ExposedHeaders       []string `json:"exposedHeaders,omitempty"`
-	MaxAge               int      `json:"maxAge,omitempty"`
-	AllowCredentials     bool     `json:"allowCredentials,omitempty"`
-	AllowPrivateNetwork  bool     `json:"allowPrivateNetwork,omitempty"`
-	OptionsSuccessStatus int      `json:"optionsSuccessStatus,omitempty"`
+	AllowedOrigins       []string `exhaustruct:"optional" json:"allowedOrigins,omitempty"`
+	AllowedMethods       []string `exhaustruct:"optional" json:"allowedMethods,omitempty"`
+	AllowedHeaders       []string `exhaustruct:"optional" json:"allowedHeaders,omitempty"`
+	ExposedHeaders       []string `exhaustruct:"optional" json:"exposedHeaders,omitempty"`
+	MaxAge               int      `exhaustruct:"optional" json:"maxAge,omitempty"`
+	AllowCredentials     bool     `exhaustruct:"optional" json:"allowCredentials,omitempty"`
+	AllowPrivateNetwork  bool     `exhaustruct:"optional" json:"allowPrivateNetwork,omitempty"`
+	OptionsSuccessStatus int      `exhaustruct:"optional" json:"optionsSuccessStatus,omitempty"`
 }
 
 // GetAllowedMethods returns the list of allowed methods.
