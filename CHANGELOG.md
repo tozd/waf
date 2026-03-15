@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Media type detection fallbacks to content detection if detection by extension fails.
+
 ### Changed
 
 - Go 1.25 or newer is required.

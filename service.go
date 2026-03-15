@@ -20,6 +20,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
@@ -587,8 +588,9 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 
 		mediaType := mime.TypeByExtension(filepath.Ext(path))
 		if mediaType == "" {
-			s.Logger.Debug().Str("path", pathWithSlash).Msg("unable to determine content type for static file")
-			mediaType = "application/octet-stream"
+			// Unable to determine media type by extension. Try to detect it by content.
+			mtype := mimetype.Detect(data)
+			mediaType = mtype.String()
 		}
 
 		// Each site might render HTML files differently.
@@ -644,7 +646,7 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 			}
 		}
 
-		s.Logger.Debug().Str("path", pathWithSlash).Msg("added file to static files")
+		s.Logger.Debug().Str("path", pathWithSlash).Str("mediaType", mediaType).Msg("added file to static files")
 
 		return nil
 	})
@@ -678,7 +680,7 @@ func (s *Service[SiteT]) renderAndCompressSiteContext() errors.E {
 		}
 	}
 
-	s.Logger.Debug().Str("path", s.SiteContextPath).Msg("added file to static files")
+	s.Logger.Debug().Str("path", s.SiteContextPath).Str("mediaType", "application/json").Msg("added file to static files")
 
 	return nil
 }
@@ -709,7 +711,7 @@ func (s *Service[SiteT]) renderAndCompressRoutes() errors.E {
 		}
 	}
 
-	s.Logger.Debug().Str("path", s.RoutesPath).Msg("added file to static files")
+	s.Logger.Debug().Str("path", s.RoutesPath).Str("mediaType", "application/json").Msg("added file to static files")
 
 	return nil
 }

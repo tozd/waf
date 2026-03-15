@@ -817,17 +817,14 @@ func TestServiceReverse(t *testing.T) {
 	assert.EqualError(t, errE, "route does not exist")
 
 	//nolint:testifylint
-	assert.Equal(t, `{"level":"debug","path":"/assets/image.png","message":"added file to static files"}
-{"level":"debug","path":"/compressible.foobar","message":"unable to determine content type for static file"}
-{"level":"debug","path":"/compressible.foobar","message":"added file to static files"}
-{"level":"debug","path":"/data.txt","message":"added file to static files"}
-{"level":"debug","path":"/index.html","message":"added file to static files"}
-{"level":"debug","path":"/noncompressible.foobar","message":"unable to determine content type for static file"}
-{"level":"debug","path":"/noncompressible.foobar","message":"added file to static files"}
-{"level":"debug","path":"/semicompressible.foobar","message":"unable to determine content type for static file"}
-{"level":"debug","path":"/semicompressible.foobar","message":"added file to static files"}
-{"level":"debug","path":"/index.json","message":"added file to static files"}
-{"level":"debug","path":"/routes.json","message":"added file to static files"}
+	assert.Equal(t, `{"level":"debug","path":"/assets/image.png","mediaType":"image/png","message":"added file to static files"}
+{"level":"debug","path":"/compressible.foobar","mediaType":"application/octet-stream","message":"added file to static files"}
+{"level":"debug","path":"/data.txt","mediaType":"text/plain; charset=utf-8","message":"added file to static files"}
+{"level":"debug","path":"/index.html","mediaType":"text/html; charset=utf-8","message":"added file to static files"}
+{"level":"debug","path":"/noncompressible.foobar","mediaType":"application/octet-stream","message":"added file to static files"}
+{"level":"debug","path":"/semicompressible.foobar","mediaType":"application/octet-stream","message":"added file to static files"}
+{"level":"debug","path":"/index.json","mediaType":"application/json","message":"added file to static files"}
+{"level":"debug","path":"/routes.json","mediaType":"application/json","message":"added file to static files"}
 `, out.String())
 }
 

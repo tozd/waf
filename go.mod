@@ -8,6 +8,7 @@ require (
 	github.com/coder/websocket v1.8.14
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/felixge/httpsnoop v1.0.5-0.20250604085516-9a9390b3efa8
+	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/hashicorp/go-cleanhttp v0.5.3-0.20250908122250-455ae7932232
 	github.com/justinas/alice v1.2.0
