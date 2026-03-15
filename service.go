@@ -198,7 +198,7 @@ func (s *Site) addStaticFile(path, mediaType string, data []byte) errors.E {
 
 		s.staticFiles[compression][path] = staticFile{
 			Data:      d,
-			Etag:      computeEtag(d),
+			Etag:      x.ComputeEtag(d),
 			MediaType: mediaType,
 		}
 	}
@@ -630,7 +630,7 @@ func (s *Service[SiteT]) renderAndCompressStaticFiles() errors.E {
 					continue
 				}
 
-				etag := computeEtag(d)
+				etag := x.ComputeEtag(d)
 
 				for _, siteT := range s.Sites {
 					site := siteT.GetSite()
@@ -922,7 +922,7 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 		return nil
 	}
 
-	etag := computeEtag(encoded, md)
+	etag := x.ComputeEtag(encoded, md)
 
 	w.Header().Set("Content-Type", "application/json")
 	if contentEncoding != compressionIdentity {

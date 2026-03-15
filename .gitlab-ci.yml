@@ -20,7 +20,13 @@ test:
       command: ["-defaultIPv6", "", "-defaultIPv4", ""]
     - name: ghcr.io/letsencrypt/pebble:2.8.0
       alias: pebble
-      command: ["-config", "/test/config/pebble-config.json", "-dnsserver", "pebble-challtestsrv:8053"]
+      command:
+        [
+          "-config",
+          "/test/config/pebble-config.json",
+          "-dnsserver",
+          "pebble-challtestsrv:8053",
+        ]
       variables:
         PEBBLE_VA_NOSLEEP: 1
         PEBBLE_WFE_NONCEREJECT: 0
@@ -65,7 +71,7 @@ test:
 
   parallel:
     matrix:
-      - IMAGE_TAG: ['1.24-alpine3.22', '1.25-alpine3.22']
+      - IMAGE_TAG: ["1.25-alpine3.22"]
 
 lint:
   stage: test

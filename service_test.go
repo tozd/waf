@@ -62,15 +62,15 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	nonCompressibleDataEtag = computeEtag(nonCompressibleData)
+	nonCompressibleDataEtag = x.ComputeEtag(nonCompressibleData)
 	semiCompressibleData = append([]byte{}, nonCompressibleData[:30*1024]...)
 	semiCompressibleData = append(semiCompressibleData, bytes.Repeat([]byte{0}, 2*1024)...)
 	semiCompressibleDataGzip, err = compress(compressionGzip, semiCompressibleData)
 	if err != nil {
 		panic(err)
 	}
-	semiCompressibleDataEtag = computeEtag(semiCompressibleData)
-	semiCompressibleDataGzipEtag = computeEtag(semiCompressibleDataGzip)
+	semiCompressibleDataEtag = x.ComputeEtag(semiCompressibleData)
+	semiCompressibleDataGzipEtag = x.ComputeEtag(semiCompressibleDataGzip)
 	compressibleDataGzip, err = compress(compressionGzip, compressibleData)
 	if err != nil {
 		panic(err)
@@ -80,8 +80,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	largeJSONEtag = computeEtag(largeJSON)
-	largeJSONGzipEtag = computeEtag(largeJSONGzip)
+	largeJSONEtag = x.ComputeEtag(largeJSON)
+	largeJSONGzipEtag = x.ComputeEtag(largeJSONGzip)
 
 	testFiles = fstest.MapFS{
 		"assets/image.png": &fstest.MapFile{
