@@ -3527,9 +3527,9 @@ func TestRunExamples(t *testing.T) { //nolint:paralleltest
 			}
 
 			//nolint:testifylint
-			assert.Equal(t, `{"level":"debug","path":"/index.html","time":"","message":"added file to static files"}
-{"level":"debug","path":"/context.json","time":"","message":"added file to static files"}
-{"level":"debug","path":"/routes.json","time":"","message":"added file to static files"}
+			assert.Equal(t, `{"level":"debug","path":"/index.html","mediaType":"text/html; charset=utf-8","time":"","message":"added file to static files"}
+{"level":"debug","path":"/context.json","mediaType":"application/json","time":"","message":"added file to static files"}
+{"level":"debug","path":"/routes.json","mediaType":"application/json","time":"","message":"added file to static files"}
 {"level":"info","listenAddr":"[::]:5001","domains":["site.test"],"time":"","message":"HTTPS server starting"}
 {"level":"info","request":"","time":"","message":"hello from Home handler"}
 {"level":"info","method":"GET","path":"/","client":"127.0.0.1","agent":"Go-http-client/2.0","connection":"","request":"","proto":"2.0","host":"site.test","etag":"nltu2O-xBi-IMFP71Eouztmo9ltQ_ZjyIe3WvcvaP6Q","code":200,"responseBody":107,"requestBody":0,"metrics":{"t":},"time":"","message":"HomeGet"}
