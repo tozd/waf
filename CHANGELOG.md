@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Go 1.25 or newer is required.
+- `GetMetrics` returns dummy value if metrics are not available in the context.
 
 ## [0.22.0] - 2026-03-10
 
