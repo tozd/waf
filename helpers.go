@@ -69,13 +69,17 @@ func MustGetSite[SiteT hasSite](ctx context.Context) SiteT { //nolint:ireturn
 	return s
 }
 
-// GetMetrics returns metrics from context ctx and true
-// if the metrics are stored in the context.
+// GetMetrics returns metrics from context ctx and true if the metrics
+// are stored in the context. If the metrics are not stored in the context,
+// it returns a new dummy metrics instance and false.
 //
 // Note, Waf service always stores the metrics in the request context.
 func GetMetrics(ctx context.Context) (*Metrics, bool) {
 	m, ok := ctx.Value(metricsContextKey).(*Metrics)
-	return m, ok
+	if !ok {
+		return NewMetrics(), false
+	}
+	return m, true
 }
 
 // MustGetMetrics returns metrics from context ctx or panics
