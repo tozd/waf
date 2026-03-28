@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-03-28
+
 ### Added
 
 - Media type detection fallbacks to content detection if detection by extension fails.
@@ -262,7 +264,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First public release.
 
-[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.22.0...main
+[unreleased]: https://gitlab.com/tozd/waf/-/compare/v0.23.0...main
+[0.23.0]: https://gitlab.com/tozd/waf/-/compare/v0.22.0...v0.23.0
 [0.22.0]: https://gitlab.com/tozd/waf/-/compare/v0.21.0...v0.22.0
 [0.21.0]: https://gitlab.com/tozd/waf/-/compare/v0.20.0...v0.21.0
 [0.20.0]: https://gitlab.com/tozd/waf/-/compare/v0.19.0...v0.20.0
