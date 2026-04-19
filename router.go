@@ -27,6 +27,14 @@ func (*MethodNotAllowedError) Error() string {
 type pathSegment struct {
 	Value     string
 	Parameter bool
+	// Repeatable marks a parameter that matches one or more (":name+") or
+	// zero or more (":name*") path segments. The matched value is the raw
+	// remainder of the path (without a leading slash). Only allowed on the
+	// last segment of a path.
+	Repeatable bool
+	// Optional marks a repeatable parameter as optional (":name*"). Ignored
+	// when Repeatable is false.
+	Optional bool
 }
 
 func parsePath(path string) ([]pathSegment, errors.E) {
@@ -42,25 +50,48 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 		return segments, nil
 	}
 	parts := strings.Split(p, "/")
-	for _, part := range parts {
+	for i, part := range parts {
 		if part == "" {
 			errE := errors.New("path has an empty part")
 			errors.Details(errE)["path"] = path
 			return nil, errE
 		}
-		// TODO: Support custom regex in params. For now we prevent them.
-		//
-		//	See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#Custom-regex-in-params
-		if strings.ContainsAny(part, "=*+()?") {
-			errE := errors.New("path contains unsupported characters")
-			errors.Details(errE)["path"] = path
-			return nil, errE
-		}
 		var segment pathSegment
 		if strings.HasPrefix(part, ":") {
-			segment.Value = strings.TrimPrefix(part, ":")
+			name := strings.TrimPrefix(part, ":")
+			// Trailing "+" or "*" marks a repeatable parameter. Only allowed
+			// on the last segment.
+			if n := len(name); n > 0 && (name[n-1] == '+' || name[n-1] == '*') {
+				if i != len(parts)-1 {
+					errE := errors.New("repeatable parameter must be the last segment")
+					errors.Details(errE)["path"] = path
+					return nil, errE
+				}
+				segment.Repeatable = true
+				segment.Optional = name[n-1] == '*'
+				name = name[:n-1]
+			}
+			if name == "" {
+				errE := errors.New("parameter name cannot be empty")
+				errors.Details(errE)["path"] = path
+				return nil, errE
+			}
+			// TODO: Support custom regex in params. For now we prevent them.
+			//
+			//	See: https://router.vuejs.org/guide/essentials/route-matching-syntax.html#Custom-regex-in-params
+			if strings.ContainsAny(name, "=*+()?") {
+				errE := errors.New("path contains unsupported characters")
+				errors.Details(errE)["path"] = path
+				return nil, errE
+			}
+			segment.Value = name
 			segment.Parameter = true
 		} else {
+			if strings.ContainsAny(part, "=*+()?") {
+				errE := errors.New("path contains unsupported characters")
+				errors.Details(errE)["path"] = path
+				return nil, errE
+			}
 			segment.Value = part
 		}
 		segments = append(segments, segment)
@@ -74,6 +105,18 @@ func compileRegexp(segments []pathSegment) (*regexp.Regexp, func([]string) Param
 	expr.WriteString("^")
 	i := 0
 	for _, segment := range segments {
+		if segment.Parameter && segment.Repeatable {
+			if segment.Optional {
+				// Zero or more remaining segments: "/prefix" or "/prefix/a/b/...".
+				expr.WriteString("(?:/(.*))?")
+			} else {
+				// One or more remaining segments: "/prefix/a/b/...".
+				expr.WriteString("/(.+)")
+			}
+			i++
+			matchMap[i] = segment.Value
+			continue
+		}
 		expr.WriteString("/")
 		if segment.Parameter {
 			expr.WriteString("([^/]+)")
@@ -504,6 +547,27 @@ func (r *Router) reverse(name string, params Params, qs url.Values, api bool) (s
 		}
 
 		val := params[segment.Value]
+
+		if segment.Repeatable {
+			// Repeatable parameters hold the raw remainder of the path
+			// (possibly empty when Optional). We insert it verbatim,
+			// ensuring we do not emit double slashes.
+			if val == "" {
+				if !segment.Optional {
+					err := errors.New("parameter is missing")
+					errors.Details(err)["parameter"] = segment.Value
+					errors.Details(err)["route"] = name
+					return "", err
+				}
+				continue
+			}
+			if !strings.HasPrefix(val, "/") {
+				res.WriteString("/")
+			}
+			res.WriteString(val)
+			continue
+		}
+
 		if val == "" {
 			err := errors.New("parameter is missing")
 			errors.Details(err)["parameter"] = segment.Value
