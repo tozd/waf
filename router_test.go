@@ -1141,10 +1141,10 @@ func TestRouterServeHTTP(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
 
-			var panicked interface{}
+			var panicked any
 
 			r := &Router{
-				panic: func(w http.ResponseWriter, _ *http.Request, err interface{}) {
+				panic: func(w http.ResponseWriter, _ *http.Request, err any) {
 					panicked = err
 					w.WriteHeader(http.StatusInternalServerError)
 				},

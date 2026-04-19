@@ -57,8 +57,7 @@ func parsePath(path string) ([]pathSegment, errors.E) {
 			return nil, errE
 		}
 		var segment pathSegment
-		if strings.HasPrefix(part, ":") {
-			name := strings.TrimPrefix(part, ":")
+		if name, ok := strings.CutPrefix(part, ":"); ok {
 			// Trailing "+" or "*" marks a repeatable parameter. Only allowed
 			// on the last segment.
 			if n := len(name); n > 0 && (name[n-1] == '+' || name[n-1] == '*') {
