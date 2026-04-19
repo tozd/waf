@@ -205,7 +205,7 @@ func toHandler(f func(http.ResponseWriter, *http.Request)) Handler {
 type Router struct {
 	notFound         http.Handler
 	methodNotAllowed func(http.ResponseWriter, *http.Request, Params, []string)
-	panic            func(w http.ResponseWriter, req *http.Request, err interface{})
+	panic            func(w http.ResponseWriter, req *http.Request, err any)
 
 	encodeQuery func(qs url.Values) string
 
@@ -238,12 +238,12 @@ func (r *Router) SetMethodNotAllowed(h func(http.ResponseWriter, *http.Request, 
 
 // Panic returns the handler which is called if handler panics instead of returning.
 // If not defined, panics propagate.
-func (r *Router) Panic() func(w http.ResponseWriter, req *http.Request, err interface{}) {
+func (r *Router) Panic() func(w http.ResponseWriter, req *http.Request, err any) {
 	return r.panic
 }
 
 // SetPanic sets the Panic handler.
-func (r *Router) SetPanic(h func(w http.ResponseWriter, req *http.Request, err interface{})) {
+func (r *Router) SetPanic(h func(w http.ResponseWriter, req *http.Request, err any)) {
 	r.panic = h
 }
 
