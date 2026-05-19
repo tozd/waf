@@ -237,6 +237,19 @@ func (s *Service[SiteT]) Proxy(w http.ResponseWriter, req *http.Request) {
 	s.reverseProxy.ServeHTTP(w, req)
 }
 
+// willProxy reports whether the request will fall through to the development
+// proxy. It is true when ProxyStaticTo is configured and the request path does
+// not resolve to a registered route. Middleware uses this to skip transforms
+// (e.g. query-string canonicalization) that would corrupt opaque URLs handled
+// by the proxied backend, like Vite's `?worker&inline` worker imports.
+func (s *Service[SiteT]) willProxy(req *http.Request) bool {
+	if s.ProxyStaticTo == "" {
+		return false
+	}
+	_, errE := s.router.Get(req.URL.Path, req.Method)
+	return errors.Is(errE, ErrNotFound)
+}
+
 // TemporaryRedirectSameMethod redirects the client to a new URL with the 307 (temporary redirect) HTTP code which makes
 // the client redo the request to a new location with the same method and body.
 func (s *Service[SiteT]) TemporaryRedirectSameMethod(w http.ResponseWriter, req *http.Request, location string) {

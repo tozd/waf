@@ -289,7 +289,7 @@ func (s *Service[SiteT]) parseForm(queryKey, rawQueryKey string) func(next http.
 				return
 			}
 
-			if len(queryForm) > 0 {
+			if len(queryForm) > 0 && !s.willProxy(req) {
 				var qs string
 				if s.router.EncodeQuery() != nil {
 					qs = s.router.EncodeQuery()(queryForm)

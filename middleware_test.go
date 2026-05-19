@@ -435,6 +435,68 @@ func TestParseFormRedirect(t *testing.T) {
 	assert.Equal(t, "/example?key1=value1&key2=value2", res.Header.Get("Location"))
 }
 
+// In dev mode the proxy backend (e.g. Vite) owns URLs that do not match any
+// registered route. Canonicalizing them would corrupt opaque framework URLs
+// such as Vite's `?worker&inline` worker imports.
+func TestParseFormSkipsCanonicalizationForProxiedRequests(t *testing.T) {
+	t.Parallel()
+
+	t.Run("non-canonical query passes through when proxied", func(t *testing.T) {
+		t.Parallel()
+
+		s := Service[*Site]{
+			router:        new(Router),
+			ProxyStaticTo: "http://localhost:5173",
+		}
+		req := httptest.NewRequest(http.MethodGet, "/src/workers/download-zip.worker.ts?worker&inline", nil)
+
+		var nextReq *http.Request
+		h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextReq = r
+			w.WriteHeader(http.StatusOK)
+		}))
+		h = setCanonicalLogger(h)
+		h = hlog.NewHandler(zerolog.New(zerolog.NewTestWriter(t)))(h)
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		res := w.Result()
+		t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+
+		assert.Equal(t, http.StatusOK, res.StatusCode)
+		if assert.NotNil(t, nextReq) {
+			assert.Equal(t, "worker&inline", nextReq.URL.RawQuery)
+		}
+	})
+
+	t.Run("registered route still canonicalized in dev mode", func(t *testing.T) {
+		t.Parallel()
+
+		r := new(Router)
+		errE := r.Handle("Example", http.MethodGet, "/example", false, func(http.ResponseWriter, *http.Request, Params) {})
+		require.NoError(t, errE)
+		s := Service[*Site]{
+			router:        r,
+			ProxyStaticTo: "http://localhost:5173",
+		}
+		req := httptest.NewRequest(http.MethodGet, "/example?key2=value2&key1=value1", nil)
+
+		h := s.parseForm("query", "rawQuery")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		h = setCanonicalLogger(h)
+		h = hlog.NewHandler(zerolog.New(zerolog.NewTestWriter(t)))(h)
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		res := w.Result()
+		t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+
+		assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+		assert.Equal(t, "/example?key1=value1&key2=value2", res.Header.Get("Location"))
+	})
+}
+
 func TestValidatePath(t *testing.T) {
 	t.Parallel()
 
