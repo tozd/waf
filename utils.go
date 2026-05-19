@@ -96,7 +96,9 @@ func canonicalLoggerMessage(ctx context.Context) *string {
 // overwrite the message, so on the happy path the deepest caller's name is what gets
 // logged.
 func SetCanonicalLogMessage(ctx context.Context, message string) {
-	*canonicalLoggerMessage(ctx) = message
+	if msg, ok := ctx.Value(canonicalLoggerMessageContextKey).(*string); ok && msg != nil {
+		*msg = message
+	}
 }
 
 func canonicalLoggerWithError(ctx context.Context, err errors.E) {
