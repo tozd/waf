@@ -89,6 +89,16 @@ func canonicalLoggerMessage(ctx context.Context) *string {
 	panic(errors.New("canonical logger message not found in context"))
 }
 
+// SetCanonicalLogMessage sets the message used for the canonical access log line of the
+// current request. Middleware and handlers should call this at the start of their work
+// so that, if they short-circuit the request, the access log identifies which
+// middleware/handler produced the response. Downstream callers that also call this
+// overwrite the message, so on the happy path the deepest caller's name is what gets
+// logged.
+func SetCanonicalLogMessage(ctx context.Context, message string) {
+	*canonicalLoggerMessage(ctx) = message
+}
+
 func canonicalLoggerWithError(ctx context.Context, err errors.E) {
 	logger := canonicalLogger(ctx)
 

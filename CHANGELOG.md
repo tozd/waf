@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SetCanonicalLogMessage` overwrites the message logged by canonical logger.
+
 ### Fixed
 
 - Do not canonicalize URLs which are proxied.
