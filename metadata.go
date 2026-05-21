@@ -171,6 +171,49 @@ func encodeMetadataInnerList(value interface{}, b *bytes.Buffer) errors.E {
 	return nil
 }
 
+// EncodeMetadataList encodes list as a top-level SFV list. Each element may
+// be a bare item (string, number, bool, []byte, time.Time), or a slice or
+// array, which is rendered as an inner list.
+//
+// See: https://www.ietf.org/archive/id/draft-ietf-httpbis-sfbis-03.html
+func EncodeMetadataList(list []interface{}, b *bytes.Buffer) errors.E {
+	first := true
+	for _, value := range list {
+		if first {
+			first = false
+		} else {
+			b.WriteString(", ")
+		}
+
+		// []byte must be checked before the reflect-based slice check
+		// because we want it serialised as an SFV byte sequence (base64
+		// item), not as an inner list of byte items.
+		if _, ok := value.([]byte); ok {
+			errE := encodeMetadataItem(value, b)
+			if errE != nil {
+				return errE
+			}
+			continue
+		}
+
+		valueKind := reflect.TypeOf(value).Kind()
+		if valueKind == reflect.Slice || valueKind == reflect.Array {
+			errE := encodeMetadataInnerList(value, b)
+			if errE != nil {
+				return errE
+			}
+			continue
+		}
+
+		errE := encodeMetadataItem(value, b)
+		if errE != nil {
+			return errE
+		}
+	}
+
+	return nil
+}
+
 // EncodeMetadata encodes data as SFV for HTTP.
 //
 // See: https://www.ietf.org/archive/id/draft-ietf-httpbis-sfbis-03.html

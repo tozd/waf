@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `SetCanonicalLogMessage` overwrites the message logged by canonical logger.
-- `EncodeMetadata` encodes data as SFV for HTTP.
+- `EncodeMetadata` and `EncodeMetadataList` encode data as SFV for HTTP.
 
 ### Fixed
 

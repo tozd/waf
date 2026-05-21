@@ -376,6 +376,74 @@ func TestEncodeMetadataInnerList(t *testing.T) {
 	}
 }
 
+func TestEncodeMetadataList(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		list     []interface{}
+		expected string
+		err      string
+	}{
+		{
+			name:     "Empty",
+			list:     []interface{}{},
+			expected: "",
+			err:      "",
+		},
+		{
+			name:     "Strings",
+			list:     []interface{}{"admin", "editor"},
+			expected: `"admin", "editor"`,
+			err:      "",
+		},
+		{
+			name:     "MixedBareItems",
+			list:     []interface{}{42, "test", true, false, 3.5},
+			expected: `42, "test", ?1, ?0, 3.5`,
+			err:      "",
+		},
+		{
+			name:     "ByteSequenceAsItem",
+			list:     []interface{}{[]byte{'c', 'd'}},
+			expected: `:Y2Q=:`,
+			err:      "",
+		},
+		{
+			name:     "InnerList",
+			list:     []interface{}{[]int{1, 2, 3}, "tail"},
+			expected: `(1 2 3), "tail"`,
+			err:      "",
+		},
+		{
+			name:     "SingleItem",
+			list:     []interface{}{"only"},
+			expected: `"only"`,
+			err:      "",
+		},
+		{
+			name:     "UnsupportedType",
+			list:     []interface{}{struct{}{}},
+			expected: "",
+			err:      "unsupported data type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			err := EncodeMetadataList(tt.list, out)
+			if tt.err != "" {
+				assert.EqualError(t, err, tt.err)
+			} else {
+				assert.Equal(t, tt.expected, out.String())
+			}
+		})
+	}
+}
+
 func TestEncodeMetadata(t *testing.T) {
 	t.Parallel()
 
