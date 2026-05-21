@@ -834,7 +834,7 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 	}
 
 	b := &bytes.Buffer{}
-	err := encodeMetadata(metadata, b)
+	err := EncodeMetadata(metadata, b)
 	if err != nil {
 		return nil, err
 	}

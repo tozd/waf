@@ -416,7 +416,7 @@ func TestEncodeMetadata(t *testing.T) {
 			t.Parallel()
 
 			out := &bytes.Buffer{}
-			err := encodeMetadata(tt.metadata, out)
+			err := EncodeMetadata(tt.metadata, out)
 			if tt.err != "" {
 				assert.EqualError(t, err, tt.err)
 			} else {

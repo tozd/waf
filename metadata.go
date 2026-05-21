@@ -171,9 +171,10 @@ func encodeMetadataInnerList(value interface{}, b *bytes.Buffer) errors.E {
 	return nil
 }
 
-// encodeMetadata encodes data as SFV for HTTP.
+// EncodeMetadata encodes data as SFV for HTTP.
+//
 // See: https://www.ietf.org/archive/id/draft-ietf-httpbis-sfbis-03.html
-func encodeMetadata(metadata map[string]interface{}, b *bytes.Buffer) errors.E {
+func EncodeMetadata(metadata map[string]interface{}, b *bytes.Buffer) errors.E {
 	keys := make([]string, 0, len(metadata))
 	for key := range metadata {
 		keys = append(keys, key)
