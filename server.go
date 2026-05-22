@@ -584,6 +584,76 @@ func (s *Server[SiteT]) ListenAddrHTTP() string {
 	return s.listenAddrHTTP.Load()
 }
 
+// Host returns the canonical host string ("domain" or "domain:port") for the
+// given domain, using the HTTPS server's port configuration. It resolves the
+// port in this order: HTTPS.ExternalPort (if non-zero), then the port parsed
+// from HTTPS.Listen (if non-zero), then the port the OS assigned (read from
+// ListenAddrHTTPS). When the resolved port is 443 it is omitted from the
+// returned string.
+//
+// Host returns immediately in the common cases. It blocks only when
+// HTTPS.Listen has port 0 and the HTTPS server has not yet bound a listener;
+// in that case it waits for the server to bind (or to fail to start, in which
+// case it returns an error).
+//
+// Because Host can block in the port-0 case, callers that need to call it
+// before [Server.Run] starts (for example, during configuration) should defer
+// the call with [sync.OnceValue]:
+//
+//	hostGetter := sync.OnceValue(func() string {
+//		h, errE := server.Host(domain)
+//		if errE != nil {
+//			return ""
+//		}
+//		return h
+//	})
+//	// Later, after Server.Run is running: h := hostGetter()
+//
+// This pushes the resolution to first-use time, by which point the server
+// has typically bound a listener.
+func (s *Server[SiteT]) Host(domain string) (string, errors.E) {
+	// Tier 1: ExternalPort explicitly set.
+	if s.HTTPS.ExternalPort != 0 {
+		if s.HTTPS.ExternalPort == 443 { //nolint:mnd
+			return domain, nil
+		}
+		return net.JoinHostPort(domain, strconv.Itoa(s.HTTPS.ExternalPort)), nil
+	}
+
+	// Tier 2: port from HTTPS.Listen.
+	_, port, err := net.SplitHostPort(s.HTTPS.Listen)
+	if err != nil {
+		errE := errors.WithMessage(err, "unable to split host port")
+		errors.Details(errE)["listen"] = s.HTTPS.Listen
+		return "", errE
+	}
+	if port == "" {
+		return "", errors.New("port empty")
+	}
+
+	// Tier 3: port "0" means OS-allocated; block on ListenAddrHTTPS.
+	if port == "0" {
+		listenAddr := s.ListenAddrHTTPS()
+		if listenAddr == "" {
+			return "", errors.New("server not running")
+		}
+		_, port, err = net.SplitHostPort(listenAddr)
+		if err != nil {
+			errE := errors.WithMessage(err, "unable to split host port")
+			errors.Details(errE)["listenAddr"] = listenAddr
+			return "", errE
+		}
+		if port == "" {
+			return "", errors.New("port empty")
+		}
+	}
+
+	if port == "443" {
+		return domain, nil
+	}
+	return net.JoinHostPort(domain, port), nil
+}
+
 func (s *Server[SiteT]) redirectHTTPHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
@@ -610,40 +680,11 @@ func (s *Server[SiteT]) redirectHTTPHandler(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	externalPort := strconv.Itoa(s.HTTPS.ExternalPort)
-
-	// If port is not explicitly provided.
-	if externalPort == "0" {
-		_, port, err := net.SplitHostPort(s.HTTPS.Listen)
-		if err != nil {
-			canonicalLoggerWithError(ctx, errors.WithMessage(err, "unable to split host port"))
-			Error(w, req, http.StatusInternalServerError)
-			return
-		} else if port == "" {
-			canonicalLoggerWithError(ctx, errors.New("port empty"))
-			Error(w, req, http.StatusInternalServerError)
-			return
-		}
-		externalPort = port
-	}
-
-	// If port is not known in advance.
-	if externalPort == "0" {
-		_, port, err := net.SplitHostPort(s.ListenAddrHTTPS())
-		if err != nil {
-			canonicalLoggerWithError(ctx, errors.WithMessage(err, "unable to split host port"))
-			Error(w, req, http.StatusInternalServerError)
-			return
-		} else if port == "" {
-			canonicalLoggerWithError(ctx, errors.New("port empty"))
-			Error(w, req, http.StatusInternalServerError)
-			return
-		}
-		externalPort = port
-	}
-
-	if externalPort != "443" {
-		host = net.JoinHostPort(host, externalPort)
+	host, errE = s.Host(host)
+	if errE != nil {
+		canonicalLoggerWithError(ctx, errors.WithMessage(errE, "unable to resolve host"))
+		Error(w, req, http.StatusInternalServerError)
+		return
 	}
 
 	req.URL.Scheme = "https"

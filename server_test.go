@@ -562,3 +562,94 @@ func TestHTTPRedirectHandler(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
+
+func TestServerHost(t *testing.T) {
+	t.Parallel()
+
+	// Tier 1: ExternalPort=443 -> domain alone, no port.
+	t.Run("external port 443", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{ExternalPort: 443}}
+		host, errE := s.Host("example.com")
+		require.NoError(t, errE, "% -+#.1v", errE)
+		assert.Equal(t, "example.com", host)
+	})
+
+	// Tier 1: ExternalPort=8443 -> domain:8443.
+	t.Run("external port non-443", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{ExternalPort: 8443}}
+		host, errE := s.Host("example.com")
+		require.NoError(t, errE, "% -+#.1v", errE)
+		assert.Equal(t, "example.com:8443", host)
+	})
+
+	// Tier 2: ExternalPort=0, Listen=":443" -> domain alone.
+	t.Run("listen port 443", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{Listen: ":443"}}
+		host, errE := s.Host("example.com")
+		require.NoError(t, errE, "% -+#.1v", errE)
+		assert.Equal(t, "example.com", host)
+	})
+
+	// Tier 2: ExternalPort=0, Listen=":8443" -> domain:8443.
+	t.Run("listen port non-443", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{Listen: ":8443"}}
+		host, errE := s.Host("example.com")
+		require.NoError(t, errE, "% -+#.1v", errE)
+		assert.Equal(t, "example.com:8443", host)
+	})
+
+	// Listen is not a valid host:port -> error.
+	t.Run("listen invalid", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{Listen: "example.com"}}
+		_, errE := s.Host("example.com")
+		require.Error(t, errE)
+	})
+
+	// Listen has empty port -> error.
+	t.Run("listen empty port", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{HTTPS: HTTPS{Listen: "example.com:"}}
+		_, errE := s.Host("example.com")
+		require.Error(t, errE)
+	})
+
+	// Tier 3: ExternalPort=0, Listen=":0", server bound -> domain:<actual>.
+	t.Run("listen port 0 with bound listener", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{
+			HTTPS:           HTTPS{Listen: ":0"},
+			listenAddrHTTPS: x.NewSyncVar[string](),
+		}
+		require.NoError(t, s.listenAddrHTTPS.Store("127.0.0.1:54321"))
+		host, errE := s.Host("example.com")
+		require.NoError(t, errE, "% -+#.1v", errE)
+		assert.Equal(t, "example.com:54321", host)
+	})
+
+	// Tier 3: ExternalPort=0, Listen=":0", server failed to start (empty
+	// addr stored to unblock waiters) -> error.
+	t.Run("listen port 0 server not running", func(t *testing.T) {
+		t.Parallel()
+
+		s := &Server[*Site]{
+			HTTPS:           HTTPS{Listen: ":0"},
+			listenAddrHTTPS: x.NewSyncVar[string](),
+		}
+		require.NoError(t, s.listenAddrHTTPS.Store(""))
+		_, errE := s.Host("example.com")
+		require.Error(t, errE)
+		assert.Equal(t, "server not running", errE.Error())
+	})
+}
