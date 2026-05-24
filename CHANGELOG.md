@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SetCanonicalLogMessage` overwrites the message logged by canonical logger.
 - `EncodeMetadata` and `EncodeMetadataList` encode data as SFV for HTTP.
 - `Server.Host` returns the canonical host string for the given domain.
+- `Forbidden` and `ForbiddenWithError` replies with 403 Forbidden.
 
 ### Fixed
 

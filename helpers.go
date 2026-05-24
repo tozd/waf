@@ -215,6 +215,42 @@ func (s *Service[SiteT]) InternalServerErrorWithError(w http.ResponseWriter, req
 	s.InternalServerError(w, req)
 }
 
+// Forbidden replies to the request with the 403 (forbidden) HTTP code and the corresponding
+// error message.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
+func (s *Service[SiteT]) Forbidden(w http.ResponseWriter, req *http.Request) {
+	Error(w, req, http.StatusForbidden)
+}
+
+// ForbiddenWithError replies to the request with the 403 (forbidden) HTTP code and the corresponding
+// error message. Error err is logged to the canonical log line.
+//
+// As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it instead replies
+// with the 408 (request timeout) HTTP code, the corresponding error message, and logs to the canonical log line
+// that the context has been canceled or that deadline exceeded, respectively.
+//
+// It does not otherwise end the request; the caller should ensure no further
+// writes are done to w.
+func (s *Service[SiteT]) ForbiddenWithError(w http.ResponseWriter, req *http.Request, err errors.E) {
+	s.WithError(req.Context(), err)
+
+	if errors.Is(err, context.Canceled) {
+		// Rationale: the client canceled the request and stopped reading the response, so in
+		// a way we are not prepared to wait indefinitely for the client to read the response.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	} else if errors.Is(err, context.DeadlineExceeded) {
+		// Rationale: the client was reading the response too slowly, and we were
+		// not prepared to wait for so long.
+		Error(w, req, http.StatusRequestTimeout)
+		return
+	}
+
+	s.Forbidden(w, req)
+}
+
 // WithError logs err to the canonical log line.
 //
 // As a special case, if err is [context.Canceled] or [context.DeadlineExceeded] it logs to the
