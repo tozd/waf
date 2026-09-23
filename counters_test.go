@@ -181,7 +181,7 @@ func TestNetConnCounters(t *testing.T) {
 		t.Run(fmt.Sprintf("%T", tt.Type), func(t *testing.T) {
 			t.Parallel()
 
-			conn := newCounterConn(tt.Conn)
+			conn := newCounterConn(tt.Conn, nil)
 			assert.IsType(t, tt.Type, conn)
 
 			data := make([]byte, 1024)
@@ -209,7 +209,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		mockBuffer := bytes.NewBufferString("test data")
 		mockConn := &MockConnWriterToReaderFrom{buffer: mockBuffer}
-		conn := newCounterConn(mockConn)
+		conn := newCounterConn(mockConn, nil)
 		assert.IsType(t, &counterConnWriterToReaderFrom{}, conn)
 
 		data := make([]byte, 1024)
@@ -243,7 +243,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		mockBuffer := bytes.NewBufferString("test data")
 		mockConn := &MockConnWriterTo{buffer: mockBuffer}
-		conn := newCounterConn(mockConn)
+		conn := newCounterConn(mockConn, nil)
 		assert.IsType(t, &counterConnWriterTo{}, conn)
 
 		data := make([]byte, 1024)
@@ -275,7 +275,7 @@ func TestNetConnCounters(t *testing.T) {
 
 		mockBuffer := bytes.NewBufferString("test data")
 		mockConn := &MockConnReaderFrom{buffer: mockBuffer}
-		conn := newCounterConn(mockConn)
+		conn := newCounterConn(mockConn, nil)
 		assert.IsType(t, &counterConnReaderFrom{}, conn)
 
 		data := make([]byte, 1024)
@@ -438,7 +438,7 @@ func TestCounterConnEOF(t *testing.T) {
 		t.Run(fmt.Sprintf("%T", c), func(t *testing.T) {
 			t.Parallel()
 
-			conn := newCounterConn(c)
+			conn := newCounterConn(c, nil)
 			buf := make([]byte, 10)
 			n, err := conn.Read(buf)
 			assert.Equal(t, 0, n)
@@ -456,7 +456,7 @@ func TestCounterConnEOF(t *testing.T) {
 		t.Run(fmt.Sprintf("Write/%T", c), func(t *testing.T) {
 			t.Parallel()
 
-			conn := newCounterConn(c)
+			conn := newCounterConn(c, nil)
 			n, err := conn.Write([]byte("test"))
 			assert.Equal(t, 0, n)
 			assert.Equal(t, io.EOF, err)
@@ -467,7 +467,7 @@ func TestCounterConnEOF(t *testing.T) {
 	t.Run("WriteTo/WriterTo", func(t *testing.T) {
 		t.Parallel()
 
-		conn := newCounterConn(&eofWriterConnWriterTo{MockConnWriterTo{buffer: bytes.NewBufferString("")}})
+		conn := newCounterConn(&eofWriterConnWriterTo{MockConnWriterTo{buffer: bytes.NewBufferString("")}}, nil)
 		n, err := conn.(io.WriterTo).WriteTo(&bytes.Buffer{}) //nolint:forcetypeassert,errcheck
 		assert.Equal(t, int64(0), n)
 		assert.Equal(t, io.EOF, err)
@@ -476,7 +476,7 @@ func TestCounterConnEOF(t *testing.T) {
 	t.Run("WriteTo/WriterToReaderFrom", func(t *testing.T) {
 		t.Parallel()
 
-		conn := newCounterConn(&eofWriterConnWriterToReaderFrom{MockConnWriterToReaderFrom{buffer: bytes.NewBufferString("")}})
+		conn := newCounterConn(&eofWriterConnWriterToReaderFrom{MockConnWriterToReaderFrom{buffer: bytes.NewBufferString("")}}, nil)
 		n, err := conn.(io.WriterTo).WriteTo(&bytes.Buffer{}) //nolint:forcetypeassert,errcheck
 		assert.Equal(t, int64(0), n)
 		assert.Equal(t, io.EOF, err)
@@ -486,7 +486,7 @@ func TestCounterConnEOF(t *testing.T) {
 	t.Run("ReadFrom/ReaderFrom", func(t *testing.T) {
 		t.Parallel()
 
-		conn := newCounterConn(&eofWriterConnReaderFrom{MockConnReaderFrom{buffer: bytes.NewBufferString("")}})
+		conn := newCounterConn(&eofWriterConnReaderFrom{MockConnReaderFrom{buffer: bytes.NewBufferString("")}}, nil)
 		n, err := conn.(io.ReaderFrom).ReadFrom(&bytes.Buffer{}) //nolint:forcetypeassert,errcheck
 		assert.Equal(t, int64(0), n)
 		assert.Equal(t, io.EOF, err)
@@ -495,7 +495,7 @@ func TestCounterConnEOF(t *testing.T) {
 	t.Run("ReadFrom/WriterToReaderFrom", func(t *testing.T) {
 		t.Parallel()
 
-		conn := newCounterConn(&eofWriterConnWriterToReaderFrom{MockConnWriterToReaderFrom{buffer: bytes.NewBufferString("")}})
+		conn := newCounterConn(&eofWriterConnWriterToReaderFrom{MockConnWriterToReaderFrom{buffer: bytes.NewBufferString("")}}, nil)
 		n, err := conn.(io.ReaderFrom).ReadFrom(&bytes.Buffer{}) //nolint:forcetypeassert,errcheck
 		assert.Equal(t, int64(0), n)
 		assert.Equal(t, io.EOF, err)

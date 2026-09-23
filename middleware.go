@@ -203,18 +203,20 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 						if err != nil {
 							return conn, bufrw, errors.WithStack(err)
 						}
-						// We wrap the connection so that we can count bytes read and written.
-						nc = newCounterConn(conn)
-						// And we set it as underlying writer so that writing to the buffer
-						// goes to our wrapped connection and not the original connection.
-						bufrw.Writer.Reset(nc)
-						// We read any buffered data pending reading.
+						// We take any data which was read from the client but not yet by the handler. It is
+						// copied because resetting the reader below leaves the buffer it points into to be
+						// overwritten by whatever is read next.
 						b, _ := bufrw.Peek(bufrw.Reader.Buffered())
-						// We count bytes buffered.
-						buffered += len(b)
-						// And then we set the underlying reader with our wrapped connection
-						// with buffered data prefixed.
-						bufrw.Reader.Reset(io.MultiReader(bytes.NewReader(b), nc))
+						b = bytes.Clone(b)
+						// We wrap the connection so that we can count bytes read and written, and so that it
+						// hands that data back before it reads the connection itself. A caller which resets the
+						// reader it is given to the connection, which is what websocket libraries do, would
+						// otherwise lose it and misparse everything after it.
+						nc = newCounterConn(conn, b)
+						// And we set it as the underlying writer and reader so that both go through our wrapped
+						// connection and not the original connection.
+						bufrw.Writer.Reset(nc)
+						bufrw.Reader.Reset(nc)
 						return nc, bufrw, nil
 					}
 				},

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -951,4 +952,66 @@ func TestServiceGetRoute(t *testing.T) {
 
 	_, errE = s.GetRoute("/notfound", http.MethodGet)
 	assert.ErrorIs(t, errE, ErrNotFound)
+}
+
+// TestWebsocketHandlerEarlyMessage checks that a message a client sends together with the handshake, so that it is
+// already buffered when the handler hijacks the connection, reaches the handler. The hijacked connection has to hand
+// those bytes back itself, because the websocket library resets the reader it is given to the connection.
+func TestWebsocketHandlerEarlyMessage(t *testing.T) {
+	t.Parallel()
+
+	done := make(chan []byte, 1)
+	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if !assert.NoError(t, err) {
+			return
+		}
+		defer func() { _ = c.CloseNow() }()
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		_, d, err := c.Read(ctx)
+		if !assert.NoError(t, err) {
+			done <- nil
+			return
+		}
+		done <- d
+		c.Close(websocket.StatusNormalClosure, "") //nolint:errcheck,gosec
+	}))
+	h2 := setCanonicalLogger(h)
+	h3 := hlog.NewHandler(zerolog.New(io.Discard))(h2)
+
+	ts := httptest.NewServer(h3)
+	t.Cleanup(ts.Close)
+
+	conn, err := net.Dial("tcp", strings.TrimPrefix(ts.URL, "http://"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	// The request and the first frame in one write, which is what puts the frame in the server's buffer before the
+	// handler ever sees the request.
+	request := "GET /ws HTTP/1.1\r\nHost: " + strings.TrimPrefix(ts.URL, "http://") + "\r\n" +
+		"Upgrade: websocket\r\nConnection: Upgrade\r\n" +
+		"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+	_, err = conn.Write(append([]byte(request), maskedTextFrame("hi")...))
+	require.NoError(t, err)
+
+	select {
+	case got := <-done:
+		assert.Equal(t, []byte("hi"), got)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the handler did not read the message")
+	}
+}
+
+// maskedTextFrame returns payload as a masked websocket text frame, which is what a client sends.
+func maskedTextFrame(payload string) []byte {
+	key := []byte{0x01, 0x02, 0x03, 0x04}
+	frame := []byte{0x81, byte(0x80 | len(payload))} //nolint:mnd
+	frame = append(frame, key...)
+	for i := range len(payload) {
+		frame = append(frame, payload[i]^key[i%len(key)])
+	}
+	return frame
 }
