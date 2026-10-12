@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SetCanonicalLogField` adds a field to the canonical log line.
 - Merge `Cache-Control` headers from defaults and callers.
 - `HasConnectionUpgrade` reports whether the request is a connection upgrade request.
+- `PrepareJSON` and `WriteJSON` keep the `Etag` header the caller already set when the response is not compressed.
 
 ### Fixed
 

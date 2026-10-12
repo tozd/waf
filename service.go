@@ -861,6 +861,10 @@ func (s *Service[SiteT]) AddMetadata(w http.ResponseWriter, req *http.Request, m
 // case it is expected that it already contains a well-formed JSON and is returned
 // as-is.
 //
+// The ETag of the response is computed from the encoded response and metadata, unless
+// the caller already set the Etag header and the response is not compressed, in which
+// case the caller's ETag is used and the caller has to make sure it matches data and metadata.
+//
 // If there is an error, PrepareJSON responds to the request and returns nil.
 func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) []byte {
 	ctx := req.Context()
@@ -924,7 +928,13 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 		return nil
 	}
 
-	etag := x.ComputeEtag(encoded, md)
+	// A caller which already knows the ETag of the response (for example, of a response it keeps
+	// and sends again) sets it, which spares hashing the response again. A compressed response is
+	// another representation of data, with its own ETag, so it is computed then anyway.
+	etag := w.Header().Get("Etag")
+	if etag == "" || contentEncoding != compressionIdentity {
+		etag = x.ComputeEtag(encoded, md)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if contentEncoding != compressionIdentity {
@@ -946,6 +956,10 @@ func (s *Service[SiteT]) PrepareJSON(w http.ResponseWriter, req *http.Request, d
 // Besides other types, data can be of type []byte and [json.RawMessage] in which
 // case it is expected that it already contains a well-formed JSON and is written
 // as-is.
+//
+// The ETag of the response is computed from the encoded response and metadata, unless
+// the caller already set the Etag header and the response is not compressed, in which
+// case the caller's ETag is used and the caller has to make sure it matches data and metadata.
 //
 // It does not otherwise end the request; the caller should ensure no further writes are done to w.
 func (s *Service[SiteT]) WriteJSON(w http.ResponseWriter, req *http.Request, data interface{}, metadata map[string]interface{}) {

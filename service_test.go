@@ -793,6 +793,41 @@ func TestWriteJSONMarshalError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
 }
 
+func TestWriteJSONKeepsCallerEtag(t *testing.T) {
+	t.Parallel()
+
+	s := &testService{Service: Service[*testSite]{router: new(Router)}}
+
+	etag := func(acceptEncoding, callerEtag string) string {
+		w := httptest.NewRecorder()
+		h := metricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if callerEtag != "" {
+				w.Header().Set("Etag", callerEtag)
+			}
+			s.WriteJSON(w, req, json.RawMessage(largeJSON), nil)
+		}))
+		h = setCanonicalLogger(h)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		if acceptEncoding != "" {
+			req.Header.Set("Accept-Encoding", acceptEncoding)
+		}
+		h.ServeHTTP(w, req)
+		res := w.Result()
+		t.Cleanup(func() { res.Body.Close() }) //nolint:errcheck,gosec
+		assert.Equal(t, http.StatusOK, res.StatusCode)
+		return res.Header.Get("Etag")
+	}
+
+	computed, computedGzip := largeJSONEtag, largeJSONGzipEtag
+
+	// Without the caller's ETag, it is computed.
+	assert.Equal(t, computed, etag("", ""))
+	// The caller's ETag is kept for a response which is not compressed.
+	assert.Equal(t, `"preset"`, etag("", `"preset"`))
+	// A compressed response is another representation, whose ETag is computed anyway.
+	assert.Equal(t, computedGzip, etag("gzip", `"preset"`))
+}
+
 func TestRouteWith(t *testing.T) {
 	t.Parallel()
 
