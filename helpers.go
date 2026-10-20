@@ -46,6 +46,31 @@ func MustRequestID(ctx context.Context) identifier.Identifier {
 	return i
 }
 
+// ConnectionID returns the connection identifier from context ctx and true
+// if the connection identifier is stored in the context.
+//
+// Note, servers made by NewHTTPServer, which Server uses for its servers, always store
+// the connection identifier in the context of the connection, and so of every request
+// made over it.
+func ConnectionID(ctx context.Context) (identifier.Identifier, bool) {
+	i, ok := ctx.Value(connectionIDContextKey).(identifier.Identifier)
+	return i, ok
+}
+
+// MustConnectionID returns the connection identifier from context ctx or panics
+// if the connection identifier is not stored in the context.
+//
+// Note, servers made by NewHTTPServer, which Server uses for its servers, always store
+// the connection identifier in the context of the connection, and so of every request
+// made over it.
+func MustConnectionID(ctx context.Context) identifier.Identifier {
+	i, ok := ConnectionID(ctx)
+	if !ok {
+		panic(errors.New("connection ID not found in context"))
+	}
+	return i
+}
+
 // GetSite returns the site from context ctx and true
 // if the site is stored in the context.
 //

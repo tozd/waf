@@ -29,8 +29,7 @@ func TestConnectionIDHandler(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	r := &http.Request{}
-	s := Server[*Site]{}
-	r = r.WithContext(s.connContext(context.Background(), nil))
+	r = r.WithContext(NewHTTPServer(zerolog.Nop(), nil).ConnContext(context.Background(), nil))
 	h := connectionIDHandler("connection")(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		l := hlog.FromRequest(r)
 		l.Log().Msg("")

@@ -125,47 +125,32 @@ type Server[SiteT hasSite] struct {
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
 
-	// TODO: Add limits on max idle time and min speed for writing the whole response.
-	//       If a limit is reached, context should be canceled.
-	//       See: https://github.com/golang/go/issues/16100
-	//       See: https://github.com/golang/go/issues/21389
-	//       See: https://github.com/golang/go/issues/59602
-	httpsServer := &http.Server{ //nolint:exhaustruct
-		Addr:                         s.HTTPS.Listen,
-		Handler:                      nil,
-		DisableGeneralOptionsHandler: false,
-		TLSConfig: &tls.Config{ //nolint:exhaustruct
-			CipherSuites: []uint16{
-				tls.TLS_AES_128_GCM_SHA256,
-				tls.TLS_AES_256_GCM_SHA384,
-				tls.TLS_CHACHA20_POLY1305_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-			},
-			MinVersion:       tls.VersionTLS12,
-			CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-			NextProtos:       []string{"h2", "http/1.1"},
+	httpsServer := NewHTTPServer(s.Logger, nil)
+	httpsServer.Addr = s.HTTPS.Listen
+	httpsServer.TLSConfig = &tls.Config{ //nolint:exhaustruct
+		CipherSuites: []uint16{
+			tls.TLS_AES_128_GCM_SHA256,
+			tls.TLS_AES_256_GCM_SHA384,
+			tls.TLS_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 		},
-		ReadTimeout:       0,
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      0,
-		IdleTimeout:       idleTimeout,
-		MaxHeaderBytes:    0,
-		ErrorLog:          log.New(s.Logger, "", 0),
-		BaseContext: func(l net.Listener) context.Context {
-			errE := s.listenAddrHTTPS.Store(l.Addr().String())
-			if errE != nil {
-				panic(errE)
-			}
-			return context.Background()
-		},
-		ConnContext: s.connContext,
+		MinVersion:       tls.VersionTLS12,
+		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+		NextProtos:       []string{"h2", "http/1.1"},
+	}
+	httpsServer.BaseContext = func(l net.Listener) context.Context {
+		errE := s.listenAddrHTTPS.Store(l.Addr().String())
+		if errE != nil {
+			panic(errE)
+		}
+		return context.Background()
 	}
 
 	domains := []string{}
@@ -397,30 +382,14 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	s.listenAddrHTTP = x.NewSyncVar[string]()
 
 	if s.HTTP.Listen != "" {
-		// TODO: Add limits on max idle time and min speed for writing the whole response.
-		//       If a limit is reached, context should be canceled.
-		//       See: https://github.com/golang/go/issues/16100
-		//       See: https://github.com/golang/go/issues/21389
-		//       See: https://github.com/golang/go/issues/59602
-		s.HTTPServer = &http.Server{ //nolint:exhaustruct
-			Addr:                         s.HTTP.Listen,
-			Handler:                      s.newRedirectHTTPHandler(),
-			DisableGeneralOptionsHandler: false,
-			TLSConfig:                    nil,
-			ReadTimeout:                  0,
-			ReadHeaderTimeout:            readHeaderTimeout,
-			WriteTimeout:                 0,
-			IdleTimeout:                  idleTimeout,
-			MaxHeaderBytes:               0,
-			ErrorLog:                     log.New(s.Logger, "", 0),
-			BaseContext: func(l net.Listener) context.Context {
-				errE := s.listenAddrHTTP.Store(l.Addr().String())
-				if errE != nil {
-					panic(errE)
-				}
-				return context.Background()
-			},
-			ConnContext: nil,
+		s.HTTPServer = NewHTTPServer(s.Logger, s.newRedirectHTTPHandler())
+		s.HTTPServer.Addr = s.HTTP.Listen
+		s.HTTPServer.BaseContext = func(l net.Listener) context.Context {
+			errE := s.listenAddrHTTP.Store(l.Addr().String())
+			if errE != nil {
+				panic(errE)
+			}
+			return context.Background()
 		}
 	} else {
 		s.HTTPServer = nil
@@ -561,8 +530,36 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 	return errors.WithStack(g.Wait())
 }
 
-func (s *Server[SiteT]) connContext(ctx context.Context, _ net.Conn) context.Context {
-	return context.WithValue(ctx, connectionIDContextKey, identifier.New())
+// NewHTTPServer returns an HTTP server serving handler, configured the way Server configures
+// its servers, without TLS and without an address: it bounds how long reading request headers
+// and idle connections can take, logs its errors with logger, and stores a random identifier
+// of each connection in the connection's context, which Waf service logs with every request
+// and ConnectionID returns.
+//
+// It is useful when serving Waf service with your own server, e.g., on a listener you make
+// yourself.
+func NewHTTPServer(logger zerolog.Logger, handler http.Handler) *http.Server {
+	// TODO: Add limits on max idle time and min speed for writing the whole response.
+	//       If a limit is reached, context should be canceled.
+	//       See: https://github.com/golang/go/issues/16100
+	//       See: https://github.com/golang/go/issues/21389
+	//       See: https://github.com/golang/go/issues/59602
+	return &http.Server{ //nolint:exhaustruct
+		Addr:                         "",
+		Handler:                      handler,
+		DisableGeneralOptionsHandler: false,
+		TLSConfig:                    nil,
+		ReadTimeout:                  0,
+		ReadHeaderTimeout:            readHeaderTimeout,
+		WriteTimeout:                 0,
+		IdleTimeout:                  idleTimeout,
+		MaxHeaderBytes:               0,
+		ErrorLog:                     log.New(logger, "", 0),
+		BaseContext:                  nil,
+		ConnContext: func(ctx context.Context, _ net.Conn) context.Context {
+			return context.WithValue(ctx, connectionIDContextKey, identifier.New())
+		},
+	}
 }
 
 // ListenAddrHTTPS returns the address on which the HTTPS server is listening.

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge `Cache-Control` headers from defaults and callers.
 - `HasConnectionUpgrade` reports whether the request is a connection upgrade request.
 - `PrepareJSON` and `WriteJSON` keep the `Etag` header the caller already set when the response is not compressed.
+- `NewHTTPServer` returns an HTTP server configured the way `Server` configures its servers, without TLS,
+  to serve Waf service with your own server.
+- `ConnectionID` and `MustConnectionID` return the connection identifier from the context.
+
+### Changed
+
+- The HTTP server which redirects to HTTPS logs the connection identifier with requests, too.
 
 ### Fixed
 

@@ -396,7 +396,7 @@ func newService(t *testing.T, logger zerolog.Logger, https2 bool, proxyStaticTo 
 	ts.TLS = &tls.Config{ //nolint:gosec
 		Certificates: []tls.Certificate{certificate},
 	}
-	ts.Config.ConnContext = (&Server[*testSite]{}).connContext
+	ts.Config.ConnContext = NewHTTPServer(zerolog.Nop(), nil).ConnContext
 	t.Cleanup(ts.Close)
 	ts.StartTLS()
 

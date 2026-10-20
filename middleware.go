@@ -22,7 +22,7 @@ import (
 func connectionIDHandler(fieldKey string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			id, ok := req.Context().Value(connectionIDContextKey).(identifier.Identifier)
+			id, ok := ConnectionID(req.Context())
 			if ok {
 				logger := hlog.FromRequest(req)
 				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
