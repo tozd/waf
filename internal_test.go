@@ -1,3 +1,6 @@
 package waf
 
-var TestingNewProxyProtocolSources = newProxyProtocolSources
+var (
+	TestingNewTrustedSources   = newTrustedSources
+	TestingForwardedForHandler = forwardedForHandler
+)

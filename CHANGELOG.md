@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--https.proxy-protocol` and `--http.proxy-protocol` require the PROXY protocol on connections from the given
   hostnames, IP addresses, or CIDR networks, and use the client's address from it.
   [#10](https://gitlab.com/tozd/waf/-/work_items/10)
+- `--https.forwarded-for` and `--http.forwarded-for` use the client's address from the `X-Forwarded-For` header on
+  requests from the given hostnames, IP addresses, or CIDR networks. The canonical log line then includes the proxy's
+  address as `proxy`.
 
 ### Changed
 

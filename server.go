@@ -51,6 +51,9 @@ type HTTPS struct {
 	// Sources (hostnames, IP addresses, or CIDR networks) of connections which have to use the PROXY protocol.
 	ProxyProtocol []string `group:"HTTPS:" help:"Require the PROXY protocol on connections from this hostname, IP address, or CIDR network, and use the client's address from it. Can be repeated." name:"proxy-protocol" placeholder:"HOST|IP|CIDR" yaml:"proxyProtocol"`
 
+	// Sources (hostnames, IP addresses, or CIDR networks) of requests whose X-Forwarded-For header is used.
+	ForwardedFor []string `group:"HTTPS:" help:"Use the client's address from the X-Forwarded-For header on requests from this hostname, IP address, or CIDR network. Can be repeated." name:"forwarded-for" placeholder:"HOST|IP|CIDR" yaml:"forwardedFor"`
+
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
 	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
@@ -70,7 +73,12 @@ func (t *HTTPS) Validate() error {
 		}
 	}
 
-	_, errE := newProxyProtocolSources(zerolog.Nop(), t.ProxyProtocol)
+	_, errE := newTrustedSources(zerolog.Nop(), proxyProtocolFeature, t.ProxyProtocol)
+	if errE != nil {
+		return errE
+	}
+
+	_, errE = newTrustedSources(zerolog.Nop(), forwardedForFeature, t.ForwardedFor)
 	if errE != nil {
 		return errE
 	}
@@ -87,11 +95,19 @@ type HTTP struct {
 
 	// Sources (hostnames, IP addresses, or CIDR networks) of connections which have to use the PROXY protocol.
 	ProxyProtocol []string `group:"HTTP:" help:"Require the PROXY protocol on connections from this hostname, IP address, or CIDR network, and use the client's address from it. Can be repeated." name:"proxy-protocol" placeholder:"HOST|IP|CIDR" yaml:"proxyProtocol"`
+
+	// Sources (hostnames, IP addresses, or CIDR networks) of requests whose X-Forwarded-For header is used.
+	ForwardedFor []string `group:"HTTP:" help:"Use the client's address from the X-Forwarded-For header on requests from this hostname, IP address, or CIDR network. Can be repeated." name:"forwarded-for" placeholder:"HOST|IP|CIDR" yaml:"forwardedFor"`
 }
 
 // Validate is used by Kong to validate the struct.
 func (t *HTTP) Validate() error {
-	_, errE := newProxyProtocolSources(zerolog.Nop(), t.ProxyProtocol)
+	_, errE := newTrustedSources(zerolog.Nop(), proxyProtocolFeature, t.ProxyProtocol)
+	if errE != nil {
+		return errE
+	}
+
+	_, errE = newTrustedSources(zerolog.Nop(), forwardedForFeature, t.ForwardedFor)
 	if errE != nil {
 		return errE
 	}
@@ -136,8 +152,10 @@ type Server[SiteT hasSite] struct {
 	listenAddrHTTPS *x.SyncVar[string]
 	listenAddrHTTP  *x.SyncVar[string]
 
-	proxyProtocolHTTPS *proxyProtocolSources
-	proxyProtocolHTTP  *proxyProtocolSources
+	proxyProtocolHTTPS *trustedSources
+	proxyProtocolHTTP  *trustedSources
+	forwardedForHTTPS  *trustedSources
+	forwardedForHTTP   *trustedSources
 }
 
 // Init determines the set of sites based on HTTPS configuration and sites provided,
@@ -151,11 +169,19 @@ type Server[SiteT hasSite] struct {
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
 
-	proxyProtocolHTTPS, errE := newProxyProtocolSources(s.Logger, s.HTTPS.ProxyProtocol)
+	proxyProtocolHTTPS, errE := newTrustedSources(s.Logger, proxyProtocolFeature, s.HTTPS.ProxyProtocol)
 	if errE != nil {
 		return sites, errE
 	}
-	proxyProtocolHTTP, errE := newProxyProtocolSources(s.Logger, s.HTTP.ProxyProtocol)
+	proxyProtocolHTTP, errE := newTrustedSources(s.Logger, proxyProtocolFeature, s.HTTP.ProxyProtocol)
+	if errE != nil {
+		return sites, errE
+	}
+	forwardedForHTTPS, errE := newTrustedSources(s.Logger, forwardedForFeature, s.HTTPS.ForwardedFor)
+	if errE != nil {
+		return sites, errE
+	}
+	forwardedForHTTP, errE := newTrustedSources(s.Logger, forwardedForFeature, s.HTTP.ForwardedFor)
 	if errE != nil {
 		return sites, errE
 	}
@@ -418,9 +444,15 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 
 	s.proxyProtocolHTTPS = proxyProtocolHTTPS
 	s.proxyProtocolHTTP = proxyProtocolHTTP
+	s.forwardedForHTTPS = forwardedForHTTPS
+	s.forwardedForHTTP = forwardedForHTTP
 
 	if s.HTTP.Listen != "" {
-		s.HTTPServer = NewHTTPServer(s.Logger, s.newRedirectHTTPHandler())
+		handler := s.newRedirectHTTPHandler()
+		if forwardedForHTTP != nil {
+			handler = forwardedForHandler(forwardedForHTTP, handler)
+		}
+		s.HTTPServer = NewHTTPServer(s.Logger, handler)
 		s.HTTPServer.Addr = s.HTTP.Listen
 		s.HTTPServer.BaseContext = func(l net.Listener) context.Context {
 			errE := s.listenAddrHTTP.Store(l.Addr().String())
@@ -459,6 +491,9 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 	if s.HTTPSServer.Handler != nil {
 		return errors.New("run already called")
 	}
+	if s.forwardedForHTTPS != nil && httpsHandler != nil {
+		httpsHandler = forwardedForHandler(s.forwardedForHTTPS, httpsHandler)
+	}
 	s.HTTPSServer.Handler = httpsHandler
 
 	for _, manager := range s.managers {
@@ -473,7 +508,7 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 
 	g, errCtx := errgroup.WithContext(ctx)
 
-	for _, sources := range []*proxyProtocolSources{s.proxyProtocolHTTPS, s.proxyProtocolHTTP} {
+	for _, sources := range []*trustedSources{s.proxyProtocolHTTPS, s.proxyProtocolHTTP, s.forwardedForHTTPS, s.forwardedForHTTP} {
 		if sources == nil {
 			continue
 		}

@@ -59,6 +59,7 @@ func newMiddlewareStack(canonicalLogger zerolog.Logger, metadataHeaderPrefix str
 		c = c.Append(hlog.MethodHandler("method"))
 		c = c.Append(urlHandler("path"))
 		c = c.Append(hlog.RemoteIPHandler("client"))
+		c = c.Append(forwardedForProxyHandler)
 		c = c.Append(hlog.UserAgentHandler("agent"))
 		c = c.Append(hlog.RefererHandler("referer"))
 		c = c.Append(connectionIDHandler("connection"))

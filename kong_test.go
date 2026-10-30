@@ -68,6 +68,11 @@ HTTPS:
                                    from this hostname, IP address, or CIDR
                                    network, and use the client's address from
                                    it. Can be repeated.
+      --https.forwarded-for=HOST|IP|CIDR,...
+                                   Use the client's address from the
+                                   X-Forwarded-For header on requests from
+                                   this hostname, IP address, or CIDR network.
+                                   Can be repeated.
 
 HTTP:
   --http.listen=HOST:PORT    TCP address for the HTTP server to listen on.
@@ -76,6 +81,10 @@ HTTP:
                              Require the PROXY protocol on connections from this
                              hostname, IP address, or CIDR network, and use the
                              client's address from it. Can be repeated.
+  --http.forwarded-for=HOST|IP|CIDR,...
+                             Use the client's address from the X-Forwarded-For
+                             header on requests from this hostname, IP address,
+                             or CIDR network. Can be repeated.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

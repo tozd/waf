@@ -20,6 +20,8 @@ Features:
   accessible from the Internet).
 - Supports the [PROXY protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
   on connections from configured sources (e.g., a TCP proxy in front of it), to use the client's address.
+- Uses the client's address from the `X-Forwarded-For` header on requests from configured sources
+  (e.g., an HTTP proxy in front of it).
 - Efficient serving of static files from memory with compression, caching, and HTTP range requests.
 - Makes [canonical log lines](https://brandur.org/canonical-log-lines) for each request.
 - Supports metrics in context and [server timing](https://www.w3.org/TR/server-timing/) measurements in response header.

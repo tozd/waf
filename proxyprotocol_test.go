@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/netip"
@@ -46,7 +47,7 @@ func tcpAddr(addr string) *net.TCPAddr {
 func TestProxyProtocolSourcesPolicy(t *testing.T) {
 	t.Parallel()
 
-	sources, errE := waf.TestingNewProxyProtocolSources(zerolog.Nop(), []string{"127.0.0.1", "10.0.0.0/8", "::1", "::ffff:192.168.0.0/112", "fd00::/8"})
+	sources, errE := waf.TestingNewTrustedSources(zerolog.Nop(), "PROXY protocol", []string{"127.0.0.1", "10.0.0.0/8", "::1", "::ffff:192.168.0.0/112", "fd00::/8"})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	for _, tt := range []struct {
@@ -71,7 +72,7 @@ func TestProxyProtocolSourcesPolicy(t *testing.T) {
 		t.Run(tt.Addr.String(), func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.Expected, policyFor(t, sources.Policy, tt.Addr))
+			assert.Equal(t, tt.Expected, policyFor(t, sources.ProxyProtocolPolicy, tt.Addr))
 		})
 	}
 }
@@ -107,7 +108,7 @@ func TestProxyProtocolSourcesInvalid(t *testing.T) {
 func TestProxyProtocolSourcesHostname(t *testing.T) {
 	t.Parallel()
 
-	sources, errE := waf.TestingNewProxyProtocolSources(zerolog.Nop(), []string{"proxy.example.com"})
+	sources, errE := waf.TestingNewTrustedSources(zerolog.Nop(), "PROXY protocol", []string{"proxy.example.com"})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	var addrs atomic.Pointer[[]netip.Addr]
@@ -126,42 +127,42 @@ func TestProxyProtocolSourcesHostname(t *testing.T) {
 	}
 
 	// Hostnames are not resolved before Refresh.
-	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
 	sources.Refresh(ctx)
-	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
-	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.Policy, tcpAddr("172.18.0.9")))
+	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.9")))
 
 	// When resolving fails, the last addresses are kept.
 	lookupErr.Store(&net.DNSError{Err: "server misbehaving", Name: "proxy.example.com", IsTemporary: true})
 	sources.Refresh(ctx)
-	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	// When the hostname does not exist anymore, its addresses are removed.
 	lookupErr.Store(&net.DNSError{Err: "no such host", Name: "proxy.example.com", IsNotFound: true})
 	sources.Refresh(ctx)
-	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	lookupErr.Store(nil)
 	sources.Refresh(ctx)
-	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	go sources.Run(ctx)
 
 	// The hostname has a new address. A connection from it requests Run to resolve the hostname again.
 	addrs.Store(&[]netip.Addr{netip.MustParseAddr("::ffff:172.18.0.9")})
 	before := lookups.Load()
-	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.Policy, tcpAddr("172.18.0.9")))
+	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.9")))
 	assert.Eventually(t, func() bool {
 		return lookups.Load() > before
 	}, 5*time.Second, 10*time.Millisecond)
 	assert.Eventually(t, func() bool {
-		return policyFor(t, sources.Policy, tcpAddr("172.18.0.9")) == proxyproto.REQUIRE
+		return policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.9")) == proxyproto.REQUIRE
 	}, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.Policy, tcpAddr("172.18.0.5")))
+	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 }
 
 // proxyProtocolClient returns an HTTP client which connects to addr from localIP (any address if empty)
@@ -208,10 +209,14 @@ func proxyProtocolClient(t *testing.T, addr, localIP, header, certPath string) *
 	}
 }
 
-func get(t *testing.T, client *http.Client, url string) (int, error) {
+// get makes a GET request with header (if not nil) and returns the response's status code.
+func get(t *testing.T, client *http.Client, url string, header http.Header) (int, error) {
 	t.Helper()
 
-	resp, err := client.Get(url) //nolint:noctx
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	require.NoError(t, err)
+	maps.Copy(req.Header, header)
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
 	}
@@ -279,21 +284,21 @@ func TestServerProxyProtocol(t *testing.T) {
 	httpURL := "http://localhost:" + httpPort + "/"
 
 	// A connection from a source has to start with the header, and the client's address from it is used.
-	code, err := get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "PROXY TCP4 203.0.113.45 127.0.0.1 51402 443\r\n", certPath), httpsURL)
+	code, err := get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "PROXY TCP4 203.0.113.45 127.0.0.1 51402 443\r\n", certPath), httpsURL, nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "203.0.113.45:51402", *remoteAddr.Load())
 
-	code, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "PROXY TCP6 2001:db8::7 ::1 51402 443\r\n", certPath), httpsURL)
+	code, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "PROXY TCP6 2001:db8::7 ::1 51402 443\r\n", certPath), httpsURL, nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "[2001:db8::7]:51402", *remoteAddr.Load())
 
-	_, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "", certPath), httpsURL)
+	_, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.1", "", certPath), httpsURL, nil)
 	assert.Error(t, err)
 
 	// A connection from another address does not use the PROXY protocol.
-	code, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.2", "", certPath), httpsURL)
+	code, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.2", "", certPath), httpsURL, nil)
 	if errors.Is(err, syscall.EADDRNOTAVAIL) {
 		t.Skip("127.0.0.2 is not available")
 	}
@@ -301,11 +306,11 @@ func TestServerProxyProtocol(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.True(t, strings.HasPrefix(*remoteAddr.Load(), "127.0.0.2:"), *remoteAddr.Load())
 
-	_, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.2", "PROXY TCP4 203.0.113.45 127.0.0.1 51402 443\r\n", certPath), httpsURL)
+	_, err = get(t, proxyProtocolClient(t, httpsAddr, "127.0.0.2", "PROXY TCP4 203.0.113.45 127.0.0.1 51402 443\r\n", certPath), httpsURL, nil)
 	assert.Error(t, err)
 
 	// The HTTP server uses the PROXY protocol for its sources as well, and the client's address is logged.
-	code, err = get(t, proxyProtocolClient(t, httpAddr, "127.0.0.1", "PROXY TCP4 198.51.100.7 127.0.0.1 40000 80\r\n", certPath), httpURL)
+	code, err = get(t, proxyProtocolClient(t, httpAddr, "127.0.0.1", "PROXY TCP4 198.51.100.7 127.0.0.1 40000 80\r\n", certPath), httpURL, nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusPermanentRedirect, code)
 
