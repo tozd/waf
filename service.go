@@ -431,7 +431,7 @@ func (s *Service[SiteT]) RouteWith(router RouterInterface) (http.Handler, errors
 		}
 		if s.router.MethodNotAllowed() == nil {
 			s.router.SetMethodNotAllowed(func(w http.ResponseWriter, req *http.Request, _ Params, allow []string) {
-				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed"
+				*canonicalLoggerMessage(req.Context()) = "MethodNotAllowed" //nolint:goconst
 				s.MethodNotAllowed(w, req, allow)
 			})
 		} else {
