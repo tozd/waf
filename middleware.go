@@ -168,13 +168,7 @@ func logMetadata(metadataHeaderPrefix string) func(next http.Handler) http.Handl
 }
 
 // websocketHandler records metrics about a websocket.
-func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handler {
-	fromClient := "fromClient"
-	toClient := "toClient"
-	if fieldKeyPrefix != "" {
-		fromClient = fieldKeyPrefix + "FromClient"
-		toClient = fieldKeyPrefix + "ToClient"
-	}
+func websocketHandler() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var nc net.Conn
@@ -183,8 +177,8 @@ func websocketHandler(fieldKeyPrefix string) func(next http.Handler) http.Handle
 				if nc != nil {
 					logger := hlog.FromRequest(req)
 					logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-						c = c.Int64(fromClient, nc.(interface{ BytesRead() int64 }).BytesRead())                     //nolint:forcetypeassert,errcheck
-						c = c.Int64(toClient, int64(buffered)+nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
+						c = c.Int64("wsFromClient", nc.(interface{ BytesRead() int64 }).BytesRead())                     //nolint:forcetypeassert,errcheck
+						c = c.Int64("wsToClient", int64(buffered)+nc.(interface{ BytesWritten() int64 }).BytesWritten()) //nolint:forcetypeassert,errcheck
 						return c
 					})
 				}

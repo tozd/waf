@@ -12,6 +12,7 @@ require (
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/hashicorp/go-cleanhttp v0.5.3-0.20250908122250-455ae7932232
 	github.com/justinas/alice v1.2.0
+	github.com/pires/go-proxyproto v0.15.0
 	github.com/rs/cors v1.11.2-0.20240830163046-1084d89a1692
 	github.com/rs/zerolog v1.34.1-0.20250418111443-9dacc014f38d
 	github.com/stretchr/testify v1.11.1

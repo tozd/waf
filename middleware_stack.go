@@ -55,7 +55,7 @@ func newMiddlewareStack(canonicalLogger zerolog.Logger, metadataHeaderPrefix str
 		if metadataHeaderPrefix != "" {
 			c = c.Append(logMetadata(metadataHeaderPrefix))
 		}
-		c = c.Append(websocketHandler("ws"))
+		c = c.Append(websocketHandler())
 		c = c.Append(hlog.MethodHandler("method"))
 		c = c.Append(urlHandler("path"))
 		c = c.Append(hlog.RemoteIPHandler("client"))

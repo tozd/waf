@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NewHTTPServer` returns an HTTP server configured the way `Server` configures its servers, without TLS,
   to serve Waf service with your own server.
 - `ConnectionID` and `MustConnectionID` return the connection identifier from the context.
+- `--https.proxy-protocol` and `--http.proxy-protocol` require the PROXY protocol on connections from the given
+  hostnames, IP addresses, or CIDR networks, and use the client's address from it.
+  [#10](https://gitlab.com/tozd/waf/-/work_items/10)
 
 ### Changed
 

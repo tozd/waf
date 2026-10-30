@@ -48,6 +48,9 @@ type HTTPS struct {
 	// External port can be different.
 	ExternalPort int `group:"HTTPS:" help:"Port on which HTTPS server is accessible when it is different from the port on which the HTTPS server listens." placeholder:"INT" yaml:"externalPort"`
 
+	// Sources (hostnames, IP addresses, or CIDR networks) of connections which have to use the PROXY protocol.
+	ProxyProtocol []string `group:"HTTPS:" help:"Require the PROXY protocol on connections from this hostname, IP address, or CIDR network, and use the client's address from it. Can be repeated." name:"proxy-protocol" placeholder:"HOST|IP|CIDR" yaml:"proxyProtocol"`
+
 	// Used primarily for testing.
 	ACMEDirectory        string `json:"-" kong:"-" yaml:"-"`
 	ACMEDirectoryRootCAs string `json:"-" kong:"-" yaml:"-"`
@@ -67,13 +70,33 @@ func (t *HTTPS) Validate() error {
 		}
 	}
 
+	_, errE := newProxyProtocolSources(zerolog.Nop(), t.ProxyProtocol)
+	if errE != nil {
+		return errE
+	}
+
 	return nil
 }
 
 // HTTP configuration used by the server.
+//
+//nolint:lll
 type HTTP struct {
 	// Listen on which TCP address.
 	Listen string `group:"HTTP:" help:"TCP address for the HTTP server to listen on. Setting it enables HTTP redirect to HTTPS." placeholder:"HOST:PORT" yaml:"listen"`
+
+	// Sources (hostnames, IP addresses, or CIDR networks) of connections which have to use the PROXY protocol.
+	ProxyProtocol []string `group:"HTTP:" help:"Require the PROXY protocol on connections from this hostname, IP address, or CIDR network, and use the client's address from it. Can be repeated." name:"proxy-protocol" placeholder:"HOST|IP|CIDR" yaml:"proxyProtocol"`
+}
+
+// Validate is used by Kong to validate the struct.
+func (t *HTTP) Validate() error {
+	_, errE := newProxyProtocolSources(zerolog.Nop(), t.ProxyProtocol)
+	if errE != nil {
+		return errE
+	}
+
+	return nil
 }
 
 // Server listens to HTTP/1.1 and HTTP2 requests on HTTPS enabled port 8080 and
@@ -112,6 +135,9 @@ type Server[SiteT hasSite] struct {
 
 	listenAddrHTTPS *x.SyncVar[string]
 	listenAddrHTTP  *x.SyncVar[string]
+
+	proxyProtocolHTTPS *proxyProtocolSources
+	proxyProtocolHTTP  *proxyProtocolSources
 }
 
 // Init determines the set of sites based on HTTPS configuration and sites provided,
@@ -124,6 +150,15 @@ type Server[SiteT hasSite] struct {
 // Key in sites map must match site's domain.
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
+
+	proxyProtocolHTTPS, errE := newProxyProtocolSources(s.Logger, s.HTTPS.ProxyProtocol)
+	if errE != nil {
+		return sites, errE
+	}
+	proxyProtocolHTTP, errE := newProxyProtocolSources(s.Logger, s.HTTP.ProxyProtocol)
+	if errE != nil {
+		return sites, errE
+	}
 
 	httpsServer := NewHTTPServer(s.Logger, nil)
 	httpsServer.Addr = s.HTTPS.Listen
@@ -381,6 +416,9 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	s.listenAddrHTTPS = x.NewSyncVar[string]()
 	s.listenAddrHTTP = x.NewSyncVar[string]()
 
+	s.proxyProtocolHTTPS = proxyProtocolHTTPS
+	s.proxyProtocolHTTP = proxyProtocolHTTP
+
 	if s.HTTP.Listen != "" {
 		s.HTTPServer = NewHTTPServer(s.Logger, s.newRedirectHTTPHandler())
 		s.HTTPServer.Addr = s.HTTP.Listen
@@ -435,6 +473,18 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 
 	g, errCtx := errgroup.WithContext(ctx)
 
+	for _, sources := range []*proxyProtocolSources{s.proxyProtocolHTTPS, s.proxyProtocolHTTP} {
+		if sources == nil {
+			continue
+		}
+		// We resolve hostnames before we start listening, so that the first connections from them are recognized.
+		sources.Refresh(errCtx)
+		g.Go(func() error {
+			sources.Run(errCtx)
+			return nil
+		})
+	}
+
 	g.Go(func() error {
 		c, cancel := context.WithCancel(errCtx)
 		go func() {
@@ -455,7 +505,12 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 		// This might return an error if the value is already stored, but we ignore it.
 		defer s.listenAddrHTTPS.Store("") //nolint:errcheck
 
-		err := s.HTTPSServer.ListenAndServeTLS("", "")
+		listener, errE := listen(errCtx, s.HTTPSServer.Addr, ":https", s.proxyProtocolHTTPS)
+		if errE != nil {
+			return errE
+		}
+
+		err := s.HTTPSServer.ServeTLS(listener, "", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return errors.WithStack(err)
 		}
@@ -501,7 +556,12 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 			// This might return an error if the value is already stored, but we ignore it.
 			defer s.listenAddrHTTP.Store("") //nolint:errcheck
 
-			err := s.HTTPServer.ListenAndServe()
+			listener, errE := listen(errCtx, s.HTTPServer.Addr, ":http", s.proxyProtocolHTTP)
+			if errE != nil {
+				return errE
+			}
+
+			err := s.HTTPServer.Serve(listener)
 			if err != nil && !errors.Is(err, http.ErrServerClosed) {
 				return errors.WithStack(err)
 			}

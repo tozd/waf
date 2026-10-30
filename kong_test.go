@@ -63,10 +63,19 @@ HTTPS:
       --https.external-port=INT    Port on which HTTPS server is accessible when
                                    it is different from the port on which the
                                    HTTPS server listens.
+      --https.proxy-protocol=HOST|IP|CIDR,...
+                                   Require the PROXY protocol on connections
+                                   from this hostname, IP address, or CIDR
+                                   network, and use the client's address from
+                                   it. Can be repeated.
 
 HTTP:
   --http.listen=HOST:PORT    TCP address for the HTTP server to listen on.
                              Setting it enables HTTP redirect to HTTPS.
+  --http.proxy-protocol=HOST|IP|CIDR,...
+                             Require the PROXY protocol on connections from this
+                             hostname, IP address, or CIDR network, and use the
+                             client's address from it. Can be repeated.
 
 Sites:
   -T, --title=NAME    Title to be shown to the users when sites are not

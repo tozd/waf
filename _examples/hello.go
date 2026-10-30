@@ -41,6 +41,10 @@ func (a *App) Validate() error {
 	if err != nil {
 		return err //nolint:wrapcheck
 	}
+	err = a.Server.HTTP.Validate()
+	if err != nil {
+		return err //nolint:wrapcheck
+	}
 	return nil
 }
 

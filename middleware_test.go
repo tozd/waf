@@ -203,7 +203,7 @@ func TestWebsocketHandlerHijack(t *testing.T) {
 		pipeW.Close() //nolint:errcheck,gosec
 	})
 	require.NoError(t, err)
-	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := websocketHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := http.NewResponseController(w)
 		netConn, _, e := rc.Hijack()
 		if e != nil {
@@ -246,7 +246,7 @@ func TestWebsocketHandler(t *testing.T) {
 		pipeW.Close() //nolint:errcheck,gosec
 	})
 	require.NoError(t, err)
-	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := websocketHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
 		if !assert.NoError(t, err) {
 			return
@@ -960,7 +960,7 @@ func TestWebsocketHandlerEarlyMessage(t *testing.T) {
 	t.Parallel()
 
 	done := make(chan []byte, 1)
-	h := websocketHandler("ws")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := websocketHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
 		if !assert.NoError(t, err) {
 			return
@@ -984,7 +984,7 @@ func TestWebsocketHandlerEarlyMessage(t *testing.T) {
 	ts := httptest.NewServer(h3)
 	t.Cleanup(ts.Close)
 
-	conn, err := net.Dial("tcp", strings.TrimPrefix(ts.URL, "http://"))
+	conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", strings.TrimPrefix(ts.URL, "http://"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
@@ -1006,8 +1006,14 @@ func TestWebsocketHandlerEarlyMessage(t *testing.T) {
 
 // maskedTextFrame returns payload as a masked websocket text frame, which is what a client sends.
 func maskedTextFrame(payload string) []byte {
+	const (
+		// The final frame of a message, with the text opcode.
+		finalTextFrame = 0x81
+		// Frames from a client have the mask bit set in the payload length byte.
+		maskBit = 0x80
+	)
 	key := []byte{0x01, 0x02, 0x03, 0x04}
-	frame := []byte{0x81, byte(0x80 | len(payload))} //nolint:mnd
+	frame := []byte{finalTextFrame, byte(maskBit | len(payload))}
 	frame = append(frame, key...)
 	for i := range len(payload) {
 		frame = append(frame, payload[i]^key[i%len(key)])
