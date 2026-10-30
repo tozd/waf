@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,56 +17,39 @@ import (
 )
 
 const (
-	trustedSourcesRefreshInterval    = 5 * time.Second
-	trustedSourcesMinRefreshInterval = time.Second
-	trustedSourcesLookupTimeout      = 5 * time.Second
+	hostResolverRefreshInterval    = 5 * time.Second
+	hostResolverMinRefreshInterval = time.Second
+	hostResolverLookupTimeout      = 5 * time.Second
 )
 
 // trustedSources matches addresses against sources trusted for a feature, e.g., for sending the PROXY protocol header.
 //
-// Sources are IP addresses, CIDR networks, and hostnames. Hostnames are resolved by Refresh and Run,
+// Sources are IP addresses, CIDR networks, and hostnames. Addresses of hostnames are provided by a hostResolver,
 // so that sources which change their addresses (e.g., Docker containers) can be configured by their hostnames.
 type trustedSources struct {
-	Logger zerolog.Logger
-
-	// Lookup resolves a hostname to its IP addresses.
-	Lookup func(ctx context.Context, host string) ([]netip.Addr, error)
-
 	// Feature for which sources are trusted, used in error messages.
 	Feature string
 
 	prefixes []netip.Prefix
 	hosts    []string
 
-	// Addresses of hosts from their last successful lookups. Protected by mu.
-	hostAddrs map[string][]netip.Addr
-	mu        sync.Mutex
-
-	// Prefixes and addresses of hosts against which addresses are matched.
-	current atomic.Pointer[[]netip.Prefix]
-
-	// Requests to resolve hosts again.
-	refresh chan struct{}
+	// Set by newHostResolver. Without it, hostnames do not match any address.
+	resolver *hostResolver
 }
 
 // newTrustedSources parses sources trusted for feature (e.g., "PROXY protocol"), each of which is an IP address,
 // a CIDR network, or a hostname. Feature is used in error messages. It does not resolve hostnames.
 // It returns nil if there are no sources.
-func newTrustedSources(logger zerolog.Logger, feature string, sources []string) (*trustedSources, errors.E) {
+func newTrustedSources(feature string, sources []string) (*trustedSources, errors.E) {
 	if len(sources) == 0 {
 		return nil, nil //nolint:nilnil
 	}
 
 	t := &trustedSources{
-		Logger:    logger,
-		Lookup:    lookupNetIP,
-		Feature:   feature,
-		prefixes:  nil,
-		hosts:     nil,
-		hostAddrs: map[string][]netip.Addr{},
-		mu:        sync.Mutex{},
-		current:   atomic.Pointer[[]netip.Prefix]{},
-		refresh:   make(chan struct{}, 1),
+		Feature:  feature,
+		prefixes: nil,
+		hosts:    nil,
+		resolver: nil,
 	}
 
 	for _, source := range sources {
@@ -80,14 +64,7 @@ func newTrustedSources(logger zerolog.Logger, feature string, sources []string) 
 		}
 	}
 
-	t.update()
-
 	return t, nil
-}
-
-func lookupNetIP(ctx context.Context, host string) ([]netip.Addr, error) {
-	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	return addrs, errors.WithStack(err)
 }
 
 // parseTrustedSource returns the prefix for an IP address or a CIDR network, or the hostname otherwise.
@@ -141,99 +118,157 @@ func normalizeAddr(addr netip.Addr) netip.Addr {
 	return addr.Unmap().WithZone("")
 }
 
-// update makes prefixes and the current addresses of hosts the ones against which addresses are matched.
-func (t *trustedSources) update() {
-	current := make([]netip.Prefix, 0, len(t.prefixes)+len(t.hostAddrs))
-	current = append(current, t.prefixes...)
-	for _, host := range t.hosts {
-		for _, addr := range t.hostAddrs[host] {
-			current = append(current, netip.PrefixFrom(addr, addr.BitLen()))
-		}
-	}
-	t.current.Store(&current)
-}
-
 // Contains reports whether addr matches one of the sources.
 func (t *trustedSources) Contains(addr netip.Addr) bool {
 	addr = normalizeAddr(addr)
-	for _, prefix := range *t.current.Load() {
+	for _, prefix := range t.prefixes {
 		if prefix.Contains(addr) {
 			return true
 		}
 	}
+
+	if t.resolver != nil {
+		hostAddrs := *t.resolver.current.Load()
+		for _, host := range t.hosts {
+			if slices.Contains(hostAddrs[host], addr) {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
 // Trusts reports whether addr matches one of the sources, like Contains. Use it for the address of the peer
-// of a connection: if the address does not match, Trusts requests Run to resolve hostnames again, because
-// the address could be a new address of a hostname. It never blocks.
+// of a connection: if the address does not match, Trusts requests the resolver to resolve hostnames again,
+// because the address could be a new address of a hostname. It never blocks.
 func (t *trustedSources) Trusts(addr netip.Addr) bool {
 	if t.Contains(addr) {
 		return true
 	}
 
-	if len(t.hosts) > 0 {
-		select {
-		case t.refresh <- struct{}{}:
-		default:
-		}
+	if t.resolver != nil && len(t.hosts) > 0 {
+		t.resolver.requestRefresh()
 	}
 
 	return false
 }
 
-// Refresh resolves hostnames again. If resolving a hostname fails, its addresses from the last
-// successful lookup are kept, unless the hostname does not exist anymore. Failures are logged.
-func (t *trustedSources) Refresh(ctx context.Context) {
-	if len(t.hosts) == 0 {
-		return
+// hostResolver resolves hostnames of trusted sources, with Refresh and Run. Each hostname is resolved once,
+// even if multiple trusted sources use it.
+type hostResolver struct {
+	Logger zerolog.Logger
+
+	// Lookup resolves a hostname to its IP addresses.
+	Lookup func(ctx context.Context, host string) ([]netip.Addr, error)
+
+	hosts []string
+
+	// Addresses of hosts from their last successful lookups. Protected by mu.
+	hostAddrs map[string][]netip.Addr
+	mu        sync.Mutex
+
+	// A copy of hostAddrs which trusted sources read. It is replaced and never modified.
+	current atomic.Pointer[map[string][]netip.Addr]
+
+	// Requests to resolve hosts again.
+	refresh chan struct{}
+}
+
+// newHostResolver returns a resolver for hostnames of all sources and makes sources use it.
+// Nil sources are skipped. It does not resolve hostnames. It returns nil if there are no hostnames.
+func newHostResolver(logger zerolog.Logger, sources ...*trustedSources) *hostResolver {
+	r := &hostResolver{
+		Logger:    logger,
+		Lookup:    lookupNetIP,
+		hosts:     nil,
+		hostAddrs: map[string][]netip.Addr{},
+		mu:        sync.Mutex{},
+		current:   atomic.Pointer[map[string][]netip.Addr]{},
+		refresh:   make(chan struct{}, 1),
+	}
+	r.current.Store(&map[string][]netip.Addr{})
+
+	for _, s := range sources {
+		if s == nil || len(s.hosts) == 0 {
+			continue
+		}
+		s.resolver = r
+		for _, host := range s.hosts {
+			if !slices.Contains(r.hosts, host) {
+				r.hosts = append(r.hosts, host)
+			}
+		}
 	}
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	if len(r.hosts) == 0 {
+		return nil
+	}
 
-	for _, host := range t.hosts {
-		addrs, err := t.lookup(ctx, host)
+	return r
+}
+
+func lookupNetIP(ctx context.Context, host string) ([]netip.Addr, error) {
+	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	return addrs, errors.WithStack(err)
+}
+
+// requestRefresh requests Run to resolve hostnames again. It never blocks.
+func (r *hostResolver) requestRefresh() {
+	select {
+	case r.refresh <- struct{}{}:
+	default:
+	}
+}
+
+// Refresh resolves hostnames again. If resolving a hostname fails, its addresses from the last
+// successful lookup are kept, unless the hostname does not exist anymore. Failures are logged.
+func (r *hostResolver) Refresh(ctx context.Context) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, host := range r.hosts {
+		addrs, err := r.lookup(ctx, host)
 		if ctx.Err() != nil {
 			// We are stopping.
 			return
 		}
 		if err != nil {
-			errE := errors.WithMessage(err, "unable to resolve "+t.Feature+" source")
+			errE := errors.WithMessage(err, "unable to resolve trusted source")
 			errors.Details(errE)["host"] = host
 			var dnsErr *net.DNSError
 			if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
-				delete(t.hostAddrs, host)
+				delete(r.hostAddrs, host)
 			} else {
-				errors.Details(errE)["kept"] = len(t.hostAddrs[host])
+				errors.Details(errE)["kept"] = len(r.hostAddrs[host])
 			}
-			t.Logger.Warn().Err(errE).Send()
+			r.Logger.Warn().Err(errE).Send()
 			continue
 		}
 		normalized := make([]netip.Addr, 0, len(addrs))
 		for _, addr := range addrs {
 			normalized = append(normalized, normalizeAddr(addr))
 		}
-		t.hostAddrs[host] = normalized
+		r.hostAddrs[host] = normalized
 	}
 
-	t.update()
+	current := make(map[string][]netip.Addr, len(r.hostAddrs))
+	for host, addrs := range r.hostAddrs {
+		current[host] = slices.Clone(addrs)
+	}
+	r.current.Store(&current)
 }
 
-func (t *trustedSources) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
-	ctx, cancel := context.WithTimeout(ctx, trustedSourcesLookupTimeout)
+func (r *hostResolver) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
+	ctx, cancel := context.WithTimeout(ctx, hostResolverLookupTimeout)
 	defer cancel()
-	return t.Lookup(ctx, host)
+	return r.Lookup(ctx, host)
 }
 
-// Run resolves hostnames again periodically and when Trusts requests it, until ctx is canceled.
+// Run resolves hostnames again periodically and when trusted sources request it, until ctx is canceled.
 // It expects that Refresh has been called just before.
-func (t *trustedSources) Run(ctx context.Context) {
-	if len(t.hosts) == 0 {
-		return
-	}
-
-	ticker := time.NewTicker(trustedSourcesRefreshInterval)
+func (r *hostResolver) Run(ctx context.Context) {
+	ticker := time.NewTicker(hostResolverRefreshInterval)
 	defer ticker.Stop()
 
 	lastRefresh := time.Now()
@@ -242,9 +277,9 @@ func (t *trustedSources) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-		case <-t.refresh:
-			// Requests from Trusts are rate limited because connections from any address can make them.
-			wait := time.Until(lastRefresh.Add(trustedSourcesMinRefreshInterval))
+		case <-r.refresh:
+			// Requests from trusted sources are rate limited because connections from any address can make them.
+			wait := time.Until(lastRefresh.Add(hostResolverMinRefreshInterval))
 			if wait > 0 {
 				timer := time.NewTimer(wait)
 				select {
@@ -255,7 +290,7 @@ func (t *trustedSources) Run(ctx context.Context) {
 				}
 			}
 		}
-		t.Refresh(ctx)
+		r.Refresh(ctx)
 		lastRefresh = time.Now()
 	}
 }

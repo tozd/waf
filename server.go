@@ -73,12 +73,12 @@ func (t *HTTPS) Validate() error {
 		}
 	}
 
-	_, errE := newTrustedSources(zerolog.Nop(), proxyProtocolFeature, t.ProxyProtocol)
+	_, errE := newTrustedSources(proxyProtocolFeature, t.ProxyProtocol)
 	if errE != nil {
 		return errE
 	}
 
-	_, errE = newTrustedSources(zerolog.Nop(), forwardedForFeature, t.ForwardedFor)
+	_, errE = newTrustedSources(forwardedForFeature, t.ForwardedFor)
 	if errE != nil {
 		return errE
 	}
@@ -102,12 +102,12 @@ type HTTP struct {
 
 // Validate is used by Kong to validate the struct.
 func (t *HTTP) Validate() error {
-	_, errE := newTrustedSources(zerolog.Nop(), proxyProtocolFeature, t.ProxyProtocol)
+	_, errE := newTrustedSources(proxyProtocolFeature, t.ProxyProtocol)
 	if errE != nil {
 		return errE
 	}
 
-	_, errE = newTrustedSources(zerolog.Nop(), forwardedForFeature, t.ForwardedFor)
+	_, errE = newTrustedSources(forwardedForFeature, t.ForwardedFor)
 	if errE != nil {
 		return errE
 	}
@@ -156,6 +156,7 @@ type Server[SiteT hasSite] struct {
 	proxyProtocolHTTP  *trustedSources
 	forwardedForHTTPS  *trustedSources
 	forwardedForHTTP   *trustedSources
+	hostResolver       *hostResolver
 }
 
 // Init determines the set of sites based on HTTPS configuration and sites provided,
@@ -169,19 +170,19 @@ type Server[SiteT hasSite] struct {
 func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E) { //nolint:maintidx
 	// TODO: How to shutdown websocket connections?
 
-	proxyProtocolHTTPS, errE := newTrustedSources(s.Logger, proxyProtocolFeature, s.HTTPS.ProxyProtocol)
+	proxyProtocolHTTPS, errE := newTrustedSources(proxyProtocolFeature, s.HTTPS.ProxyProtocol)
 	if errE != nil {
 		return sites, errE
 	}
-	proxyProtocolHTTP, errE := newTrustedSources(s.Logger, proxyProtocolFeature, s.HTTP.ProxyProtocol)
+	proxyProtocolHTTP, errE := newTrustedSources(proxyProtocolFeature, s.HTTP.ProxyProtocol)
 	if errE != nil {
 		return sites, errE
 	}
-	forwardedForHTTPS, errE := newTrustedSources(s.Logger, forwardedForFeature, s.HTTPS.ForwardedFor)
+	forwardedForHTTPS, errE := newTrustedSources(forwardedForFeature, s.HTTPS.ForwardedFor)
 	if errE != nil {
 		return sites, errE
 	}
-	forwardedForHTTP, errE := newTrustedSources(s.Logger, forwardedForFeature, s.HTTP.ForwardedFor)
+	forwardedForHTTP, errE := newTrustedSources(forwardedForFeature, s.HTTP.ForwardedFor)
 	if errE != nil {
 		return sites, errE
 	}
@@ -446,6 +447,7 @@ func (s *Server[SiteT]) Init(sites map[string]SiteT) (map[string]SiteT, errors.E
 	s.proxyProtocolHTTP = proxyProtocolHTTP
 	s.forwardedForHTTPS = forwardedForHTTPS
 	s.forwardedForHTTP = forwardedForHTTP
+	s.hostResolver = newHostResolver(s.Logger, proxyProtocolHTTPS, proxyProtocolHTTP, forwardedForHTTPS, forwardedForHTTP)
 
 	if s.HTTP.Listen != "" {
 		handler := s.newRedirectHTTPHandler()
@@ -508,14 +510,11 @@ func (s *Server[SiteT]) Run(ctx context.Context, httpsHandler http.Handler) erro
 
 	g, errCtx := errgroup.WithContext(ctx)
 
-	for _, sources := range []*trustedSources{s.proxyProtocolHTTPS, s.proxyProtocolHTTP, s.forwardedForHTTPS, s.forwardedForHTTP} {
-		if sources == nil {
-			continue
-		}
+	if s.hostResolver != nil {
 		// We resolve hostnames before we start listening, so that the first connections from them are recognized.
-		sources.Refresh(errCtx)
+		s.hostResolver.Refresh(errCtx)
 		g.Go(func() error {
-			sources.Run(errCtx)
+			s.hostResolver.Run(errCtx)
 			return nil
 		})
 	}

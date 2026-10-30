@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -47,7 +48,7 @@ func tcpAddr(addr string) *net.TCPAddr {
 func TestProxyProtocolSourcesPolicy(t *testing.T) {
 	t.Parallel()
 
-	sources, errE := waf.TestingNewTrustedSources(zerolog.Nop(), "PROXY protocol", []string{"127.0.0.1", "10.0.0.0/8", "::1", "::ffff:192.168.0.0/112", "fd00::/8"})
+	sources, errE := waf.TestingNewTrustedSources("PROXY protocol", []string{"127.0.0.1", "10.0.0.0/8", "::1", "::ffff:192.168.0.0/112", "fd00::/8"})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	for _, tt := range []struct {
@@ -108,15 +109,16 @@ func TestProxyProtocolSourcesInvalid(t *testing.T) {
 func TestProxyProtocolSourcesHostname(t *testing.T) {
 	t.Parallel()
 
-	sources, errE := waf.TestingNewTrustedSources(zerolog.Nop(), "PROXY protocol", []string{"proxy.example.com"})
+	sources, errE := waf.TestingNewTrustedSources("PROXY protocol", []string{"proxy.example.com"})
 	require.NoError(t, errE, "% -+#.1v", errE)
+	resolver := waf.TestingNewHostResolver(zerolog.Nop(), sources)
 
 	var addrs atomic.Pointer[[]netip.Addr]
 	addrs.Store(&[]netip.Addr{netip.MustParseAddr("172.18.0.5")})
 	// When set, lookups fail with it.
 	var lookupErr atomic.Pointer[net.DNSError]
 	var lookups atomic.Int64
-	sources.Lookup = func(_ context.Context, host string) ([]netip.Addr, error) {
+	resolver.Lookup = func(_ context.Context, host string) ([]netip.Addr, error) {
 		assert.Equal(t, "proxy.example.com", host)
 		lookups.Add(1)
 		err := lookupErr.Load()
@@ -132,25 +134,25 @@ func TestProxyProtocolSourcesHostname(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	sources.Refresh(ctx)
+	resolver.Refresh(ctx)
 	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.9")))
 
 	// When resolving fails, the last addresses are kept.
 	lookupErr.Store(&net.DNSError{Err: "server misbehaving", Name: "proxy.example.com", IsTemporary: true})
-	sources.Refresh(ctx)
+	resolver.Refresh(ctx)
 	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	// When the hostname does not exist anymore, its addresses are removed.
 	lookupErr.Store(&net.DNSError{Err: "no such host", Name: "proxy.example.com", IsNotFound: true})
-	sources.Refresh(ctx)
+	resolver.Refresh(ctx)
 	assert.Equal(t, proxyproto.SKIP, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
 	lookupErr.Store(nil)
-	sources.Refresh(ctx)
+	resolver.Refresh(ctx)
 	assert.Equal(t, proxyproto.REQUIRE, policyFor(t, sources.ProxyProtocolPolicy, tcpAddr("172.18.0.5")))
 
-	go sources.Run(ctx)
+	go resolver.Run(ctx)
 
 	// The hostname has a new address. A connection from it requests Run to resolve the hostname again.
 	addrs.Store(&[]netip.Addr{netip.MustParseAddr("::ffff:172.18.0.9")})
@@ -418,4 +420,46 @@ func TestServerProxyProtocolInvalid(t *testing.T) {
 	}
 	_, errE = server.Init(nil)
 	assert.EqualError(t, errE, "empty PROXY protocol source")
+}
+
+func TestHostResolverShared(t *testing.T) {
+	t.Parallel()
+
+	proxyProtocol, errE := waf.TestingNewTrustedSources("PROXY protocol", []string{"proxy.example.com", "10.0.0.0/8"})
+	require.NoError(t, errE, "% -+#.1v", errE)
+	forwardedFor, errE := waf.TestingNewTrustedSources("X-Forwarded-For", []string{"proxy.example.com", "other.example.com"})
+	require.NoError(t, errE, "% -+#.1v", errE)
+	// Sources without hostnames do not need a resolver.
+	withoutHostnames, errE := waf.TestingNewTrustedSources("X-Forwarded-For", []string{"192.0.2.1"})
+	require.NoError(t, errE, "% -+#.1v", errE)
+
+	resolver := waf.TestingNewHostResolver(zerolog.Nop(), proxyProtocol, nil, forwardedFor, withoutHostnames)
+	require.NotNil(t, resolver)
+
+	var mu sync.Mutex
+	lookups := map[string]int{}
+	resolver.Lookup = func(_ context.Context, host string) ([]netip.Addr, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		lookups[host]++
+		if host == "proxy.example.com" {
+			return []netip.Addr{netip.MustParseAddr("172.18.0.5")}, nil
+		}
+		return []netip.Addr{netip.MustParseAddr("172.18.0.6")}, nil
+	}
+
+	resolver.Refresh(t.Context())
+
+	// Each hostname is resolved once, even if multiple sources use it.
+	assert.Equal(t, map[string]int{"proxy.example.com": 1, "other.example.com": 1}, lookups)
+
+	assert.True(t, proxyProtocol.Contains(netip.MustParseAddr("172.18.0.5")))
+	assert.False(t, proxyProtocol.Contains(netip.MustParseAddr("172.18.0.6")))
+	assert.True(t, forwardedFor.Contains(netip.MustParseAddr("172.18.0.5")))
+	assert.True(t, forwardedFor.Contains(netip.MustParseAddr("172.18.0.6")))
+	assert.True(t, withoutHostnames.Contains(netip.MustParseAddr("192.0.2.1")))
+	assert.False(t, withoutHostnames.Contains(netip.MustParseAddr("172.18.0.5")))
+
+	// No resolver is needed without any hostnames.
+	assert.Nil(t, waf.TestingNewHostResolver(zerolog.Nop(), withoutHostnames, nil))
 }

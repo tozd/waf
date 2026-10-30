@@ -27,7 +27,7 @@ import (
 func TestForwardedForHandler(t *testing.T) {
 	t.Parallel()
 
-	sources, errE := waf.TestingNewTrustedSources(zerolog.Nop(), "X-Forwarded-For", []string{"127.0.0.1", "10.0.0.0/8", "::1"})
+	sources, errE := waf.TestingNewTrustedSources("X-Forwarded-For", []string{"127.0.0.1", "10.0.0.0/8", "::1"})
 	require.NoError(t, errE, "% -+#.1v", errE)
 
 	for _, tt := range []struct {
